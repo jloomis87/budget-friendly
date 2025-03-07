@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Container, Box, Typography, Stepper, Step, StepLabel, Paper, Button, CircularProgress, Alert, List, ListItem, ListItemText, ListItemIcon, Grid, TextField, FormControl, InputLabel, Select, MenuItem, Table, TableHead, TableBody, TableRow, TableCell, IconButton, Popover, Tooltip, Fab, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 // Import custom icon components to avoid the directory import issue
-import { EditOutlinedIcon, SaveIcon, CloseIcon, DragIndicatorIcon, PaletteIcon, MicIcon, HelpOutlineIcon } from '../utils/materialIcons';
+import { EditOutlinedIcon, SaveIcon, CloseIcon, DragIndicatorIcon, PaletteIcon, MicIcon, HelpOutlineIcon, DeleteIcon } from '../utils/materialIcons';
 import { HexColorPicker } from 'react-colorful';
 import { TransactionTable } from './TransactionTable';
 import { BudgetSummary } from './BudgetSummary';
@@ -1471,6 +1471,58 @@ export function BudgetApp() {
     }
   };
 
+  // Add a function to handle transaction deletion
+  const handleDeleteTransaction = (index: number) => {
+    // Ensure the index is valid
+    if (index < 0 || index >= transactions.length) {
+      console.error(`Invalid transaction index: ${index}`);
+      setAlertMessage({
+        type: 'error',
+        message: 'Could not delete transaction: Invalid index'
+      });
+      return;
+    }
+
+    // Create a copy of the transactions array without the deleted transaction
+    const updatedTransactions = transactions.filter((_, i) => i !== index);
+    
+    setTransactions(updatedTransactions);
+    
+    // Save to localStorage
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(updatedTransactions));
+    
+    // Automatically recalculate budget
+    try {
+      // Calculate budget summary
+      const summary = calculateBudgetSummary(updatedTransactions);
+      setBudgetSummary(summary);
+      
+      // Create budget plan
+      const plan = create503020Plan(summary);
+      setBudgetPlan(plan);
+      
+      // Get suggestions
+      const budgetSuggestions = getBudgetSuggestions(plan);
+      setSuggestions(budgetSuggestions);
+      
+      // Save to localStorage
+      localStorage.setItem(STORAGE_KEYS.SUMMARY, JSON.stringify(summary));
+      localStorage.setItem(STORAGE_KEYS.PLAN, JSON.stringify(plan));
+      localStorage.setItem(STORAGE_KEYS.SUGGESTIONS, JSON.stringify(budgetSuggestions));
+      
+      setAlertMessage({
+        type: 'success',
+        message: 'Transaction deleted successfully!'
+      });
+    } catch (error) {
+      console.error('Error processing transactions after deletion:', error);
+      setAlertMessage({
+        type: 'error',
+        message: `Error updating budget after deletion: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+  };
+
   return (
     <Box sx={{ width: '100%', p: 3, backgroundColor: 'background.default' }}>
       <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 4, fontWeight: 'bold', color: 'primary.main' }}>
@@ -1752,14 +1804,34 @@ export function BudgetApp() {
                                     }}
                                     onClick={(e) => e.stopPropagation()}
                                   >
-                                    <DragIndicatorIcon 
-                                      fontSize="small" 
-                                      color="action" 
-                                      sx={{ 
-                                        cursor: 'grab',
-                                        color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : undefined
-                                      }}
-                                    />
+                                    <Tooltip title="Drag to another category">
+                                      <DragIndicatorIcon 
+                                        fontSize="small" 
+                                        color="action" 
+                                        sx={{ 
+                                          cursor: 'grab',
+                                          color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : undefined
+                                        }}
+                                      />
+                                    </Tooltip>
+                                    <Tooltip title="Delete transaction">
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation(); // Prevent row click event
+                                          // Confirm before deleting
+                                          if (window.confirm(`Are you sure you want to delete this transaction: ${transaction.description}?`)) {
+                                            handleDeleteTransaction(globalIndex);
+                                          }
+                                        }}
+                                        sx={{ 
+                                          ml: 1,
+                                          color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'error.main'
+                                        }}
+                                      >
+                                        <DeleteIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
                                   </Box>
                                 )}
                               </TableCell>
