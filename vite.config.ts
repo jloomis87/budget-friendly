@@ -13,8 +13,5 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-  },
-  optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router', 'react-router-dom'],
   }
 });
