@@ -33,3 +33,7 @@ yarn-error.log*
 
 # Browser tools
 /browser-tools-mcp
+
+# Vercel
+.vercel
+.turbo

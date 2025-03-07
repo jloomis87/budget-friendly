@@ -22,7 +22,7 @@ const initPdfWorker = () => {
     
     // Set the worker source to a CDN URL for the same version
     const workerUrl = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
     console.log(`PDF.js worker source set to: ${workerUrl}`);
     
     pdfWorkerInitialized = true;

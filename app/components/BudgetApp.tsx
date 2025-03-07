@@ -1177,7 +1177,7 @@ export function BudgetApp() {
       }
       
       // Transactions are already processed automatically when added
-      setActiveStep(1);
+        setActiveStep(1);
     } else if (activeStep === 1) {
       setActiveStep(2);
     }
@@ -1247,10 +1247,10 @@ export function BudgetApp() {
     
     // Save directly to localStorage to prevent race conditions
     localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(updatedTransactions));
-    
-    // Show success message
-    setAlertMessage({
-      type: 'success',
+        
+        // Show success message
+        setAlertMessage({
+          type: 'success',
       message: currentTransactions.length === 0 
         ? 'First transaction added! Continue adding transactions to see your budget plan.'
         : 'Transaction added successfully!'
@@ -1280,8 +1280,8 @@ export function BudgetApp() {
       localStorage.setItem(STORAGE_KEYS.SUGGESTIONS, JSON.stringify(budgetSuggestions));
     } catch (error) {
       console.error('Error processing transaction:', error);
-      setAlertMessage({
-        type: 'error',
+        setAlertMessage({
+          type: 'error',
         message: 'Error processing transaction. Please try again.'
       });
     }
@@ -1376,8 +1376,8 @@ export function BudgetApp() {
   // Process transactions and move to next step
   const handleProcessTransactions = () => {
     if (transactions.length === 0) {
-      setAlertMessage({
-        type: 'warning',
+        setAlertMessage({
+          type: 'warning',
         message: 'Please add at least one transaction before proceeding.'
       });
       return;
@@ -1524,7 +1524,13 @@ export function BudgetApp() {
   };
 
   return (
-    <Box sx={{ width: '100%', p: 3, backgroundColor: 'background.default' }}>
+    <Box sx={{ 
+      width: '100%', 
+      p: 3, 
+      backgroundColor: 'background.default',
+      mx: 'auto', // Center the content
+      px: { xs: 2, sm: 3, md: 4 } // Responsive horizontal padding
+    }}>
       <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 4, fontWeight: 'bold', color: 'primary.main' }}>
         Friendly Budgets
       </Typography>
@@ -1555,7 +1561,11 @@ export function BudgetApp() {
 
         {/* Display transactions */}
         {transactions.length > 0 && (
-          <Box sx={{ mt: 3 }}>
+          <Box sx={{ 
+            mt: 3,
+            px: { xs: 1, sm: 2, md: 3 }, // Add responsive horizontal padding
+            maxWidth: '100%', // Ensure content doesn't overflow
+          }}>
             {/* Display Income Summary */}
             {(() => {
               const totalIncome = getTotalIncome();
@@ -1568,7 +1578,9 @@ export function BudgetApp() {
                     p: 2,
                     borderRadius: 2,
                     bgcolor: 'success.light',
-                    color: 'success.contrastText'
+                    color: 'success.contrastText',
+                    mx: { xs: 1, sm: 2 }, // Add horizontal margin
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)', // Add subtle shadow
                   }}
                 >
                   <Typography 
@@ -1590,12 +1602,12 @@ export function BudgetApp() {
             {Object.entries(getTransactionsByCategory()).map(([category, categoryTransactions]) => (
               <Box 
                 key={category} 
-                sx={{ mb: 3 }}
+                sx={{ mb: 4 }} // Increased margin bottom for more space between categories
                 onDragOver={(e) => handleDragOver(e, category)}
                 onDrop={(e) => handleDrop(e, category)}
                 onDragLeave={() => setDragOverCategory(null)}
               >
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h6" sx={{ mb: 2 }}> {/* Added margin bottom for spacing between title and table */}
                   {category} ({categoryTransactions.length})
                 </Typography>
                 <Paper 
@@ -1604,6 +1616,9 @@ export function BudgetApp() {
                     backgroundColor: tableColors[category] || '#f5f5f5',
                     transition: 'all 0.3s ease',
                     color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'inherit',
+                    p: 2, // Add padding around the entire table
+                    borderRadius: 2, // Slightly rounded corners
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)', // Add subtle shadow
                     ...(dragOverCategory === category && {
                       boxShadow: '0 0 15px rgba(25, 118, 210, 0.5)',
                       transform: 'translateY(-4px)',
@@ -1626,7 +1641,8 @@ export function BudgetApp() {
                               color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'inherit',
                               '& .MuiIconButton-root': {
                                 color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'inherit'
-                              }
+                              },
+                              py: 1.5 // Add more vertical padding to header cells
                             }}
                           >
                             <Box 
@@ -1649,20 +1665,23 @@ export function BudgetApp() {
                           </TableCell>
                           <TableCell
                             sx={{ 
-                              color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'inherit'
+                              color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'inherit',
+                              py: 1.5 // Add more vertical padding to header cells
                             }}
                           >
                             Due Date
                           </TableCell>
                           <TableCell
                             sx={{ 
-                              color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'inherit'
+                              color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'inherit',
+                              py: 1.5 // Add more vertical padding to header cells
                             }}
                           >Description</TableCell>
                           <TableCell 
                             align="right"
                             sx={{ 
-                              color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'inherit'
+                              color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'inherit',
+                              py: 1.5 // Add more vertical padding to header cells
                             }}
                           >Amount</TableCell>
                         </TableRow>
@@ -1670,77 +1689,64 @@ export function BudgetApp() {
                       <TableBody>
                         {categoryTransactions.map((transaction, index) => {
                           // Create a more reliable way to find the transaction in the global array
-                          // Using a combination of properties to create a unique identifier
-                          const transactionId = `${transaction.date.toISOString()}-${transaction.description}-${transaction.amount}`;
-                          
-                          // Find the global index more reliably
+                          // Use a combination of properties to find the transaction in the global array
                           const globalIndex = transactions.findIndex(t => 
                             t.date.toISOString() === transaction.date.toISOString() && 
                             t.description === transaction.description && 
                             t.amount === transaction.amount
                           );
                           
+                          // Create a unique identifier for this transaction
+                          const transactionId = `${transaction.date.toISOString()}-${transaction.description}-${transaction.amount}`;
+                          
+                          // Check if this row is being edited
                           const isEditing = editingRow && editingRow.identifier === transactionId;
                           
                           return (
                             <TableRow 
                               key={transactionId}
-                              draggable={!isEditing}
-                              onDragStart={(e) => handleDragStart(e, transaction, globalIndex)}
-                              onClick={(e) => {
-                                // Don't trigger edit when clicking on drag handle or save/cancel buttons
-                                if (e.target instanceof HTMLElement && 
-                                    (e.target.closest('.drag-handle') || 
-                                     e.target.closest('.edit-controls'))) {
-                                  return;
-                                }
-                                
+                              onClick={() => {
                                 if (!isEditing) {
-                                  setEditingRow({ 
-                                    index: globalIndex, 
+                                  setEditingRow({
+                                    index: globalIndex,
                                     identifier: transactionId,
-                                    amount: String(Math.abs(transaction.amount)),
-                                    date: transaction.date.toISOString().split('T')[0], // YYYY-MM-DD format
+                                    amount: Math.abs(transaction.amount).toString(),
+                                    date: transaction.date.toISOString().split('T')[0],
                                     description: transaction.description
                                   });
                                 }
                               }}
-                              sx={{ 
+                              sx={{
                                 cursor: isEditing ? 'default' : 'pointer',
+                                backgroundColor: isEditing ? 'rgba(0, 0, 0, 0.04)' : 'inherit',
                                 '&:hover': {
-                                  bgcolor: isEditing ? 'transparent' : 'action.hover',
-                                },
-                                bgcolor: isEditing ? 'action.selected' : 'transparent',
-                                transition: 'background-color 0.2s ease',
-                                // Animation for recently dropped transactions
-                                ...(recentlyDropped === transactionId && {
-                                  animation: 'popIn 0.6s ease-out',
-                                  position: 'relative',
-                                  zIndex: 1,
-                                  transformOrigin: 'center',
-                                  '@keyframes popIn': {
-                                    '0%': {
-                                      transform: 'scale(0.95)',
-                                      boxShadow: '0 0 0 rgba(0,0,0,0)',
-                                      opacity: 0.7
-                                    },
-                                    '50%': {
-                                      transform: 'scale(1.02)', // Reduced from 1.03 to minimize overflow
-                                      boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-                                      opacity: 1
-                                    },
-                                    '100%': {
-                                      transform: 'scale(1)',
-                                      boxShadow: '0 0 0 rgba(0,0,0,0)',
-                                      opacity: 1
-                                    }
-                                  }
-                                })
+                                  backgroundColor: isEditing ? 'rgba(0, 0, 0, 0.04)' : 'rgba(0, 0, 0, 0.08)',
+                                }
                               }}
+                              draggable={!isEditing}
+                              onDragStart={(e) => handleDragStart(e, transaction, globalIndex)}
                             >
                               <TableCell padding="checkbox">
                                 {isEditing ? (
-                                  <Box className="edit-controls" sx={{ display: 'flex' }}>
+                                  <Box className="edit-controls" sx={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center',
+                                    gap: '4px',  // Increased gap between buttons
+                                    ml: '-12px',  // Pull slightly more left to create more space
+                                  }}>
+                                    <IconButton
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.stopPropagation(); // Prevent row click event
+                                        // Confirm before deleting
+                                        if (window.confirm(`Are you sure you want to delete this transaction: ${transaction.description}?`)) {
+                                          handleDeleteTransaction(globalIndex);
+                                        }
+                                      }}
+                                      color="error"
+                                    >
+                                      <DeleteIcon fontSize="small" />
+                                    </IconButton>
                                     <IconButton 
                                       size="small"
                                       onClick={(e) => {
@@ -1763,7 +1769,9 @@ export function BudgetApp() {
                                           // Update date if changed
                                           if (editingRow.date) {
                                             try {
-                                              updates.date = new Date(editingRow.date);
+                                              // Fix for date offset issue - create date object without timezone conversion
+                                              const [year, month, day] = editingRow.date.split('-').map(Number);
+                                              updates.date = new Date(year, month - 1, day);
                                             } catch (e) {
                                               // Invalid date, ignore
                                             }
@@ -1789,63 +1797,42 @@ export function BudgetApp() {
                                         e.stopPropagation(); // Prevent row click event
                                         setEditingRow(null);
                                       }}
-                                      sx={{ ml: 0.5 }}
                                     >
                                       <CloseIcon fontSize="small" />
                                     </IconButton>
                                   </Box>
                                 ) : (
                                   <Box 
-                                    className="drag-handle"
                                     sx={{ 
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center'
                                     }}
-                                    onClick={(e) => e.stopPropagation()}
+                                    draggable
+                                    onDragStart={(e) => {
+                                      e.stopPropagation();
+                                      handleDragStart(e, transaction, globalIndex);
+                                    }}
                                   >
-                                    <Tooltip title="Drag to another category">
-                                      <DragIndicatorIcon 
-                                        fontSize="small" 
-                                        color="action" 
-                                        sx={{ 
-                                          cursor: 'grab',
-                                          color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : undefined
-                                        }}
-                                      />
-                                    </Tooltip>
-                                    <Tooltip title="Delete transaction">
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation(); // Prevent row click event
-                                          // Confirm before deleting
-                                          if (window.confirm(`Are you sure you want to delete this transaction: ${transaction.description}?`)) {
-                                            handleDeleteTransaction(globalIndex);
-                                          }
-                                        }}
-                                        sx={{ 
-                                          ml: 1,
-                                          color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'error.main'
-                                        }}
-                                      >
-                                        <DeleteIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
+                                    <DragIndicatorIcon 
+                                      fontSize="small" 
+                                      sx={{ 
+                                        cursor: 'grab',
+                                        opacity: 0.6
+                                      }} 
+                                    />
                                   </Box>
                                 )}
                               </TableCell>
-                              <TableCell
-                                sx={{ 
-                                  color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'inherit'
-                                }}
-                              >
+                              <TableCell sx={{ 
+                                pl: isEditing ? 12 : 2,  // Increased padding when editing
+                              }}>
                                 {isEditing ? (
                                   <TextField
+                                    type="date"
                                     size="small"
                                     fullWidth
                                     value={editingRow?.date || ''}
-                                    type="date"
                                     onChange={(e) => setEditingRow(prev => prev ? { ...prev, date: e.target.value } : null)}
                                     onClick={(e) => e.stopPropagation()}
                                     sx={{
@@ -1891,6 +1878,7 @@ export function BudgetApp() {
                               </TableCell>
                               <TableCell
                                 sx={{ 
+                                  pl: isEditing ? 2 : 2,  // Consistent padding
                                   color: isColorDark(tableColors[category] || '#f5f5f5') ? '#fff' : 'inherit'
                                 }}
                               >

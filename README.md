@@ -217,44 +217,47 @@ npm run build
 
 ## Deployment
 
-### Docker Deployment
+### Deploying to Vercel from GitHub
 
-This template includes three Dockerfiles optimized for different package managers:
+This application is configured for seamless deployment to Vercel directly from GitHub:
 
-- `Dockerfile` - for npm
-- `Dockerfile.pnpm` - for pnpm
-- `Dockerfile.bun` - for bun
+1. **Push your code to GitHub**
+   - Create a repository on GitHub if you haven't already
+   - Push your code to the repository
 
-To build and run using Docker:
+2. **Connect Vercel to GitHub**
+   - Sign up or log in at [vercel.com](https://vercel.com)
+   - Click "Add New..." > "Project"
+   - Select your GitHub repository
+   - Vercel will automatically detect the project as a Vite application
 
-```bash
-# For npm
-docker build -t my-app .
+3. **Configure the deployment**
+   - Vercel should automatically detect the correct settings, but verify:
+     - Framework Preset: `Vite`
+     - Build Command: `npm run build`
+     - Output Directory: `dist`
+   - Click "Deploy"
 
-# For pnpm
-docker build -f Dockerfile.pnpm -t my-app .
+4. **Environment Variables** (if needed)
+   - Add any required environment variables in the Vercel dashboard under Project Settings > Environment Variables
 
-# For bun
-docker build -f Dockerfile.bun -t my-app .
+### Automatic Deployments
 
-# Run the container
-docker run -p 3000:3000 my-app
-```
+Once connected to GitHub, Vercel will automatically:
+- Deploy when you push to the main branch
+- Generate preview deployments for pull requests
+- Allow you to roll back to previous deployments if needed
 
-The containerized application can be deployed to any platform that supports Docker, including:
+### Custom Domain
 
-- AWS ECS
-- Google Cloud Run
-- Azure Container Apps
-- Digital Ocean App Platform
-- Fly.io
-- Railway
+To add a custom domain to your Vercel deployment:
+1. Go to your project in the Vercel dashboard
+2. Navigate to "Settings" > "Domains"
+3. Add your domain and follow the verification steps
 
-### DIY Deployment
+---
 
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
-
-Make sure to deploy the output of `npm run build`
+Built with ❤️ using React Router.
 
 ```
 ├── package.json
@@ -267,6 +270,48 @@ Make sure to deploy the output of `npm run build`
 ## Styling
 
 This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
+
+### Deploying to Vercel
+
+This application is configured for easy deployment to Vercel. Follow these steps to deploy:
+
+1. **Create a Vercel Account**
+   - Sign up at [vercel.com](https://vercel.com) if you don't already have an account
+
+2. **Install Vercel CLI** (optional)
+   ```bash
+   npm install -g vercel
+   ```
+
+3. **Deploy from the Dashboard**
+   - Push your code to a Git repository (GitHub, GitLab, or Bitbucket)
+   - Import your repository in the Vercel dashboard
+   - Vercel will automatically detect the project settings
+   - Click "Deploy"
+
+4. **Deploy from CLI** (alternative)
+   ```bash
+   # Login to Vercel
+   vercel login
+
+   # Deploy from your project directory
+   vercel
+   ```
+
+5. **Environment Variables**
+   - If needed, add environment variables in the Vercel dashboard under Project Settings > Environment Variables
+
+The application uses the following Vercel configuration:
+- Build Command: `npm run build`
+- Output Directory: `build`
+- Framework Preset: `vite`
+
+### Custom Domain
+
+To add a custom domain to your Vercel deployment:
+1. Go to your project in the Vercel dashboard
+2. Navigate to "Settings" > "Domains"
+3. Add your domain and follow the verification steps
 
 ---
 
