@@ -1,4 +1,4 @@
-# BudgetFriendly
+# Friendly Budgets
 
 A React application for managing personal finances with a 50/30/20 budget plan.
 

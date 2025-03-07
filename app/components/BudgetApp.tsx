@@ -74,6 +74,41 @@ const isColorDark = (hexColor: string): boolean => {
   return luminance < 0.5;
 };
 
+// Add these constants at the top of the file, after the imports
+// Constants for localStorage keys
+const STORAGE_KEYS = {
+  TRANSACTIONS: 'friendlyBudgets_transactions',
+  SUMMARY: 'friendlyBudgets_summary',
+  PLAN: 'friendlyBudgets_plan',
+  SUGGESTIONS: 'friendlyBudgets_suggestions',
+  TABLE_COLORS: 'friendlyBudgets_tableColors'
+};
+
+// Legacy keys for backward compatibility
+const LEGACY_STORAGE_KEYS = {
+  TRANSACTIONS: 'budgetFriendly_transactions',
+  SUMMARY: 'budgetFriendly_summary',
+  PLAN: 'budgetFriendly_plan',
+  SUGGESTIONS: 'budgetFriendly_suggestions',
+  TABLE_COLORS: 'budgetFriendly_tableColors'
+};
+
+// Helper function to get item from localStorage with legacy fallback
+const getStorageItem = (key: string, legacyKey: string) => {
+  const value = localStorage.getItem(key);
+  if (value) return value;
+  
+  // Try legacy key
+  const legacyValue = localStorage.getItem(legacyKey);
+  if (legacyValue) {
+    // Migrate data to new key
+    localStorage.setItem(key, legacyValue);
+    return legacyValue;
+  }
+  
+  return null;
+};
+
 export function BudgetApp() {
   const [activeStep, setActiveStep] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -1049,18 +1084,19 @@ export function BudgetApp() {
   
   // Handle color selection
   const handleColorSelect = (color: string) => {
-    if (currentCategory) {
-      // Update the color for the current category
-      const updatedColors = {
-        ...tableColors,
-        [currentCategory]: color
-      };
-      
-      setTableColors(updatedColors);
-      
-      // Save to localStorage
-      localStorage.setItem('budgetFriendly_tableColors', JSON.stringify(updatedColors));
-    }
+    if (!currentCategory) return;
+    
+    const updatedColors = {
+      ...tableColors,
+      [currentCategory]: color
+    };
+    
+    setTableColors(updatedColors);
+    setColorPickerAnchor(null);
+    setCurrentCategory(null);
+    
+    // Save to localStorage
+    localStorage.setItem(STORAGE_KEYS.TABLE_COLORS, JSON.stringify(updatedColors));
   };
 
   // Load data from local storage on component mount
@@ -1068,57 +1104,44 @@ export function BudgetApp() {
     const loadFromLocalStorage = () => {
       try {
         // Load transactions
-        const savedTransactions = localStorage.getItem('budgetFriendly_transactions');
+        const savedTransactions = getStorageItem(STORAGE_KEYS.TRANSACTIONS, LEGACY_STORAGE_KEYS.TRANSACTIONS);
         if (savedTransactions) {
           const parsedTransactions = JSON.parse(savedTransactions);
           // Convert string dates back to Date objects
-          const processedTransactions = parsedTransactions.map((t: any) => ({
+          setTransactions(parsedTransactions.map((t: any) => ({
             ...t,
             date: new Date(t.date)
-          }));
-          setTransactions(processedTransactions);
+          })));
         }
-
+        
         // Load budget summary
-        const savedSummary = localStorage.getItem('budgetFriendly_summary');
+        const savedSummary = getStorageItem(STORAGE_KEYS.SUMMARY, LEGACY_STORAGE_KEYS.SUMMARY);
         if (savedSummary) {
           setBudgetSummary(JSON.parse(savedSummary));
         }
-
+        
         // Load budget plan
-        const savedPlan = localStorage.getItem('budgetFriendly_plan');
+        const savedPlan = getStorageItem(STORAGE_KEYS.PLAN, LEGACY_STORAGE_KEYS.PLAN);
         if (savedPlan) {
           setBudgetPlan(JSON.parse(savedPlan));
         }
-
+        
         // Load suggestions
-        const savedSuggestions = localStorage.getItem('budgetFriendly_suggestions');
+        const savedSuggestions = getStorageItem(STORAGE_KEYS.SUGGESTIONS, LEGACY_STORAGE_KEYS.SUGGESTIONS);
         if (savedSuggestions) {
           setSuggestions(JSON.parse(savedSuggestions));
         }
         
         // Load table colors
-        const savedTableColors = localStorage.getItem('budgetFriendly_tableColors');
+        const savedTableColors = getStorageItem(STORAGE_KEYS.TABLE_COLORS, LEGACY_STORAGE_KEYS.TABLE_COLORS);
         if (savedTableColors) {
           setTableColors(JSON.parse(savedTableColors));
         }
-
-        // Show success message if data was loaded
-        if (savedTransactions) {
-        setAlertMessage({
-          type: 'success',
-            message: 'Your budget data has been loaded from local storage.'
-        });
-      }
-    } catch (error) {
-        console.error('Error loading data from local storage:', error);
-      setAlertMessage({
-        type: 'error',
-          message: 'Failed to load saved data. Starting with a fresh budget.'
-        });
+      } catch (error) {
+        console.error('Error loading data from localStorage:', error);
       }
     };
-
+    
     loadFromLocalStorage();
   }, []);
 
@@ -1165,37 +1188,42 @@ export function BudgetApp() {
   };
 
   const handleReset = () => {
+    // Clear all data
     setTransactions([]);
     setBudgetSummary(null);
     setBudgetPlan(null);
     setSuggestions([]);
     setActiveStep(0);
-    setAlertMessage(null);
     
-    // Clear local storage
-    localStorage.removeItem('budgetFriendly_transactions');
-    localStorage.removeItem('budgetFriendly_summary');
-    localStorage.removeItem('budgetFriendly_plan');
-    localStorage.removeItem('budgetFriendly_suggestions');
+    // Clear localStorage
+    localStorage.removeItem(STORAGE_KEYS.TRANSACTIONS);
+    localStorage.removeItem(STORAGE_KEYS.SUMMARY);
+    localStorage.removeItem(STORAGE_KEYS.PLAN);
+    localStorage.removeItem(STORAGE_KEYS.SUGGESTIONS);
+    
+    // Also clear legacy keys
+    localStorage.removeItem(LEGACY_STORAGE_KEYS.TRANSACTIONS);
+    localStorage.removeItem(LEGACY_STORAGE_KEYS.SUMMARY);
+    localStorage.removeItem(LEGACY_STORAGE_KEYS.PLAN);
+    localStorage.removeItem(LEGACY_STORAGE_KEYS.SUGGESTIONS);
     
     setAlertMessage({
       type: 'success',
-      message: 'Budget data has been reset. Start fresh by adding new transactions.'
+      message: 'All data has been reset. Start fresh with a new budget!'
     });
   };
 
   // Handle manual transaction entry
   const handleManualTransactionAdd = (transaction: Transaction) => {
-    // CRITICAL FIX: Ensure we have the latest transactions from localStorage
-    // This prevents voice commands from overwriting existing data
+    // Get current transactions from state or localStorage
     let currentTransactions = [...transactions];
     
-    // Double-check localStorage for existing transactions as a safety measure
     try {
-      const savedTransactions = localStorage.getItem('budgetFriendly_transactions');
-      if (savedTransactions) {
-        const parsedTransactions = JSON.parse(savedTransactions);
-        // If localStorage has more transactions than our state, use those instead
+      // Double-check localStorage in case there are more transactions there than in state
+      // This can happen if transactions were added in another tab
+      const currentStoredTransactions = getStorageItem(STORAGE_KEYS.TRANSACTIONS, LEGACY_STORAGE_KEYS.TRANSACTIONS);
+      if (currentStoredTransactions) {
+        const parsedTransactions = JSON.parse(currentStoredTransactions);
         if (parsedTransactions.length > currentTransactions.length) {
           console.log('Found more transactions in localStorage than in state, using localStorage data');
           // Convert string dates back to Date objects
@@ -1218,7 +1246,7 @@ export function BudgetApp() {
     setTransactions(updatedTransactions);
     
     // Save directly to localStorage to prevent race conditions
-    localStorage.setItem('budgetFriendly_transactions', JSON.stringify(updatedTransactions));
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(updatedTransactions));
     
     // Show success message
     setAlertMessage({
@@ -1235,21 +1263,21 @@ export function BudgetApp() {
       setBudgetSummary(summary);
       
       // Save summary directly to localStorage
-      localStorage.setItem('budgetFriendly_summary', JSON.stringify(summary));
+      localStorage.setItem(STORAGE_KEYS.SUMMARY, JSON.stringify(summary));
       
       // Create budget plan
       const plan = create503020Plan(summary);
       setBudgetPlan(plan);
       
       // Save plan directly to localStorage
-      localStorage.setItem('budgetFriendly_plan', JSON.stringify(plan));
+      localStorage.setItem(STORAGE_KEYS.PLAN, JSON.stringify(plan));
       
       // Generate suggestions
       const budgetSuggestions = getBudgetSuggestions(plan);
       setSuggestions(budgetSuggestions);
       
       // Save suggestions directly to localStorage
-      localStorage.setItem('budgetFriendly_suggestions', JSON.stringify(budgetSuggestions));
+      localStorage.setItem(STORAGE_KEYS.SUGGESTIONS, JSON.stringify(budgetSuggestions));
     } catch (error) {
       console.error('Error processing transaction:', error);
       setAlertMessage({
@@ -1426,9 +1454,9 @@ export function BudgetApp() {
       setSuggestions(budgetSuggestions);
       
       // Save to localStorage
-      localStorage.setItem('budgetFriendly_summary', JSON.stringify(summary));
-      localStorage.setItem('budgetFriendly_plan', JSON.stringify(plan));
-      localStorage.setItem('budgetFriendly_suggestions', JSON.stringify(budgetSuggestions));
+      localStorage.setItem(STORAGE_KEYS.SUMMARY, JSON.stringify(summary));
+      localStorage.setItem(STORAGE_KEYS.PLAN, JSON.stringify(plan));
+      localStorage.setItem(STORAGE_KEYS.SUGGESTIONS, JSON.stringify(budgetSuggestions));
       
       setAlertMessage({
         type: 'success',
@@ -1446,7 +1474,7 @@ export function BudgetApp() {
   return (
     <Box sx={{ width: '100%', p: 3, backgroundColor: 'background.default' }}>
       <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 4, fontWeight: 'bold', color: 'primary.main' }}>
-        Budget Friendly
+        Friendly Budgets
       </Typography>
       
       {/* Alert Messages */}

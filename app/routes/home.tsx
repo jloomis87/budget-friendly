@@ -4,7 +4,7 @@ import { ThemeProvider } from "../components/ThemeProvider";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Budget Friendly - 50/30/20 Budget Planner" },
+    { title: "Friendly Budgets - 50/30/20 Budget Planner" },
     { name: "description", content: "Upload your bank statements and create a personalized 50/30/20 budget plan." },
   ];
 }
