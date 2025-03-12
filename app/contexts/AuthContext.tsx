@@ -51,7 +51,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Listen for auth state changes
   useEffect(() => {
     
-    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setIsLoading(true);
       
@@ -90,7 +89,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setError('Failed to load user data');
         }
       } else {
-        
         setUser(null);
       }
       
@@ -98,7 +96,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => {
-      
       unsubscribe();
     };
   }, []);

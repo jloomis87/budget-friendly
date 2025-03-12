@@ -20,6 +20,7 @@ export interface EnhancedTransactionTableProps {
   onDrop: (e: React.DragEvent, targetCategory: string) => void;
   dragOverCategory: string | null;
   recentlyDropped: string | null;
+  onReorder?: (category: string, sourceIndex: number, targetIndex: number) => void;
 }
 
 export interface TransactionUtilsHook {
@@ -104,6 +105,7 @@ export interface MobileTransactionListProps {
   onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
   allTransactions?: Transaction[];
   findGlobalIndex?: (transaction: Transaction, allTransactions: Transaction[]) => number;
+  onReorder?: (category: string, sourceIndex: number, targetIndex: number) => void;
 }
 
 export interface DeleteConfirmationDialogProps {

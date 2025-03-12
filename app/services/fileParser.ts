@@ -6,10 +6,12 @@ let pdfWorkerInitialized = false;
 
 // Define the transaction interface
 export interface Transaction {
+  id?: string; // Document ID from Firestore
   date: Date | number; // Updated to allow day of month as number
   description: string;
   amount: number;
   category?: 'Essentials' | 'Wants' | 'Savings' | 'Income';
+  order?: number; // Order within the category for sorting
 }
 
 // Initialize PDF.js worker - using a more compatible approach

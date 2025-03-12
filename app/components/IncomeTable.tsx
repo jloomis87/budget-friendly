@@ -46,6 +46,7 @@ interface IncomeTableProps {
   onDrop?: (e: React.DragEvent, targetCategory: string) => void;
   dragOverCategory?: string | null;
   recentlyDropped?: string | null;
+  onReorder?: (category: string, sourceIndex: number, targetIndex: number) => void;
 }
 
 interface EditingRow {
@@ -65,7 +66,8 @@ export function IncomeTable({
   onDragOver,
   onDrop,
   dragOverCategory,
-  recentlyDropped
+  recentlyDropped,
+  onReorder
 }: IncomeTableProps) {
   // State for tracking if we're showing delete buttons (hover effect)
   // const [showDeleteButtons, setShowDeleteButtons] = useState(false);
@@ -79,6 +81,10 @@ export function IncomeTable({
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [isAdding, setIsAdding] = useState(false);
 
+  // State for drag and drop reordering
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
   const [tableColors] = useTableColors();
 
   // Initialize form errors state property if it doesn't already exist
@@ -87,11 +93,15 @@ export function IncomeTable({
     amount?: string;
   }>({});
 
-  // Filter only income transactions and sort by date (newest first)
+  // Filter only income transactions and sort by order
   const incomeTransactions = transactions
     .filter(transaction => transaction.category === 'Income')
     .sort((a, b) => {
-      // Sort by amount (largest first)
+      // Sort by order (if available) or amount as fallback
+      if (a.order !== undefined && b.order !== undefined) {
+        return a.order - b.order;
+      }
+      // Fallback to amount sorting
       return b.amount - a.amount;
     });
 
@@ -131,13 +141,61 @@ export function IncomeTable({
 
   // Find the global index of a transaction in the full transactions array
   const findGlobalIndex = (transaction: Transaction): number => {
-    return transactions.findIndex(t => {
-      const dateMatch = getDateString(t.date) === getDateString(transaction.date);
-      return dateMatch && 
-        t.description === transaction.description && 
-        t.amount === transaction.amount &&
-        t.category === transaction.category;
+    console.log('Finding global index for transaction:', {
+      id: transaction.id,
+      description: transaction.description,
+      amount: transaction.amount,
+      category: transaction.category,
+      date: transaction.date
     });
+    
+    // First try to find by ID if available
+    if (transaction.id) {
+      const idIndex = transactions.findIndex(t => t.id === transaction.id);
+      if (idIndex !== -1) {
+        console.log(`Found transaction by ID at index ${idIndex}`);
+        return idIndex;
+      }
+    }
+    
+    // Otherwise, try to match by properties - ENSURE CATEGORY MATCH IS REQUIRED
+    const index = transactions.findIndex(t => {
+      // Category match is REQUIRED - if categories don't match, return false immediately
+      if (t.category !== transaction.category) {
+        return false;
+      }
+      
+      const dateMatch = getDateString(t.date) === getDateString(transaction.date);
+      const descriptionMatch = t.description === transaction.description;
+      const amountMatch = t.amount === transaction.amount;
+      
+      const isMatch = dateMatch && descriptionMatch && amountMatch;
+      
+      if (isMatch) {
+        console.log(`Found matching transaction at index ${transactions.indexOf(t)}`);
+      }
+      
+      return isMatch;
+    });
+    
+    if (index === -1) {
+      console.warn('Could not find transaction in global array:', transaction);
+      
+      // Log all transactions in the same category for debugging
+      console.log('All transactions in category', transaction.category, ':');
+      transactions
+        .filter(t => t.category === transaction.category)
+        .forEach((t, i) => {
+          console.log(`[${i}]`, {
+            id: t.id,
+            description: t.description,
+            amount: t.amount,
+            date: t.date
+          });
+        });
+    }
+    
+    return index;
   };
 
   // Helper to get date string for comparison 
@@ -204,25 +262,33 @@ export function IncomeTable({
   const handleDeleteClick = (e: React.MouseEvent, transaction: Transaction) => {
     e.stopPropagation();
     
-    // Find the global index of the transaction in the entire transactions array
-    const index = transactions.findIndex(t => 
-      t.description === transaction.description && 
-      t.amount === transaction.amount && 
-      t.category === transaction.category &&
-      (t.date instanceof Date && transaction.date instanceof Date 
-        ? t.date.getTime() === transaction.date.getTime()
-        : String(t.date) === String(transaction.date))
-    );
+    console.log('Delete button clicked for transaction:', {
+      description: transaction.description,
+      amount: transaction.amount,
+      category: transaction.category
+    });
+    
+    // Use our improved findGlobalIndex function
+    const index = findGlobalIndex(transaction);
+    console.log(`Found global index: ${index}`);
     
     if (index !== -1) {
       setTransactionToDelete({ transaction, index });
       setDeleteConfirmOpen(true);
+    } else {
+      console.error('Could not find transaction to delete in global array');
+      alert('Error: Could not find the transaction to delete. Please try again.');
     }
   };
 
   // Confirm and execute delete
   const confirmDelete = () => {
     if (transactionToDelete) {
+      console.log('Deleting transaction:', {
+        transaction: transactionToDelete.transaction,
+        index: transactionToDelete.index,
+        category: transactionToDelete.transaction.category
+      });
       onDeleteTransaction(transactionToDelete.index);
     }
     setDeleteConfirmOpen(false);
@@ -484,6 +550,107 @@ export function IncomeTable({
         </Typography>
       </Box>
     );
+  };
+
+  // Handle drag start for reordering
+  const handleInternalDragStart = (e: React.DragEvent, transaction: Transaction, index: number, globalIndex: number) => {
+    setDraggedIndex(index);
+    
+    // Create a custom drag image that looks like the card
+    const dragPreview = document.createElement('div');
+    dragPreview.style.backgroundColor = isDark ? '#333' : '#f5f5f5';
+    dragPreview.style.border = '1px solid #ccc';
+    dragPreview.style.borderRadius = '4px';
+    dragPreview.style.padding = '8px 12px';
+    dragPreview.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+    dragPreview.style.width = '250px';
+    dragPreview.style.display = 'flex';
+    dragPreview.style.alignItems = 'center';
+    dragPreview.style.color = isDark ? '#fff' : '#333';
+    
+    // Add an icon
+    const icon = document.createElement('span');
+    icon.innerHTML = '↕️';
+    icon.style.marginRight = '8px';
+    dragPreview.appendChild(icon);
+    
+    // Add description
+    const text = document.createElement('div');
+    text.textContent = transaction.description;
+    text.style.fontWeight = '500';
+    text.style.flex = '1';
+    dragPreview.appendChild(text);
+    
+    // Add amount
+    const amount = document.createElement('div');
+    amount.textContent = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(transaction.amount);
+    amount.style.marginLeft = '8px';
+    dragPreview.appendChild(amount);
+    
+    // Add to DOM temporarily
+    document.body.appendChild(dragPreview);
+    
+    // Set the drag image
+    e.dataTransfer.setDragImage(dragPreview, 125, 20);
+    
+    // Set other drag properties
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', transaction.description);
+    
+    // Store transaction ID in dataTransfer for reordering
+    if (transaction.id) {
+      e.dataTransfer.setData('application/json', JSON.stringify({
+        id: transaction.id,
+        index: index,
+        category: 'Income'
+      }));
+    }
+    
+    // Call the parent handler
+    if (onDragStart) {
+      onDragStart(e, transaction, globalIndex);
+    }
+    
+    // Remove the element after a short delay
+    setTimeout(() => {
+      document.body.removeChild(dragPreview);
+    }, 0);
+  };
+  
+  // Handle drag over for reordering
+  const handleInternalDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+  
+  // Handle drop for reordering
+  const handleInternalDrop = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+    
+    // If we have a dragged item and a valid drop target
+    if (draggedIndex !== null && draggedIndex !== index) {
+      // Call the parent reorder handler if provided
+      if (onReorder) {
+        console.log(`Reordering in Income category: from ${draggedIndex} to ${index}`);
+        onReorder('Income', draggedIndex, index);
+      }
+    }
+    
+    setDraggedIndex(null);
+  };
+  
+  // Handle drag end
+  const handleInternalDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
   };
 
   if (incomeTransactions.length === 0 && !isAdding) {
@@ -920,68 +1087,14 @@ export function IncomeTable({
         {/* Income Transaction Items */}
         {incomeTransactions.length > 0 && !isAdding && (
           <>
-            {[...incomeTransactions]
-              .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
-              .map((transaction, index) => {
+            {incomeTransactions.map((transaction, index) => {
               const transactionId = getTransactionId(transaction);
               const dateString = formatDateForDisplay(transaction.date);
               const globalIndex = findGlobalIndex(transaction);
               
               // Create a custom drag handler for the income item
               const handleDragStart = (e: React.DragEvent) => {
-                // Create a custom drag image that looks like the card
-                const dragPreview = document.createElement('div');
-                dragPreview.style.backgroundColor = isDark ? '#333' : '#f5f5f5';
-                dragPreview.style.border = '1px solid #ccc';
-                dragPreview.style.borderRadius = '4px';
-                dragPreview.style.padding = '8px 12px';
-                dragPreview.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
-                dragPreview.style.width = '250px';
-                dragPreview.style.display = 'flex';
-                dragPreview.style.alignItems = 'center';
-                dragPreview.style.color = isDark ? '#fff' : '#333';
-                
-                // Add an icon
-                const icon = document.createElement('span');
-                icon.innerHTML = '↕️';
-                icon.style.marginRight = '8px';
-                dragPreview.appendChild(icon);
-                
-                // Add description
-                const text = document.createElement('div');
-                text.textContent = transaction.description;
-                text.style.fontWeight = '500';
-                text.style.flex = '1';
-                dragPreview.appendChild(text);
-                
-                // Add amount
-                const amount = document.createElement('div');
-                amount.textContent = new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: 'USD',
-                }).format(transaction.amount);
-                amount.style.marginLeft = '8px';
-                dragPreview.appendChild(amount);
-                
-                // Add to DOM temporarily
-                document.body.appendChild(dragPreview);
-                
-                // Set the drag image
-                e.dataTransfer.setDragImage(dragPreview, 125, 20);
-                
-                // Set other drag properties
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', transaction.description);
-                
-                // Call the parent handler
-                if (onDragStart) {
-                  onDragStart(e, transaction, globalIndex);
-                }
-                
-                // Remove the element after a short delay
-                setTimeout(() => {
-                  document.body.removeChild(dragPreview);
-                }, 0);
+                handleInternalDragStart(e, transaction, index, globalIndex);
               };
               
               return (
@@ -990,9 +1103,12 @@ export function IncomeTable({
                   onClick={() => handleOpenMobileEdit(transaction, index)}
                   draggable={true}
                   onDragStart={handleDragStart}
+                  onDragOver={(e) => handleInternalDragOver(e, index)}
+                  onDrop={(e) => handleInternalDrop(e, index)}
+                  onDragEnd={handleInternalDragEnd}
                   sx={{
                     mx: '5px',
-                    mb: '5px',
+                    mb: dragOverIndex === index ? '15px' : '5px',
                     p: 2,
                     display: 'flex',
                     flexDirection: 'column',
@@ -1005,10 +1121,11 @@ export function IncomeTable({
                       backgroundColor: isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.7)',
                       boxShadow: '0 3px 6px rgba(0,0,0,0.15)',
                     },
+                    transform: dragOverIndex === index ? 'translateY(5px)' : 'none',
+                    opacity: draggedIndex === index ? 0.5 : 1,
+                    transition: 'transform 0.2s, opacity 0.2s, background-color 0.2s, box-shadow 0.2s',
                   }}
                 >
-                  {/* Remove the drag indicator */}
-                  
                   {/* Description and Amount on top line */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                     <Typography
@@ -1060,7 +1177,7 @@ export function IncomeTable({
                       pointerEvents: 'none'
                     }}
                   >
-                    (click to edit or hold and drag)
+                    (click to edit or drag to reorder)
                   </Typography>
                 </Box>
               );
@@ -1282,7 +1399,28 @@ export function IncomeTable({
           <Button 
             onClick={() => {
               if (mobileEditTransaction) {
-                setTransactionToDelete(mobileEditTransaction);
+                console.log('Delete button clicked for transaction:', {
+                  description: mobileEditTransaction.transaction.description,
+                  amount: mobileEditTransaction.transaction.amount,
+                  category: mobileEditTransaction.transaction.category,
+                  localIndex: mobileEditTransaction.index
+                });
+                
+                // Use findGlobalIndex to get the correct global index
+                const globalIndex = findGlobalIndex(mobileEditTransaction.transaction);
+                console.log(`Found global index: ${globalIndex}`);
+                
+                if (globalIndex === -1) {
+                  console.error('Could not find transaction to delete in global array');
+                  alert('Error: Could not find the transaction to delete. Please try again.');
+                  handleCloseMobileEdit();
+                  return;
+                }
+                
+                setTransactionToDelete({ 
+                  transaction: mobileEditTransaction.transaction, 
+                  index: globalIndex 
+                });
                 setDeleteConfirmOpen(true);
                 handleCloseMobileEdit();
               }

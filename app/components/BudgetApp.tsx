@@ -72,7 +72,8 @@ function BudgetAppContent() {
     getTransactionsByCategory,
     getTotalIncome,
     resetTransactions,
-    moveTransaction
+    moveTransaction,
+    reorderTransactions
   } = useTransactions();
   
   // Color picker state - use useLocalStorage hook directly for this
@@ -259,8 +260,19 @@ function BudgetAppContent() {
     // Remove the dragging class
     document.body.classList.remove('dragging-active');
     
-    // Ensure we have a dragged transaction and it's not already in this category
-    if (draggedTransaction && draggedTransaction.transaction.category !== targetCategory) {
+    // Ensure we have a dragged transaction
+    if (!draggedTransaction) return;
+    
+    // If dropping in the same category, this might be a reordering operation
+    if (draggedTransaction.transaction.category === targetCategory) {
+      // This will be handled by the handleReorder function
+      // Reset dragged transaction
+      setDraggedTransaction(null);
+      return;
+    }
+    
+    // If dropping in a different category, move the transaction
+    if (draggedTransaction.transaction.category !== targetCategory) {
       // Move the transaction to the new category
       moveTransaction(draggedTransaction.index, targetCategory);
       
@@ -274,6 +286,29 @@ function BudgetAppContent() {
     // Reset dragged transaction
     setDraggedTransaction(null);
   }, [draggedTransaction, moveTransaction]);
+
+  // Handle reordering within a category
+  const handleReorder = useCallback((category: string, sourceIndex: number, targetIndex: number) => {
+    // Get transactions for this category
+    const categoryTransactions = transactions.filter(t => t.category === category);
+    
+    // Ensure indices are valid
+    if (sourceIndex < 0 || sourceIndex >= categoryTransactions.length || 
+        targetIndex < 0 || targetIndex >= categoryTransactions.length) {
+      return;
+    }
+    
+    // Create a new array with the reordered transactions
+    const reordered = [...categoryTransactions];
+    const [movedItem] = reordered.splice(sourceIndex, 1);
+    reordered.splice(targetIndex, 0, movedItem);
+    
+    // Get the IDs in the new order
+    const orderedIds = reordered.map(t => t.id).filter(id => id !== undefined) as string[];
+    
+    // Update the order in the database
+    reorderTransactions(category, orderedIds);
+  }, [transactions, reorderTransactions]);
   
   // Clear any drag/drop/animation states when mouse leaves a draggable area
   const handleDragLeave = useCallback(() => {
@@ -354,6 +389,7 @@ function BudgetAppContent() {
           onDrop={handleDrop}
           dragOverCategory={dragOverCategory}
           recentlyDropped={recentlyDropped}
+          onReorder={handleReorder}
         />
         
         {/* Display transactions grouped by category */}
@@ -371,6 +407,7 @@ function BudgetAppContent() {
             onDrop={handleDrop}
             dragOverCategory={dragOverCategory}
             recentlyDropped={recentlyDropped}
+            onReorder={handleReorder}
           />
         ))}
       </Box>
@@ -386,7 +423,7 @@ function BudgetAppContent() {
     handleDrop, 
     dragOverCategory, 
     recentlyDropped,
-    handleDragEnd
+    handleReorder
   ]);
 
   // Memoize the budget summary component to prevent unnecessary re-renders

@@ -71,35 +71,68 @@ export function useTransactionUtils(): TransactionUtilsHook {
 
   // Find the global index of a transaction in the full transactions array
   const findGlobalIndex = useCallback((transaction: Transaction, allTransactions: Transaction[]): number => {
-    // First, try finding exact match
+    console.log('Finding global index for transaction:', {
+      id: transaction.id,
+      description: transaction.description,
+      amount: transaction.amount,
+      category: transaction.category,
+      date: transaction.date
+    });
+    
+    // First try to find by ID if available
+    if (transaction.id && allTransactions) {
+      const idIndex = allTransactions.findIndex(t => t.id === transaction.id);
+      if (idIndex !== -1) {
+        console.log(`Found transaction by ID at index ${idIndex}`);
+        return idIndex;
+      }
+    }
+    
+    // Otherwise, try finding exact match - ENSURE CATEGORY MATCH IS REQUIRED
     const index = allTransactions.findIndex(t => {
+      // Category match is REQUIRED - if categories don't match, return false immediately
+      if (t.category !== transaction.category) {
+        return false;
+      }
+      
       const dateMatch = getDateString(t.date) === getDateString(transaction.date);
       const descriptionMatch = t.description === transaction.description;
       const amountMatch = t.amount === transaction.amount;
-      const categoryMatch = t.category === transaction.category;
       
-      return dateMatch && descriptionMatch && amountMatch && categoryMatch;
+      const isMatch = dateMatch && descriptionMatch && amountMatch;
+      
+      if (isMatch) {
+        console.log(`Found matching transaction at index ${allTransactions.indexOf(t)}`);
+      }
+      
+      return isMatch;
     });
     
     // For debugging, if we couldn't find a match, log details
     if (index === -1) {
       console.warn('Transaction not found in global array:', {
         searchingFor: {
+          id: transaction.id,
           date: getDateString(transaction.date),
           description: transaction.description,
           amount: transaction.amount,
           category: transaction.category,
         },
-        totalTransactions: allTransactions.length,
-        sampleTransactions: allTransactions.slice(0, 3).map(t => ({
-          date: getDateString(t.date),
-          description: t.description,
-          amount: t.amount,
-          category: t.category,
-        }))
+        totalTransactions: allTransactions.length
       });
-    } else {
-      console.log(`Found transaction in global array at index ${index}`);
+      
+      // Log all transactions in the same category for debugging
+      console.log('All transactions in category', transaction.category, ':');
+      allTransactions
+        .filter(t => t.category === transaction.category)
+        .forEach((t, i) => {
+          console.log(`[${i}]`, {
+            id: t.id,
+            description: t.description,
+            amount: t.amount,
+            date: t.date
+          });
+        });
     }
     
     return index;

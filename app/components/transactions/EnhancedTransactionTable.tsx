@@ -24,7 +24,8 @@ export function EnhancedTransactionTable({
   onDragOver,
   onDrop,
   dragOverCategory,
-  recentlyDropped
+  recentlyDropped,
+  onReorder
 }: EnhancedTransactionTableProps) {
   const [editingRow, setEditingRow] = useState<EditingRow | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -174,8 +175,28 @@ export function EnhancedTransactionTable({
   // Handle delete transaction click
   const handleDeleteClick = (e: React.MouseEvent, transaction: Transaction, index: number) => {
     e.stopPropagation(); // Prevent row click event
-    setTransactionToDelete({ transaction, index });
-    setDeleteConfirmOpen(true);
+    
+    console.log('Delete button clicked for transaction:', {
+      description: transaction.description,
+      amount: transaction.amount,
+      category: transaction.category,
+      localIndex: index
+    });
+    
+    if (allTransactions) {
+      // Use findGlobalIndex to get the correct global index
+      const globalIndex = utils.findGlobalIndex(transaction, allTransactions);
+      console.log(`Found global index: ${globalIndex}`);
+      
+      if (globalIndex === -1) {
+        console.error('Could not find transaction to delete in global array');
+        alert('Error: Could not find the transaction to delete. Please try again.');
+        return;
+      }
+      
+      setTransactionToDelete({ transaction, index: globalIndex });
+      setDeleteConfirmOpen(true);
+    }
   };
 
   // Confirm and execute delete
@@ -395,7 +416,7 @@ export function EnhancedTransactionTable({
           {/* Always use the mobile view regardless of screen size */}
           <MobileTransactionList
             category={category}
-            transactions={[...transactions].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))}
+            transactions={[...transactions].sort((a, b) => (a.order || 0) - (b.order || 0))}
             isDark={isDark}
             isAdding={isAdding}
             handleOpenMobileEdit={handleOpenMobileEdit}
@@ -405,6 +426,7 @@ export function EnhancedTransactionTable({
             onDragStart={onDragStart}
             allTransactions={allTransactions}
             findGlobalIndex={(transaction, allTrans) => utils.findGlobalIndex(transaction, allTrans)}
+            onReorder={onReorder}
           />
         </Paper>
       </Box>
@@ -425,10 +447,28 @@ export function EnhancedTransactionTable({
         onClose={handleCloseMobileEdit}
         onSave={handleSaveMobileEdit}
         onDelete={() => {
-          if (mobileEditTransaction) {
+          if (mobileEditTransaction && allTransactions) {
+            console.log('Delete button clicked for transaction:', {
+              description: mobileEditTransaction.transaction.description,
+              amount: mobileEditTransaction.transaction.amount,
+              category: mobileEditTransaction.transaction.category,
+              localIndex: mobileEditTransaction.index
+            });
+            
+            // Use findGlobalIndex to get the correct global index
+            const globalIndex = utils.findGlobalIndex(mobileEditTransaction.transaction, allTransactions);
+            console.log(`Found global index: ${globalIndex}`);
+            
+            if (globalIndex === -1) {
+              console.error('Could not find transaction to delete in global array');
+              alert('Error: Could not find the transaction to delete. Please try again.');
+              handleCloseMobileEdit();
+              return;
+            }
+            
             setTransactionToDelete({
               transaction: mobileEditTransaction.transaction,
-              index: mobileEditTransaction.index
+              index: globalIndex
             });
             setDeleteConfirmOpen(true);
             handleCloseMobileEdit();

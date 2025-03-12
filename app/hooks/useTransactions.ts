@@ -62,12 +62,10 @@ export function useTransactions() {
     const loadTransactions = async () => {
       // Only proceed if we have both authentication and a valid user ID
       if (isAuthenticated && user?.id) {
-
         
         setIsLoading(true);
         try {
           const userTransactions = await transactionService.getUserTransactions(user.id);
-
           
           setTransactions(userTransactions);
           
@@ -103,7 +101,6 @@ export function useTransactions() {
         setSuggestions(localSuggestions);
       } else {
         // User is authenticated but id is not yet available
-
         setIsLoading(true);
       }
     };
@@ -373,7 +370,7 @@ export function useTransactions() {
         setBudgetSummary(summary);
         
         // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.uid) {
+        if (!isAuthenticated || !user?.id) {
           setLocalBudgetSummary(summary);
         }
         
@@ -382,7 +379,7 @@ export function useTransactions() {
         setBudgetPlan(plan);
         
         // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.uid) {
+        if (!isAuthenticated || !user?.id) {
           setLocalBudgetPlan(plan);
         }
         
@@ -391,7 +388,7 @@ export function useTransactions() {
         setSuggestions(budgetSuggestions);
         
         // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.uid) {
+        if (!isAuthenticated || !user?.id) {
           setLocalSuggestions(budgetSuggestions);
         }
         
@@ -406,7 +403,7 @@ export function useTransactions() {
           message: `Error updating budget after deletion: ${error instanceof Error ? error.message : 'Unknown error'}`
         });
       } finally {
-        if (isAuthenticated && user?.uid) {
+        if (isAuthenticated && user?.id) {
           setIsLoading(false);
         }
       }
@@ -416,7 +413,7 @@ export function useTransactions() {
         type: 'error',
         message: `Error deleting transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
-      if (isAuthenticated && user?.uid) {
+      if (isAuthenticated && user?.id) {
         setIsLoading(false);
       }
     }
@@ -618,11 +615,17 @@ export function useTransactions() {
     try {
       if (isAuthenticated && user?.id && transaction.id) {
         setIsLoading(true);
-        await transactionService.moveTransactionToCategory(transaction.id, targetCategory, user.id);
+        await transactionService.moveTransactionToCategory(
+          transaction.id, 
+          targetCategory as 'Income' | 'Essentials' | 'Wants' | 'Savings',
+          user.id
+        );
       }
       
       // Update local state
-      await updateTransaction(index, { category: targetCategory });
+      await updateTransaction(index, { 
+        category: targetCategory as 'Income' | 'Essentials' | 'Wants' | 'Savings' 
+      });
     } catch (error) {
       console.error('Error moving transaction:', error);
       setAlertMessage({
@@ -633,6 +636,64 @@ export function useTransactions() {
       setIsLoading(false);
     }
   }, [transactions, updateTransaction, isAuthenticated, user, setAlertMessage]);
+
+  // Reorder transactions within a category
+  const reorderTransactions = useCallback(async (category: string, orderedTransactionIds: string[]) => {
+    try {
+      // If authenticated, update in Firestore
+      if (isAuthenticated && user?.id) {
+        setIsLoading(true);
+        await transactionService.reorderTransactions(user.id, category, orderedTransactionIds);
+      }
+      
+      // Update local state
+      const updatedTransactions = [...transactions];
+      
+      // Create a map of id to new order
+      const orderMap = new Map<string, number>();
+      orderedTransactionIds.forEach((id, index) => {
+        orderMap.set(id, index + 1);
+      });
+      
+      // Update the order of each transaction
+      updatedTransactions.forEach(transaction => {
+        if (transaction.category === category && transaction.id && orderMap.has(transaction.id)) {
+          transaction.order = orderMap.get(transaction.id);
+        }
+      });
+      
+      // Sort transactions by order within each category
+      updatedTransactions.sort((a, b) => {
+        // First sort by category
+        if (a.category !== b.category) {
+          return (a.category || '').localeCompare(b.category || '');
+        }
+        
+        // Then sort by order within the category
+        return (a.order || 0) - (b.order || 0);
+      });
+      
+      setTransactions(updatedTransactions);
+      
+      // If not authenticated, update in localStorage
+      if (!isAuthenticated || !user?.id) {
+        setLocalTransactions(updatedTransactions);
+      }
+      
+      setAlertMessage({
+        type: 'success',
+        message: 'Transaction order updated successfully!'
+      });
+    } catch (error) {
+      console.error('[useTransactions] Error reordering transactions:', error);
+      setAlertMessage({
+        type: 'error',
+        message: 'Failed to reorder transactions. Please try again.'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, user?.id, transactions, setLocalTransactions, setAlertMessage]);
 
   return {
     transactions,
@@ -649,6 +710,7 @@ export function useTransactions() {
     getTransactionsByCategory,
     getTotalIncome,
     resetTransactions,
-    moveTransaction
+    moveTransaction,
+    reorderTransactions
   };
 } 

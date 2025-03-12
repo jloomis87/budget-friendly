@@ -60,6 +60,15 @@ export function MobileTransactionCard({
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', transaction.description);
     
+    // Store transaction ID in dataTransfer for reordering
+    if (transaction.id) {
+      e.dataTransfer.setData('application/json', JSON.stringify({
+        id: transaction.id,
+        index: index,
+        category: transaction.category
+      }));
+    }
+    
     // Add a class to the body to indicate dragging is in progress
     document.body.classList.add('dragging-active');
     
@@ -136,7 +145,7 @@ export function MobileTransactionCard({
             pointerEvents: 'none'
           }}
         >
-          (click to edit or hold and drag)
+          (click to edit or drag to reorder)
         </Typography>
       </CardContent>
     </Card>
