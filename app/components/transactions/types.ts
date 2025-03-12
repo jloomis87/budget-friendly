@@ -107,6 +107,8 @@ export interface MobileEditDialogProps {
   handleEditingChange: (field: keyof EditingRow, value: string) => void;
   generateDayOptions: () => number[];
   getOrdinalSuffix: (day: number) => string;
+  tableColor: string;
+  isDark: boolean;
 }
 
 export interface MobileAddDialogProps {
@@ -122,4 +124,6 @@ export interface MobileAddDialogProps {
   onAdd: () => void;
   generateDayOptions: () => number[];
   getOrdinalSuffix: (day: number) => string;
+  tableColor: string;
+  isDark: boolean;
 } 

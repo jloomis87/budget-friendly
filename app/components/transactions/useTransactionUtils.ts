@@ -71,13 +71,38 @@ export function useTransactionUtils(): TransactionUtilsHook {
 
   // Find the global index of a transaction in the full transactions array
   const findGlobalIndex = useCallback((transaction: Transaction, allTransactions: Transaction[]): number => {
-    return allTransactions.findIndex(t => {
+    // First, try finding exact match
+    const index = allTransactions.findIndex(t => {
       const dateMatch = getDateString(t.date) === getDateString(transaction.date);
-      return dateMatch && 
-        t.description === transaction.description && 
-        t.amount === transaction.amount &&
-        t.category === transaction.category;
+      const descriptionMatch = t.description === transaction.description;
+      const amountMatch = t.amount === transaction.amount;
+      const categoryMatch = t.category === transaction.category;
+      
+      return dateMatch && descriptionMatch && amountMatch && categoryMatch;
     });
+    
+    // For debugging, if we couldn't find a match, log details
+    if (index === -1) {
+      console.warn('Transaction not found in global array:', {
+        searchingFor: {
+          date: getDateString(transaction.date),
+          description: transaction.description,
+          amount: transaction.amount,
+          category: transaction.category,
+        },
+        totalTransactions: allTransactions.length,
+        sampleTransactions: allTransactions.slice(0, 3).map(t => ({
+          date: getDateString(t.date),
+          description: t.description,
+          amount: t.amount,
+          category: t.category,
+        }))
+      });
+    } else {
+      console.log(`Found transaction in global array at index ${index}`);
+    }
+    
+    return index;
   }, [getDateString]);
 
   // Create a unique identifier for a transaction

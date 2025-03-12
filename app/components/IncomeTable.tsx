@@ -76,23 +76,32 @@ export function IncomeTable({
   const incomeTransactions = transactions
     .filter(transaction => transaction.category === 'Income')
     .sort((a, b) => {
-      const dateA = a.date instanceof Date ? a.date : new Date(a.date);
-      const dateB = b.date instanceof Date ? b.date : new Date(b.date);
-      return dateB.getTime() - dateA.getTime();
+      // Sort by amount (largest first)
+      return b.amount - a.amount;
     });
 
+  // Helper for handling dates that can be either Date objects or numbers
+  const formatDateIfNeeded = (date: Date | number | string): string | Date => {
+    if (typeof date === 'number') {
+      // Convert number to string for display
+      return date.toString();
+    }
+    return date;
+  };
+
   // Helper to format date for display
-  const formatDateForDisplay = (date: Date | string): string => {
-    if (date instanceof Date) {
-      return date.toLocaleDateString();
-    } else if (typeof date === 'string') {
+  const formatDateForDisplay = (date: Date | string | number): string => {
+    const formattedDate = formatDateIfNeeded(date);
+    if (formattedDate instanceof Date) {
+      return formattedDate.toLocaleDateString();
+    } else if (typeof formattedDate === 'string') {
       try {
-        return new Date(date).toLocaleDateString();
+        return new Date(formattedDate).toLocaleDateString();
       } catch (e) {
-        return date;
+        return formattedDate;
       }
     }
-    return String(date);
+    return String(formattedDate);
   };
 
   // Handle editing row changes
@@ -117,19 +126,20 @@ export function IncomeTable({
   };
 
   // Helper to get date string for comparison 
-  const getDateString = (date: Date | string): string => {
-    if (date instanceof Date) {
-      return date.toISOString();
-    } else if (typeof date === 'string') {
+  const getDateString = (date: Date | string | number): string => {
+    const formattedDate = formatDateIfNeeded(date);
+    if (formattedDate instanceof Date) {
+      return formattedDate.toISOString();
+    } else if (typeof formattedDate === 'string') {
       // Try to convert string to date and then to ISO string
       try {
-        return new Date(date).toISOString();
+        return new Date(formattedDate).toISOString();
       } catch (e) {
-        return date;
+        return formattedDate;
       }
     }
     // Fallback
-    return String(date);
+    return String(formattedDate);
   };
 
   // Create a unique identifier for a transaction
@@ -266,10 +276,21 @@ export function IncomeTable({
   // Check if any row is currently being edited - used to determine if we need the Actions column
   const isAnyRowEditing = editingRow !== null;
 
-  // Add theme and media query for responsive design
+  // Get theme for responsive design
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  // Use a direct media query for 1500px breakpoint
+  const isDesktop = useMediaQuery('(min-width:1500px)');
+  const isMobile = !isDesktop;
   
+  // Add debug logging
+  useEffect(() => {
+    console.log('IncomeTable - Screen size state:', {
+      isMobile,
+      isDesktop,
+      windowWidth: window.innerWidth
+    });
+  }, [isMobile, isDesktop]);
+
   // Mobile edit dialog state
   const [mobileEditDialogOpen, setMobileEditDialogOpen] = useState(false);
   const [mobileEditTransaction, setMobileEditTransaction] = useState<{
@@ -495,36 +516,37 @@ export function IncomeTable({
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <TextField
-                          value={newAmount}
-                          onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                          placeholder="0.00"
-                          variant="standard"
-                          size="small"
-                          sx={{
-                            '& input': {
-                              color: isDark ? '#fff' : 'inherit',
-                              textAlign: 'right',
-                              width: `${Math.max(70, (newAmount?.length || 1) * 8 + 10)}px`,
-                              transition: 'width 0.1s'
-                            }
+                      <TextField
+                        value={newAmount}
+                        onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                        placeholder="0.00"
+                          variant="outlined"
+                        fullWidth
+                          inputProps={{ style: { fontSize: '1.1rem' } }}
+                        InputProps={{
+                            startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
                           }}
-                          InputProps={{
-                            startAdornment: <span style={{ 
-                              marginRight: 4,
-                              color: isDark ? '#fff' : 'inherit',
-                            }}>$</span>,
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newDescription && newAmount) {
-                              e.preventDefault();
-                              handleAddTransaction();
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
-                              setIsAdding(false);
-                            }
-                          }}
-                        />
+                          sx={{ 
+                            "& .MuiOutlinedInput-root": { 
+                              backgroundColor: 'white' 
+                            },
+                            "& .MuiOutlinedInput-notchedOutline": {
+                              borderColor: 'rgba(0, 0, 0, 0.23)'
+                            },
+                            "& .MuiInputLabel-outlined": {
+                              color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                              fontWeight: 500,
+                              backgroundColor: 'transparent',
+                              '&.Mui-focused': {
+                                color: isDark ? '#fff' : 'primary.main',
+                              }
+                            },
+                            "& .MuiInputLabel-shrink": {
+                              bgcolor: tableColors['Income'],
+                              padding: '0 5px',
+                          }
+                        }}
+                      />
                       </Box>
                     </TableCell>
                     <TableCell>
@@ -669,39 +691,13 @@ export function IncomeTable({
 
   return (
     <Box sx={{ mb: 4 }}>
-      <Typography variant="h6" component="h2" sx={{ 
-        mb: 2, 
-        fontWeight: 600,
-        color: isDark ? '#fff' : 'inherit',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1
-      }}>
-        Income Summary
-        <Typography 
-          component="span" 
-          variant="subtitle1" 
-          sx={{ 
-            fontWeight: 600, 
-            color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
-            ml: 'auto'
-          }}
-        >
-          {totalIncome > 0 ? (
-            <>Total: ${totalIncome.toFixed(2)}</>
-          ) : (
-            <>No income</>
-          )}
-        </Typography>
-      </Typography>
-      
       {/* Render regular table for desktop or optimized cards for mobile */}
       {!isMobile ? (
         // Original desktop table implementation
         <Paper sx={{ 
-          overflow: 'hidden',
+          overflow: 'hidden', 
           backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'background.paper',
-          borderRadius: 2,
+          borderRadius: 2, 
           ...getBackgroundStyles()
         }}>
           <Box>
@@ -717,25 +713,23 @@ export function IncomeTable({
               <Typography 
                 variant="h6" 
                 sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center',
                   fontWeight: 'bold',
                   color: isDark ? '#fff' : 'inherit',
                   fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                   letterSpacing: '0.01em',
                 }}
               >
-                Income
+                  Income
                 <Typography 
                   component="span" 
-                  variant="subtitle1" 
+                    variant="subtitle1" 
                   sx={{ 
                     ml: 1,
-                    fontWeight: 500, 
+                      fontWeight: 500, 
                     color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'
                   }}
                 >
-                  (Total: ${totalIncome.toFixed(2)})
+                    (Total: ${totalIncome.toFixed(2)})
                 </Typography>
               </Typography>
               
@@ -865,21 +859,47 @@ export function IncomeTable({
                           <TextField
                             value={editingRow?.description || ''}
                             onChange={(e) => handleEditingChange('description', e.target.value)}
-                            variant="standard"
-                            size="small"
+                            variant="outlined"
                             fullWidth
-                            sx={{
-                              '& input': {
-                                color: isDark ? '#fff' : 'inherit',
+                            inputProps={{ style: { fontSize: '1.1rem' } }}
+                            InputLabelProps={{
+                              shrink: true,
+                              sx: {
+                                position: 'relative',
+                                transform: 'none',
+                                marginBottom: '8px', 
+                                color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                                fontWeight: 500,
+                                fontSize: '0.9rem',
+                                '&.Mui-focused': {
+                                  color: isDark ? '#fff' : 'primary.main',
+                                }
                               }
                             }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleSaveEdit(transaction);
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                setEditingRow(null);
+                            sx={{ 
+                              "& .MuiOutlinedInput-root": { 
+                                backgroundColor: 'white',
+                                borderRadius: '4px',
+                                "&.Mui-focused": {
+                                  "& .MuiOutlinedInput-notchedOutline": {
+                                    borderColor: 'primary.main',
+                                    borderWidth: 2,
+                                  }
+                                }
+                              },
+                              "& .MuiOutlinedInput-notchedOutline": {
+                                borderColor: 'rgba(0, 0, 0, 0.23)'
+                              },
+                              "& .MuiFormLabel-root": {
+                                position: 'relative',
+                                transform: 'none',
+                                marginBottom: '8px',
+                              },
+                              "& .MuiInputLabel-animated": {
+                                transition: 'none',
+                              },
+                              "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                                marginTop: '0',
                               }
                             }}
                           />
@@ -899,25 +919,49 @@ export function IncomeTable({
                             type="date"
                             value={editingRow?.date || ''}
                             onChange={(e) => handleEditingChange('date', e.target.value)}
-                            variant="standard"
-                            size="small"
-                            sx={{
-                              width: '140px',
-                              margin: '0 auto',
-                              '& input': {
-                                color: isDark ? '#fff' : 'inherit',
-                                textAlign: 'center',
+                            variant="outlined"
+                            fullWidth
+                            InputProps={{
+                              notched: false,
+                            }}
+                            InputLabelProps={{
+                              shrink: true,
+                              sx: {
+                                position: 'relative',
+                                transform: 'none',
+                                marginBottom: '8px', 
+                                color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                                fontWeight: 500,
                                 fontSize: '0.9rem',
-                                padding: '4px 0',
+                                '&.Mui-focused': {
+                                  color: isDark ? '#fff' : 'primary.main',
+                                }
                               }
                             }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleSaveEdit(transaction);
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                setEditingRow(null);
+                            sx={{ 
+                              "& .MuiOutlinedInput-root": { 
+                                backgroundColor: 'white',
+                                borderRadius: '4px',
+                                "&.Mui-focused": {
+                                  "& .MuiOutlinedInput-notchedOutline": {
+                                    borderColor: 'primary.main',
+                                    borderWidth: 2,
+                                  }
+                                }
+                              },
+                              "& .MuiOutlinedInput-notchedOutline": {
+                                borderColor: 'rgba(0, 0, 0, 0.23)'
+                              },
+                              "& .MuiFormLabel-root": {
+                                position: 'relative',
+                                transform: 'none',
+                                marginBottom: '8px',
+                              },
+                              "& .MuiInputLabel-animated": {
+                                transition: 'none',
+                              },
+                              "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                                marginTop: '0',
                               }
                             }}
                           />
@@ -937,31 +981,51 @@ export function IncomeTable({
                             <TextField
                               value={editingRow?.amount || ''}
                               onChange={(e) => handleEditingChange('amount', e.target.value.replace(/[^0-9.]/g, ''))}
-                              variant="standard"
-                              size="small"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleSaveEdit(transaction);
-                                } else if (e.key === 'Escape') {
-                                  e.preventDefault();
-                                  setEditingRow(null);
+                              variant="outlined"
+                              fullWidth
+                              inputProps={{ style: { fontSize: '1.1rem' } }}
+                              InputProps={{
+                                startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>,
+                                notched: false,
+                              }}
+                              InputLabelProps={{
+                                shrink: true,
+                                sx: {
+                                  position: 'relative',
+                                  transform: 'none',
+                                  marginBottom: '8px', 
+                                  color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                                  fontWeight: 500,
+                                  fontSize: '0.9rem',
+                                  '&.Mui-focused': {
+                                    color: isDark ? '#fff' : 'primary.main',
+                                  }
                                 }
                               }}
-                              InputProps={{
-                                startAdornment: <span style={{ 
-                                  marginRight: 4,
-                                  color: isDark ? '#fff' : 'inherit',
-                                }}>$</span>,
-                                sx: {
-                                  color: isDark ? '#fff' : 'inherit',
-                                  fontSize: '0.95rem',
-                                  textAlign: 'right',
-                                  '& input': {
-                                    textAlign: 'right',
-                                    width: `${Math.max(70, (editingRow?.amount?.length || 1) * 8 + 10)}px`,
-                                    transition: 'width 0.1s'
+                              sx={{ 
+                                "& .MuiOutlinedInput-root": { 
+                                  backgroundColor: 'white',
+                                  borderRadius: '4px',
+                                  "&.Mui-focused": {
+                                    "& .MuiOutlinedInput-notchedOutline": {
+                                      borderColor: 'primary.main',
+                                      borderWidth: 2,
+                                    }
                                   }
+                                },
+                                "& .MuiOutlinedInput-notchedOutline": {
+                                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                                },
+                                "& .MuiFormLabel-root": {
+                                  position: 'relative',
+                                  transform: 'none',
+                                  marginBottom: '8px',
+                                },
+                                "& .MuiInputLabel-animated": {
+                                  transition: 'none',
+                                },
+                                "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                                  marginTop: '0',
                                 }
                               }}
                             />
@@ -1091,21 +1155,41 @@ export function IncomeTable({
                         value={newDescription}
                         onChange={(e) => setNewDescription(e.target.value)}
                         placeholder="Income Source"
-                        variant="standard"
-                        size="small"
+                        variant="outlined"
                         fullWidth
-                        sx={{
-                          '& input': {
-                            color: isDark ? '#fff' : 'inherit',
+                        inputProps={{ style: { fontSize: '1.1rem' } }}
+                        InputLabelProps={{
+                          shrink: true,
+                          sx: {
+                            position: 'relative',
+                            transform: 'none',
+                            marginBottom: '8px', 
+                            color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                            fontWeight: 500,
+                            fontSize: '0.9rem',
+                            '&.Mui-focused': {
+                              color: isDark ? '#fff' : 'primary.main',
+                            }
                           }
                         }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && newDescription && newAmount) {
-                            e.preventDefault();
-                            handleAddTransaction();
-                          } else if (e.key === 'Escape') {
-                            e.preventDefault();
-                            setIsAdding(false);
+                        sx={{ 
+                          "& .MuiOutlinedInput-root": { 
+                            backgroundColor: 'white' 
+                          },
+                          "& .MuiOutlinedInput-notchedOutline": {
+                            borderColor: 'rgba(0, 0, 0, 0.23)'
+                          },
+                          "& .MuiInputLabel-outlined": {
+                            color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                            fontWeight: 500,
+                            backgroundColor: 'transparent',
+                            '&.Mui-focused': {
+                              color: isDark ? '#fff' : 'primary.main',
+                            }
+                          },
+                          "& .MuiInputLabel-shrink": {
+                            bgcolor: tableColors['Income'],
+                            padding: '0 5px',
                           }
                         }}
                       />
@@ -1116,25 +1200,49 @@ export function IncomeTable({
                           type="date"
                           value={newDate}
                           onChange={(e) => setNewDate(e.target.value)}
-                          variant="standard"
-                          size="small"
-                          sx={{
-                            width: '140px',
-                            margin: '0 auto',
-                            '& input': {
-                              color: isDark ? '#fff' : 'inherit',
-                              textAlign: 'center',
+                          variant="outlined"
+                          fullWidth
+                          InputProps={{
+                            notched: false,
+                          }}
+                          InputLabelProps={{
+                            shrink: true,
+                            sx: {
+                              position: 'relative',
+                              transform: 'none',
+                              marginBottom: '8px', 
+                              color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                              fontWeight: 500,
                               fontSize: '0.9rem',
-                              padding: '4px 0',
+                              '&.Mui-focused': {
+                                color: isDark ? '#fff' : 'primary.main',
+                              }
                             }
                           }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newDescription && newAmount) {
-                              e.preventDefault();
-                              handleAddTransaction();
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
-                              setIsAdding(false);
+                          sx={{ 
+                            "& .MuiOutlinedInput-root": { 
+                              backgroundColor: 'white',
+                              borderRadius: '4px',
+                              "&.Mui-focused": {
+                                "& .MuiOutlinedInput-notchedOutline": {
+                                  borderColor: 'primary.main',
+                                  borderWidth: 2,
+                                }
+                              }
+                            },
+                            "& .MuiOutlinedInput-notchedOutline": {
+                              borderColor: 'rgba(0, 0, 0, 0.23)'
+                            },
+                            "& .MuiFormLabel-root": {
+                              position: 'relative',
+                              transform: 'none',
+                              marginBottom: '8px',
+                            },
+                            "& .MuiInputLabel-animated": {
+                              transition: 'none',
+                            },
+                            "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                              marginTop: '0',
                             }
                           }}
                         />
@@ -1142,36 +1250,37 @@ export function IncomeTable({
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <TextField
-                          value={newAmount}
-                          onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                          placeholder="0.00"
-                          variant="standard"
-                          size="small"
-                          sx={{
-                            '& input': {
-                              color: isDark ? '#fff' : 'inherit',
-                              textAlign: 'right',
-                              width: `${Math.max(70, (newAmount?.length || 1) * 8 + 10)}px`,
-                              transition: 'width 0.1s'
-                            }
+                      <TextField
+                        value={newAmount}
+                        onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                        placeholder="0.00"
+                          variant="outlined"
+                        fullWidth
+                          inputProps={{ style: { fontSize: '1.1rem' } }}
+                        InputProps={{
+                            startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
                           }}
-                          InputProps={{
-                            startAdornment: <span style={{ 
-                              marginRight: 4,
-                              color: isDark ? '#fff' : 'inherit',
-                            }}>$</span>,
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newDescription && newAmount) {
-                              e.preventDefault();
-                              handleAddTransaction();
-                            } else if (e.key === 'Escape') {
-                              e.preventDefault();
-                              setIsAdding(false);
-                            }
-                          }}
-                        />
+                          sx={{ 
+                            "& .MuiOutlinedInput-root": { 
+                              backgroundColor: 'white' 
+                            },
+                            "& .MuiOutlinedInput-notchedOutline": {
+                              borderColor: 'rgba(0, 0, 0, 0.23)'
+                            },
+                            "& .MuiInputLabel-outlined": {
+                              color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                              fontWeight: 500,
+                              backgroundColor: 'transparent',
+                              '&.Mui-focused': {
+                                color: isDark ? '#fff' : 'primary.main',
+                              }
+                            },
+                            "& .MuiInputLabel-shrink": {
+                              bgcolor: tableColors['Income'],
+                              padding: '0 5px',
+                          }
+                        }}
+                      />
                       </Box>
                     </TableCell>
                     <TableCell sx={{ 
@@ -1363,10 +1472,15 @@ export function IncomeTable({
                   Income
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="subtitle1" sx={{ 
-                    fontWeight: 600, 
-                    color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'text.primary'
-                  }}>
+                  <Typography 
+                    component="span" 
+                    variant="subtitle1" 
+                    sx={{ 
+                      fontWeight: 500, 
+                      color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
+                      fontSize: '0.9rem'
+                    }}
+                  >
                     (Total: ${totalIncome.toFixed(2)})
                   </Typography>
                   <CategoryColorPicker category="Income" />
@@ -1404,7 +1518,12 @@ export function IncomeTable({
                         backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)',
                         '&:hover': {
                           backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.9)',
-                        }
+                        },
+                        mx: '5px', // 5px margin on left and right sides
+                        mb: '5px', // Added 5px margin on bottom for spacing between rows
+                        position: 'relative', // Add position relative for absolute positioning of the click text
+                        borderRadius: 2, // Add border radius
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)', // Add box shadow
                       }}
                       onClick={() => handleOpenMobileEdit(transaction, index)}
                     >
@@ -1419,13 +1538,30 @@ export function IncomeTable({
                         </Grid>
                         <Grid item xs={4} sx={{ textAlign: 'right' }}>
                           <Typography variant="subtitle1" sx={{ 
-                            fontWeight: 600, 
-                            color: '#4caf50' 
+                            color: isDark ? '#fff' : 'text.primary' // Change from green to black/white
                           }}>
                             ${Math.abs(transaction.amount).toFixed(2)}
                           </Typography>
                         </Grid>
                       </Grid>
+                      
+                      {/* Click to edit text - absolute positioned to center without adding height */}
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          position: 'absolute',
+                          bottom: '4px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
+                          fontSize: '0.7rem',
+                          width: 'auto',
+                          textAlign: 'center',
+                          pointerEvents: 'none' // Prevents the text from interfering with clicks
+                        }}
+                      >
+                        (click to edit)
+                      </Typography>
                     </Box>
                   );
                 })}
@@ -1480,6 +1616,23 @@ export function IncomeTable({
                     fullWidth
                     placeholder="e.g., Salary, Freelance work"
                     inputProps={{ style: { fontSize: '1.1rem' } }}
+                    InputProps={{
+                      notched: false,
+                    }}
+                    InputLabelProps={{
+                      shrink: true,
+                      sx: {
+                        position: 'relative',
+                        transform: 'none',
+                        marginBottom: '8px', 
+                        color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                        fontWeight: 500,
+                        fontSize: '0.9rem',
+                        '&.Mui-focused': {
+                          color: isDark ? '#fff' : 'primary.main',
+                        }
+                      }
+                    }}
                     sx={{ 
                       "& .MuiOutlinedInput-root": { 
                         backgroundColor: 'white' 
@@ -1487,10 +1640,20 @@ export function IncomeTable({
                       "& .MuiOutlinedInput-notchedOutline": {
                         borderColor: 'rgba(0, 0, 0, 0.23)'
                       },
-                      "& .MuiInputLabel-outlined": {
-                        backgroundColor: 'white',
-                        paddingLeft: '5px',
-                        paddingRight: '5px'
+                      "& .MuiFormLabel-root": {
+                        position: 'relative',
+                        transform: 'none',
+                        marginBottom: '8px',
+                      },
+                      "& .MuiInputLabel-animated": {
+                        transition: 'none',
+                      },
+                      "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                        marginTop: '0',
+                      },
+                      "& .MuiFormHelperText-root": {
+                        marginTop: 1,
+                        color: formErrors.description ? '#f44336' : 'rgba(0, 0, 0, 0.6)',
                       }
                     }}
                   />
@@ -1502,53 +1665,51 @@ export function IncomeTable({
                     onChange={(e) => setNewDate(e.target.value)}
                     variant="outlined"
                     fullWidth
-                    InputLabelProps={{ shrink: true }}
-                    sx={{ 
-                      "& .MuiOutlinedInput-root": { 
-                        backgroundColor: 'white' 
-                      },
-                      "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: 'rgba(0, 0, 0, 0.23)'
-                      },
-                      "& .MuiInputLabel-outlined": {
-                        backgroundColor: 'white',
-                        paddingLeft: '5px',
-                        paddingRight: '5px'
-                      }
-                    }}
-                  />
-                  
-                  <TextField
-                    label="Amount"
-                    value={newAmount}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/[^0-9.]/g, '');
-                      setNewAmount(value);
-                      // Clear error when user types
-                      if (formErrors.amount && value && !isNaN(parseFloat(value))) {
-                        setFormErrors({...formErrors, amount: undefined});
-                      }
-                    }}
-                    error={!!formErrors.amount}
-                    helperText={formErrors.amount}
-                    variant="outlined"
-                    fullWidth
-                    placeholder="0.00"
-                    inputProps={{ style: { fontSize: '1.1rem' } }}
                     InputProps={{
-                      startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
+                      notched: false,
+                    }}
+                    InputLabelProps={{
+                      shrink: true,
+                      sx: {
+                        position: 'relative',
+                        transform: 'none',
+                        marginBottom: '8px', 
+                        color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                        fontWeight: 500,
+                        fontSize: '0.9rem',
+                        '&.Mui-focused': {
+                          color: isDark ? '#fff' : 'primary.main',
+                        }
+                      }
                     }}
                     sx={{ 
                       "& .MuiOutlinedInput-root": { 
-                        backgroundColor: 'white' 
+                        backgroundColor: 'white',
+                        borderRadius: '4px',
+                        "&.Mui-focused": {
+                          "& .MuiOutlinedInput-notchedOutline": {
+                            borderColor: 'primary.main',
+                            borderWidth: 2,
+                          }
+                        }
                       },
                       "& .MuiOutlinedInput-notchedOutline": {
                         borderColor: 'rgba(0, 0, 0, 0.23)'
                       },
-                      "& .MuiInputLabel-outlined": {
-                        backgroundColor: 'white',
-                        paddingLeft: '5px',
-                        paddingRight: '5px'
+                      "& .MuiFormLabel-root": {
+                        position: 'relative',
+                        transform: 'none',
+                        marginBottom: '8px',
+                      },
+                      "& .MuiInputLabel-animated": {
+                        transition: 'none',
+                      },
+                      "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                        marginTop: '0',
+                      },
+                      "& .MuiFormHelperText-root": {
+                        marginTop: 1,
+                        color: formErrors.amount ? '#f44336' : 'rgba(0, 0, 0, 0.6)',
                       }
                     }}
                   />
@@ -1588,8 +1749,16 @@ export function IncomeTable({
         onClose={handleCloseMobileEdit}
         fullWidth
         maxWidth="xs"
+        PaperProps={{
+          style: {
+            backgroundColor: tableColors['Income'],
+          }
+        }}
       >
-        <DialogTitle sx={{ pb: 1 }}>
+        <DialogTitle sx={{ 
+          pb: 1,
+          color: isDark ? '#fff' : 'inherit'
+        }}>
           Edit Income Source
         </DialogTitle>
         <DialogContent>
@@ -1598,20 +1767,56 @@ export function IncomeTable({
               label="Description"
               value={editingRow?.description || ''}
               onChange={(e) => handleEditingChange('description', e.target.value)}
+              error={!!formErrors.description}
+              helperText={formErrors.description}
               variant="outlined"
               fullWidth
               inputProps={{ style: { fontSize: '1.1rem' } }}
+              InputLabelProps={{
+                shrink: true,
+                sx: {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px', 
+                  color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                  fontWeight: 500,
+                  fontSize: '0.9rem',
+                  '&.Mui-focused': {
+                    color: isDark ? '#fff' : 'primary.main',
+                  }
+                }
+              }}
+              InputProps={{
+                notched: false,
+              }}
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
-                  backgroundColor: 'white' 
+                  backgroundColor: 'white',
+                  borderRadius: '4px',
+                  "&.Mui-focused": {
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: 'primary.main',
+                      borderWidth: 2,
+                    }
+                  }
                 },
                 "& .MuiOutlinedInput-notchedOutline": {
                   borderColor: 'rgba(0, 0, 0, 0.23)'
                 },
-                "& .MuiInputLabel-outlined": {
-                  backgroundColor: 'white',
-                  paddingLeft: '5px',
-                  paddingRight: '5px'
+                "& .MuiFormLabel-root": {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px',
+                },
+                "& .MuiInputLabel-animated": {
+                  transition: 'none',
+                },
+                "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                  marginTop: '0',
+                },
+                "& .MuiFormHelperText-root": {
+                  marginTop: 1,
+                  color: 'rgba(0, 0, 0, 0.6)',
                 }
               }}
             />
@@ -1623,18 +1828,52 @@ export function IncomeTable({
               onChange={(e) => handleEditingChange('date', e.target.value)}
               variant="outlined"
               fullWidth
-              InputLabelProps={{ shrink: true }}
+              inputProps={{ style: { fontSize: '1.1rem' } }}
+              InputLabelProps={{
+                shrink: true,
+                sx: {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px', 
+                  color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                  fontWeight: 500,
+                  fontSize: '0.9rem',
+                  '&.Mui-focused': {
+                    color: isDark ? '#fff' : 'primary.main',
+                  }
+                }
+              }}
+              InputProps={{
+                notched: false,
+              }}
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
-                  backgroundColor: 'white' 
+                  backgroundColor: 'white',
+                  borderRadius: '4px',
+                  "&.Mui-focused": {
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: 'primary.main',
+                      borderWidth: 2,
+                    }
+                  }
                 },
                 "& .MuiOutlinedInput-notchedOutline": {
                   borderColor: 'rgba(0, 0, 0, 0.23)'
                 },
-                "& .MuiInputLabel-outlined": {
-                  backgroundColor: 'white',
-                  paddingLeft: '5px',
-                  paddingRight: '5px'
+                "& .MuiFormLabel-root": {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px',
+                },
+                "& .MuiInputLabel-animated": {
+                  transition: 'none',
+                },
+                "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                  marginTop: '0',
+                },
+                "& .MuiFormHelperText-root": {
+                  marginTop: 1,
+                  color: 'rgba(0, 0, 0, 0.6)',
                 }
               }}
             />
@@ -1647,19 +1886,51 @@ export function IncomeTable({
               fullWidth
               inputProps={{ style: { fontSize: '1.1rem' } }}
               InputProps={{
-                startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
+                startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>,
+                notched: false,
+              }}
+              InputLabelProps={{
+                shrink: true,
+                sx: {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px', 
+                  color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                  fontWeight: 500,
+                  fontSize: '0.9rem',
+                  '&.Mui-focused': {
+                    color: isDark ? '#fff' : 'primary.main',
+                  }
+                }
               }}
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
-                  backgroundColor: 'white' 
+                  backgroundColor: 'white',
+                  borderRadius: '4px',
+                  "&.Mui-focused": {
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: 'primary.main',
+                      borderWidth: 2,
+                    }
+                  }
                 },
                 "& .MuiOutlinedInput-notchedOutline": {
                   borderColor: 'rgba(0, 0, 0, 0.23)'
                 },
-                "& .MuiInputLabel-outlined": {
-                  backgroundColor: 'white',
-                  paddingLeft: '5px',
-                  paddingRight: '5px'
+                "& .MuiFormLabel-root": {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px',
+                },
+                "& .MuiInputLabel-animated": {
+                  transition: 'none',
+                },
+                "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                  marginTop: '0',
+                },
+                "& .MuiFormHelperText-root": {
+                  marginTop: 1,
+                  color: 'rgba(0, 0, 0, 0.6)',
                 }
               }}
             />
@@ -1669,7 +1940,12 @@ export function IncomeTable({
           <Button 
             onClick={handleCloseMobileEdit} 
             variant="outlined"
-            sx={{ borderRadius: 2, px: 3 }}
+            sx={{ 
+              borderRadius: 2, 
+              px: 3,
+              color: isDark ? '#fff' : undefined,
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.5)' : undefined,
+            }}
           >
             Cancel
           </Button>
@@ -1694,6 +1970,9 @@ export function IncomeTable({
             }}
             color="error"
             size="small"
+            sx={{
+              backgroundColor: 'white',
+            }}
           >
             <DeleteIcon />
           </IconButton>
@@ -1706,8 +1985,16 @@ export function IncomeTable({
         onClose={handleCloseMobileAdd}
         fullWidth
         maxWidth="xs"
+        PaperProps={{
+          style: {
+            backgroundColor: tableColors['Income'],
+          }
+        }}
       >
-        <DialogTitle sx={{ pb: 1 }}>
+        <DialogTitle sx={{ 
+          pb: 1,
+          color: isDark ? '#fff' : 'inherit'
+        }}>
           New Income Source
         </DialogTitle>
         <DialogContent>
@@ -1728,17 +2015,51 @@ export function IncomeTable({
               fullWidth
               placeholder="e.g., Salary, Freelance work"
               inputProps={{ style: { fontSize: '1.1rem' } }}
+              InputProps={{
+                notched: false,
+              }}
+              InputLabelProps={{
+                shrink: true,
+                sx: {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px', 
+                  color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                  fontWeight: 500,
+                  fontSize: '0.9rem',
+                  '&.Mui-focused': {
+                    color: isDark ? '#fff' : 'primary.main',
+                  }
+                }
+              }}
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
-                  backgroundColor: 'white' 
+                  backgroundColor: 'white',
+                  borderRadius: '4px',
+                  "&.Mui-focused": {
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: 'primary.main',
+                      borderWidth: 2,
+                    }
+                  }
                 },
                 "& .MuiOutlinedInput-notchedOutline": {
                   borderColor: 'rgba(0, 0, 0, 0.23)'
                 },
-                "& .MuiInputLabel-outlined": {
-                  backgroundColor: 'white',
-                  paddingLeft: '5px',
-                  paddingRight: '5px'
+                "& .MuiFormLabel-root": {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px',
+                },
+                "& .MuiInputLabel-animated": {
+                  transition: 'none',
+                },
+                "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                  marginTop: '0',
+                },
+                "& .MuiFormHelperText-root": {
+                  marginTop: 1,
+                  color: formErrors.description ? '#f44336' : 'rgba(0, 0, 0, 0.6)',
                 }
               }}
             />
@@ -1750,18 +2071,47 @@ export function IncomeTable({
               onChange={(e) => setNewDate(e.target.value)}
               variant="outlined"
               fullWidth
-              InputLabelProps={{ shrink: true }}
+              InputProps={{
+                notched: false,
+              }}
+              InputLabelProps={{
+                shrink: true,
+                sx: {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px', 
+                  color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                  fontWeight: 500,
+                  fontSize: '0.9rem',
+                  '&.Mui-focused': {
+                    color: isDark ? '#fff' : 'primary.main',
+                  }
+                }
+              }}
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
-                  backgroundColor: 'white' 
+                  backgroundColor: 'white',
+                  borderRadius: '4px',
+                  "&.Mui-focused": {
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: 'primary.main',
+                      borderWidth: 2,
+                    }
+                  }
                 },
                 "& .MuiOutlinedInput-notchedOutline": {
                   borderColor: 'rgba(0, 0, 0, 0.23)'
                 },
-                "& .MuiInputLabel-outlined": {
-                  backgroundColor: 'white',
-                  paddingLeft: '5px',
-                  paddingRight: '5px'
+                "& .MuiFormLabel-root": {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px',
+                },
+                "& .MuiInputLabel-animated": {
+                  transition: 'none',
+                },
+                "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                  marginTop: '0',
                 }
               }}
             />
@@ -1784,19 +2134,51 @@ export function IncomeTable({
               placeholder="0.00"
               inputProps={{ style: { fontSize: '1.1rem' } }}
               InputProps={{
-                startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
+                startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>,
+                notched: false,
+              }}
+              InputLabelProps={{
+                shrink: true,
+                sx: {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px', 
+                  color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+                  fontWeight: 500,
+                  fontSize: '0.9rem',
+                  '&.Mui-focused': {
+                    color: isDark ? '#fff' : 'primary.main',
+                  }
+                }
               }}
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
-                  backgroundColor: 'white' 
+                  backgroundColor: 'white',
+                  borderRadius: '4px',
+                  "&.Mui-focused": {
+                    "& .MuiOutlinedInput-notchedOutline": {
+                      borderColor: 'primary.main',
+                      borderWidth: 2,
+                    }
+                  }
                 },
                 "& .MuiOutlinedInput-notchedOutline": {
                   borderColor: 'rgba(0, 0, 0, 0.23)'
                 },
-                "& .MuiInputLabel-outlined": {
-                  backgroundColor: 'white',
-                  paddingLeft: '5px',
-                  paddingRight: '5px'
+                "& .MuiFormLabel-root": {
+                  position: 'relative',
+                  transform: 'none',
+                  marginBottom: '8px',
+                },
+                "& .MuiInputLabel-animated": {
+                  transition: 'none',
+                },
+                "& .MuiFormLabel-filled + .MuiInputBase-root": {
+                  marginTop: '0',
+                },
+                "& .MuiFormHelperText-root": {
+                  marginTop: 1,
+                  color: formErrors.amount ? '#f44336' : 'rgba(0, 0, 0, 0.6)',
                 }
               }}
             />
@@ -1806,7 +2188,12 @@ export function IncomeTable({
           <Button 
             onClick={handleCloseMobileAdd} 
             variant="outlined"
-            sx={{ borderRadius: 2, px: 3 }}
+            sx={{ 
+              borderRadius: 2, 
+              px: 3,
+              color: isDark ? '#fff' : undefined,
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.5)' : undefined,
+            }}
           >
             Cancel
           </Button>

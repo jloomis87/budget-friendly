@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, CardContent, Grid, Typography } from '@mui/material';
+import { Card, CardContent, Grid, Typography, Box } from '@mui/material';
 import type { MobileTransactionCardProps } from './types';
 
 export function MobileTransactionCard({
@@ -12,10 +12,12 @@ export function MobileTransactionCard({
   return (
     <Card 
       sx={{ 
-        mb: 2, 
+        mb: '5px',
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'background.paper',
+        bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.5)',
         borderRadius: 2,
+        mx: '5px',
+        position: 'relative',
       }}
       onClick={() => handleOpenMobileEdit(transaction, index)}
     >
@@ -31,13 +33,29 @@ export function MobileTransactionCard({
           </Grid>
           <Grid item xs={4} sx={{ textAlign: 'right' }}>
             <Typography variant="subtitle1" sx={{ 
-              fontWeight: 600, 
               color: isDark ? '#fff' : 'text.primary' 
             }}>
               ${Math.abs(transaction.amount).toFixed(2)}
             </Typography>
           </Grid>
         </Grid>
+        
+        <Typography 
+          variant="caption" 
+          sx={{ 
+            position: 'absolute',
+            bottom: '4px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
+            fontSize: '0.7rem',
+            width: 'auto',
+            textAlign: 'center',
+            pointerEvents: 'none'
+          }}
+        >
+          (click to edit)
+        </Typography>
       </CardContent>
     </Card>
   );

@@ -54,7 +54,7 @@ export function MobileTransactionList({
       
       {/* Mobile Add Button - Only show when not adding */}
       {!isAdding && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 3 }}>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -70,7 +70,7 @@ export function MobileTransactionList({
               }
             }}
           >
-            Add {category} Expense
+            Add Expense
           </Button>
         </Box>
       )}

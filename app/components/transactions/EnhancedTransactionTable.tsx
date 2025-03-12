@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Box, Paper, useMediaQuery, useTheme } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Paper, useMediaQuery, useTheme, Typography } from '@mui/material';
 import { isColorDark } from '../../utils/colorUtils';
 import { useTableColors } from '../../hooks/useTableColors';
 import { useTransactionUtils } from './useTransactionUtils';
@@ -11,6 +11,7 @@ import { MobileEditDialog } from './MobileEditDialog';
 import { MobileAddDialog } from './MobileAddDialog';
 import type { Transaction } from '../../services/fileParser';
 import type { EnhancedTransactionTableProps, EditingRow } from './types';
+import { CategoryColorPicker } from '../CategoryColorPicker';
 
 export function EnhancedTransactionTable({
   category,
@@ -37,7 +38,18 @@ export function EnhancedTransactionTable({
   
   // Add theme and media query for responsive design
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  // Use a direct media query instead of theme breakpoints
+  const isDesktop = useMediaQuery('(min-width:1500px)');
+  const isMobile = !isDesktop;
+  
+  // Add debug console log
+  useEffect(() => {
+    console.log('Screen size state:', { 
+      isMobile, 
+      isDesktop,
+      windowWidth: window.innerWidth
+    });
+  }, [isMobile, isDesktop]);
   
   // Mobile edit dialog state
   const [mobileEditDialogOpen, setMobileEditDialogOpen] = useState(false);
@@ -226,6 +238,16 @@ export function EnhancedTransactionTable({
   // Handle opening mobile edit dialog
   const handleOpenMobileEdit = (transaction: Transaction, index: number) => {
     const transactionId = utils.getTransactionId(transaction);
+    const globalIndex = utils.findGlobalIndex(transaction, allTransactions);
+    
+    console.log('Opening mobile edit dialog:', {
+      transaction,
+      localIndex: index,
+      globalIndex,
+      category: transaction.category,
+      transactionId
+    });
+    
     setMobileEditTransaction({
       transaction,
       index,
@@ -242,7 +264,7 @@ export function EnhancedTransactionTable({
           : new Date(transaction.date as string).getDate().toString()));
     
     setEditingRow({
-      index: utils.findGlobalIndex(transaction, allTransactions),
+      index: globalIndex,
       identifier: transactionId,
       amount: Math.abs(transaction.amount).toString(),
       date: dayValue,
@@ -270,13 +292,18 @@ export function EnhancedTransactionTable({
         amount: parseFloat(editingRow.amount) * (category === 'Income' ? 1 : -1)
       };
       
+      // Find the global index in the full transactions array
+      const globalIndex = utils.findGlobalIndex(mobileEditTransaction.transaction, allTransactions);
+      
       console.log('Mobile Edit - Updating transaction:', {
         originalTransaction: mobileEditTransaction.transaction,
         updatedFields: updatedTransaction,
-        index: mobileEditTransaction.index
+        localIndex: mobileEditTransaction.index,
+        globalIndex: globalIndex
       });
       
-      onUpdateTransaction(mobileEditTransaction.index, updatedTransaction);
+      // Use the global index instead of the local category index
+      onUpdateTransaction(globalIndex, updatedTransaction);
       handleCloseMobileEdit();
     }
   };
@@ -339,14 +366,44 @@ export function EnhancedTransactionTable({
           borderRadius: 2,
           ...getBackgroundStyles()
         }}>
-          <TableHeader 
-            category={category} 
-            totalAmount={totalAmount} 
-            isDark={isDark} 
-          />
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <Typography variant="h6">
+              {category}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography 
+                component="span" 
+                variant="subtitle1"
+                sx={{ 
+                  fontWeight: 500, 
+                  color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
+                  fontSize: '0.9rem'
+                }}
+              >
+                (Total: ${totalAmount.toFixed(2)})
+              </Typography>
+              <CategoryColorPicker category={category} />
+            </Box>
+          </Box>
           
           {/* Render regular table for desktop or optimized cards for mobile */}
-          {!isMobile ? (
+          {!isDesktop ? (
+            <MobileTransactionList
+              category={category}
+              transactions={transactions}
+              isDark={isDark}
+              isAdding={isAdding}
+              handleOpenMobileEdit={handleOpenMobileEdit}
+              handleOpenMobileAdd={handleOpenMobileAdd}
+              isMobile={isMobile}
+              setIsAdding={setIsAdding}
+              formatDateForDisplay={utils.formatDateForDisplay}
+            />
+          ) : (
             <DesktopTransactionTable
               category={category}
               transactions={transactions}
@@ -374,18 +431,6 @@ export function EnhancedTransactionTable({
               formatDateForDisplay={utils.formatDateForDisplay}
               totalAmount={totalAmount}
               onRowClick={handleRowClick}
-            />
-          ) : (
-            <MobileTransactionList
-              category={category}
-              transactions={transactions}
-              isDark={isDark}
-              isAdding={isAdding}
-              handleOpenMobileEdit={handleOpenMobileEdit}
-              handleOpenMobileAdd={handleOpenMobileAdd}
-              isMobile={isMobile}
-              setIsAdding={setIsAdding}
-              formatDateForDisplay={utils.formatDateForDisplay}
             />
           )}
         </Paper>
@@ -419,6 +464,8 @@ export function EnhancedTransactionTable({
         handleEditingChange={handleEditingChange}
         generateDayOptions={utils.generateDayOptions}
         getOrdinalSuffix={utils.getOrdinalSuffix}
+        tableColor={tableColors[category]}
+        isDark={isDark}
       />
 
       {/* Mobile add dialog */}
@@ -435,6 +482,8 @@ export function EnhancedTransactionTable({
         onAdd={handleAddTransactionMobile}
         generateDayOptions={utils.generateDayOptions}
         getOrdinalSuffix={utils.getOrdinalSuffix}
+        tableColor={tableColors[category]}
+        isDark={isDark}
       />
     </>
   );

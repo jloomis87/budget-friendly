@@ -4,6 +4,15 @@ import { blue, green, grey } from '@mui/material/colors';
 
 // Create a theme instance
 const theme = createTheme({
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 1500,
+      md: 1650,
+      lg: 1900,
+      xl: 2200,
+    },
+  },
   palette: {
     primary: {
       main: blue[500],

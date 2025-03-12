@@ -123,6 +123,21 @@ export function ManualTransactionEntry({ onAddTransaction }: ManualTransactionEn
             placeholder={category === 'Income' ? "e.g., Salary, Bonus" : "e.g., Grocery Shopping"}
             InputLabelProps={{ shrink: true }}
             required
+            sx={{ 
+              "& .MuiOutlinedInput-root": { 
+                backgroundColor: 'white',
+                borderRadius: '4px',
+                "&.Mui-focused": {
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: 'primary.main',
+                    borderWidth: 2,
+                  }
+                }
+              },
+              "& .MuiOutlinedInput-notchedOutline": {
+                borderColor: 'rgba(0, 0, 0, 0.23)'
+              }
+            }}
           />
         </Grid>
         
@@ -140,6 +155,21 @@ export function ManualTransactionEntry({ onAddTransaction }: ManualTransactionEn
             }}
             InputLabelProps={{ shrink: true }}
             required
+            sx={{ 
+              "& .MuiOutlinedInput-root": { 
+                backgroundColor: 'white',
+                borderRadius: '4px',
+                "&.Mui-focused": {
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: 'primary.main',
+                    borderWidth: 2,
+                  }
+                }
+              },
+              "& .MuiOutlinedInput-notchedOutline": {
+                borderColor: 'rgba(0, 0, 0, 0.23)'
+              }
+            }}
           />
         </Grid>
         
@@ -154,6 +184,21 @@ export function ManualTransactionEntry({ onAddTransaction }: ManualTransactionEn
             helperText={errors.date}
             InputLabelProps={{ shrink: true }}
             required={category !== 'Income'}
+            sx={{ 
+              "& .MuiOutlinedInput-root": { 
+                backgroundColor: 'white',
+                borderRadius: '4px',
+                "&.Mui-focused": {
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: 'primary.main',
+                    borderWidth: 2,
+                  }
+                }
+              },
+              "& .MuiOutlinedInput-notchedOutline": {
+                borderColor: 'rgba(0, 0, 0, 0.23)'
+              }
+            }}
           />
         </Grid>
         
