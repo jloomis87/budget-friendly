@@ -18,6 +18,12 @@ export function MobileTransactionCard({
         borderRadius: 2,
         mx: '5px',
         position: 'relative',
+        transition: 'all 0.2s ease',
+        cursor: 'pointer',
+        '&:hover': {
+          backgroundColor: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.7)',
+          boxShadow: '0 3px 6px rgba(0,0,0,0.15)',
+        }
       }}
       onClick={() => handleOpenMobileEdit(transaction, index)}
     >

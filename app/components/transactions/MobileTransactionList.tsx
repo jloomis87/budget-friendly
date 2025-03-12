@@ -11,7 +11,6 @@ interface MobileTransactionListProps {
   isAdding: boolean;
   handleOpenMobileEdit: (transaction: Transaction, index: number) => void;
   handleOpenMobileAdd: () => void;
-  isMobile: boolean;
   setIsAdding: (value: boolean) => void;
   formatDateForDisplay: (date: Date | string | number) => string;
 }
@@ -23,7 +22,6 @@ export function MobileTransactionList({
   isAdding,
   handleOpenMobileEdit,
   handleOpenMobileAdd,
-  isMobile,
   setIsAdding,
   formatDateForDisplay
 }: MobileTransactionListProps) {
@@ -60,26 +58,24 @@ export function MobileTransactionList({
       {!isAdding && (
         <Box sx={{ 
           p: 2, 
-          display: 'flex', 
-          justifyContent: 'center',
+          textAlign: 'center',
           backgroundColor: 'rgba(255, 255, 255, 0.05)' 
         }}>
           <Button
             variant="contained"
-            startIcon={<AddIcon />}
-            onClick={isMobile ? handleOpenMobileAdd : () => setIsAdding(true)}
+            onClick={handleOpenMobileAdd}
             sx={{ 
-              borderRadius: 2,
+              bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+              color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+              borderRadius: 8,
               py: 1,
               px: 3,
-              backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'primary.main',
-              color: isDark ? '#fff' : 'white',
               '&:hover': {
-                backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'primary.dark',
+                bgcolor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
               }
             }}
           >
-            ADD EXPENSE
+            <AddIcon sx={{ mr: 1 }} /> ADD EXPENSE
           </Button>
         </Box>
       )}

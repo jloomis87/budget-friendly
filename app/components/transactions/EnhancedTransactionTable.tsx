@@ -36,21 +36,6 @@ export function EnhancedTransactionTable({
   const [newDate, setNewDate] = useState('1');
   const [isAdding, setIsAdding] = useState(false);
   
-  // Add theme and media query for responsive design
-  const theme = useTheme();
-  // Use a direct media query instead of theme breakpoints
-  const isDesktop = useMediaQuery('(min-width:1500px)');
-  const isMobile = !isDesktop;
-  
-  // Add debug console log
-  useEffect(() => {
-    console.log('Screen size state:', { 
-      isMobile, 
-      isDesktop,
-      windowWidth: window.innerWidth
-    });
-  }, [isMobile, isDesktop]);
-  
   // Mobile edit dialog state
   const [mobileEditDialogOpen, setMobileEditDialogOpen] = useState(false);
   const [mobileEditTransaction, setMobileEditTransaction] = useState<{
@@ -399,49 +384,17 @@ export function EnhancedTransactionTable({
             </Box>
           </Box>
           
-          {/* Render regular table for desktop or optimized cards for mobile */}
-          {!isDesktop ? (
-            <MobileTransactionList
-              category={category}
-              transactions={transactions}
-              isDark={isDark}
-              isAdding={isAdding}
-              handleOpenMobileEdit={handleOpenMobileEdit}
-              handleOpenMobileAdd={handleOpenMobileAdd}
-              isMobile={isMobile}
-              setIsAdding={setIsAdding}
-              formatDateForDisplay={utils.formatDateForDisplay}
-            />
-          ) : (
-            <DesktopTransactionTable
-              category={category}
-              transactions={transactions}
-              isDark={isDark}
-              isAnyRowEditing={isAnyRowEditing}
-              isAdding={isAdding}
-              editingRow={editingRow}
-              newDescription={newDescription}
-              newAmount={newAmount}
-              newDate={newDate}
-              setNewDescription={setNewDescription}
-              setNewAmount={setNewAmount}
-              setNewDate={setNewDate}
-              setIsAdding={setIsAdding}
-              handleAddTransaction={handleAddTransaction}
-              onEditingChange={handleEditingChange}
-              handleSaveEdit={handleSaveEdit}
-              setEditingRow={setEditingRow}
-              handleDeleteClick={handleDeleteClick}
-              onDragStart={onDragStart}
-              findGlobalIndex={(transaction) => utils.findGlobalIndex(transaction, allTransactions)}
-              getTransactionId={utils.getTransactionId}
-              generateDayOptions={utils.generateDayOptions}
-              getOrdinalSuffix={utils.getOrdinalSuffix}
-              formatDateForDisplay={utils.formatDateForDisplay}
-              totalAmount={totalAmount}
-              onRowClick={handleRowClick}
-            />
-          )}
+          {/* Always use the mobile view regardless of screen size */}
+          <MobileTransactionList
+            category={category}
+            transactions={[...transactions].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))}
+            isDark={isDark}
+            isAdding={isAdding}
+            handleOpenMobileEdit={handleOpenMobileEdit}
+            handleOpenMobileAdd={handleOpenMobileAdd}
+            setIsAdding={setIsAdding}
+            formatDateForDisplay={utils.formatDateForDisplay}
+          />
         </Paper>
       </Box>
 
