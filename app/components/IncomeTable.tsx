@@ -289,11 +289,7 @@ export function IncomeTable({
   
   // Add debug logging
   useEffect(() => {
-    console.log('IncomeTable - Screen size state:', {
-      isMobile,
-      isDesktop,
-      windowWidth: window.innerWidth
-    });
+   
   }, [isMobile, isDesktop]);
 
   // Mobile edit dialog state

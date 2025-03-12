@@ -62,12 +62,12 @@ export function useTransactions() {
     const loadTransactions = async () => {
       // Only proceed if we have both authentication and a valid user ID
       if (isAuthenticated && user?.id) {
-        console.log('[useTransactions] Loading transactions for user:', user.id);
+
         
         setIsLoading(true);
         try {
           const userTransactions = await transactionService.getUserTransactions(user.id);
-          console.log('[useTransactions] Loaded transactions:', userTransactions.length);
+
           
           setTransactions(userTransactions);
           
@@ -97,14 +97,13 @@ export function useTransactions() {
         }
       } else if (!isAuthenticated) {
         // If not authenticated, use local storage
-        console.log('[useTransactions] Using local storage data (not authenticated)');
         setTransactions(localTransactions);
         setBudgetSummary(localBudgetSummary);
         setBudgetPlan(localBudgetPlan);
         setSuggestions(localSuggestions);
       } else {
         // User is authenticated but id is not yet available
-        console.log('[useTransactions] Waiting for user ID to be available...');
+
         setIsLoading(true);
       }
     };
@@ -115,8 +114,6 @@ export function useTransactions() {
   // Add a transaction
   const addTransaction = useCallback(async (transaction: Transaction) => {
     try {
-      console.log('[useTransactions] Starting to add transaction:', transaction);
-      console.log('[useTransactions] Auth state:', { isAuthenticated, userId: user?.id });
       
       const newTransaction = {
         ...transaction,
@@ -127,12 +124,10 @@ export function useTransactions() {
       
       // If authenticated, save to Firestore
       if (isAuthenticated && user?.id) {
-        console.log('[useTransactions] User authenticated, saving to Firebase. User ID:', user.id);
         setIsLoading(true);
         
         try {
           transactionId = await transactionService.addTransaction(user.id, newTransaction);
-          console.log('[useTransactions] Transaction saved to Firebase with ID:', transactionId);
           
           // Add the id to the transaction
           newTransaction.id = transactionId;
@@ -141,23 +136,21 @@ export function useTransactions() {
           throw firebaseError;
         }
       } else {
-        console.log('[useTransactions] User not authenticated or no ID, transaction will be saved locally only');
       }
       
       // Update local state
       const updatedTransactions = [...transactions, newTransaction];
-      console.log('[useTransactions] Updating local state with new transaction. Total transactions:', updatedTransactions.length);
+
       setTransactions(updatedTransactions);
       
       // If not authenticated, save to localStorage
       if (!isAuthenticated || !user?.id) {
-        console.log('[useTransactions] Saving transaction to localStorage');
+
         setLocalTransactions(updatedTransactions);
       }
       
       // Process transactions for budget calculations
       try {
-        console.log('[useTransactions] Processing budget calculations');
         // Calculate budget summary
         const summary = calculateBudgetSummary(updatedTransactions);
         setBudgetSummary(summary);
@@ -264,20 +257,10 @@ export function useTransactions() {
     try {
       // If authenticated and transaction has an ID, update in Firestore
       if (isAuthenticated && user?.id && transaction.id) {
-        console.log('[useTransactions] Updating transaction in Firebase:', {
-          transactionId: transaction.id,
-          userId: user.id,
-          updates: updatedFields
-        });
+
         setIsLoading(true);
         await transactionService.updateTransaction(transaction.id, updatedFields, user.id);
-      } else {
-        console.log('[useTransactions] Skipping Firebase update:', {
-          isAuthenticated,
-          hasUserId: Boolean(user?.id),
-          hasTransactionId: Boolean(transaction.id)
-        });
-      }
+      } 
       
       // Update local state
       const updatedTransactions = [...transactions];
@@ -509,27 +492,18 @@ export function useTransactions() {
       'Savings': []
     };
     
-    console.log('[useTransactions] getTransactionsByCategory - Total transactions:', transactions.length);
     
     // Group transactions (excluding Income)
     transactions.forEach(transaction => {
-      console.log('[useTransactions] Processing transaction:', transaction);
       
       if (transaction.category && transaction.category !== 'Income' && 
           (transaction.category === 'Essentials' || 
            transaction.category === 'Wants' || 
            transaction.category === 'Savings')) {
         grouped[transaction.category].push(transaction);
-      } else {
-        console.log('[useTransactions] Skipped transaction - Category:', transaction.category);
       }
     });
-    
-    console.log('[useTransactions] Grouped transactions count:', {
-      Essentials: grouped['Essentials'].length,
-      Wants: grouped['Wants'].length,
-      Savings: grouped['Savings'].length
-    });
+
     
     return grouped;
   }, [transactions]);
@@ -545,7 +519,7 @@ export function useTransactions() {
   const resetTransactions = useCallback(async () => {
     // Check for both authentication and valid user ID
     if (!isAuthenticated || !user?.id) {
-      console.log('[resetTransactions] Not authenticated or no user ID, skipping Firebase deletion');
+    
       // Reset local storage only
       setLocalTransactions([]);
       setLocalBudgetSummary(null);
@@ -556,42 +530,37 @@ export function useTransactions() {
 
     try {
       setIsLoading(true);
-      console.log('[resetTransactions] Starting reset for user:', user.id);
+  
 
       // Delete all transactions from Firebase for the current user
       const transactionsRef = collection(db, 'users', user.id, 'transactions');
-      console.log('[resetTransactions] Fetching transactions from:', transactionsRef.path);
       
       const querySnapshot = await getDocs(transactionsRef);
-      console.log('[resetTransactions] Found transactions:', querySnapshot.size);
 
       if (!querySnapshot.empty) {
         const batch = writeBatch(db);
         let deleteCount = 0;
 
         querySnapshot.forEach((doc) => {
-          console.log('[resetTransactions] Adding doc to batch delete:', doc.id);
           batch.delete(doc.ref);
           deleteCount++;
         });
 
-        console.log(`[resetTransactions] Attempting to delete ${deleteCount} transactions`);
+
         await batch.commit();
-        console.log('[resetTransactions] Batch delete completed successfully');
+
 
         // Verify deletion
         const verifySnapshot = await getDocs(transactionsRef);
         if (verifySnapshot.empty) {
-          console.log('[resetTransactions] Verification: All transactions deleted successfully');
+
         } else {
           console.warn('[resetTransactions] Verification: Some transactions still exist:', verifySnapshot.size);
         }
-      } else {
-        console.log('[resetTransactions] No transactions found to delete');
-      }
+      } 
 
       // Reset all state and trigger reload
-      console.log('[resetTransactions] Resetting application state');
+ 
       setTransactions([]);
       setBudgetSummary(null);
       setBudgetPlan(null);

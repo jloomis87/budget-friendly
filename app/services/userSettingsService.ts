@@ -22,7 +22,7 @@ export interface UserSettings {
  */
 export const getUserSettings = async (userId: string): Promise<UserSettings | null> => {
   try {
-    console.log(`[Firebase] Getting settings for user ID: "${userId}"`);
+    
     
     if (!userId) {
       console.error('[Firebase] Error: getUserSettings called with empty userId');
@@ -36,10 +36,10 @@ export const getUserSettings = async (userId: string): Promise<UserSettings | nu
     const settingsDoc = await getDoc(settingsDocRef);
     
     if (settingsDoc.exists()) {
-      console.log('[Firebase] User settings found:', settingsDoc.data());
+     
       return settingsDoc.data() as UserSettings;
     } else {
-      console.log('[Firebase] No settings found for user. Creating default settings.');
+     
       
       // Create default settings if none exist
       const defaultSettings: UserSettings = {
@@ -70,7 +70,7 @@ export const getUserSettings = async (userId: string): Promise<UserSettings | nu
  */
 export const saveUserSettings = async (userId: string, settings: UserSettings): Promise<boolean> => {
   try {
-    console.log(`[Firebase] Saving settings for user ID: "${userId}"`, settings);
+    
     
     if (!userId) {
       console.error('[Firebase] Error: saveUserSettings called with empty userId');
@@ -91,7 +91,7 @@ export const saveUserSettings = async (userId: string, settings: UserSettings): 
       await setDoc(settingsDocRef, settings);
     }
     
-    console.log('[Firebase] User settings saved successfully');
+   
     return true;
   } catch (error) {
     console.error('[Firebase] Error saving user settings:', error);
@@ -107,7 +107,7 @@ export const saveUserSettings = async (userId: string, settings: UserSettings): 
  */
 export const saveTableColors = async (userId: string, tableColors: Record<string, string>): Promise<boolean> => {
   try {
-    console.log(`[Firebase] Saving table colors for user ID: "${userId}"`, tableColors);
+    
     
     if (!userId) {
       console.error('[Firebase] Error: saveTableColors called with empty userId');
@@ -128,7 +128,7 @@ export const saveTableColors = async (userId: string, tableColors: Record<string
       await setDoc(settingsDocRef, { tableColors });
     }
     
-    console.log('[Firebase] Table colors saved successfully');
+   
     return true;
   } catch (error) {
     console.error('[Firebase] Error saving table colors:', error);

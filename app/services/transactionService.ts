@@ -20,7 +20,7 @@ const getUserTransactionsRef = (userId: string) => {
     console.error('[Firebase] getUserTransactionsRef called with invalid userId:', userId);
     throw new Error('Valid user ID string is required');
   }
-  console.log('[Firebase] Creating collection reference for user:', userId);
+ 
   return collection(db, 'users', userId, 'transactions');
 };
 
@@ -31,11 +31,8 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
   }
 
   try {
-    console.log('[transactionService] Adding transaction for user:', userId);
-    console.log('[transactionService] Transaction data:', transactionData);
 
     const transactionsRef = getUserTransactionsRef(userId);
-    console.log('[transactionService] Collection path:', transactionsRef.path);
 
     const docRef = await addDoc(transactionsRef, {
       ...transactionData,
@@ -43,7 +40,6 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
       createdAt: new Date().toISOString()
     });
 
-    console.log('[transactionService] Transaction added successfully:', docRef.id);
     return docRef.id;
   } catch (error) {
     console.error('[transactionService] Error adding transaction:', error);
@@ -54,7 +50,7 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
 // Get all transactions for a user
 export const getUserTransactions = async (userId: string): Promise<Transaction[]> => {
   try {
-    console.log(`[Firebase] Getting transactions for user ID: "${userId}"`);
+   
     
     if (!userId) {
       console.error('[Firebase] Error: getUserTransactions called with empty userId');
@@ -62,19 +58,16 @@ export const getUserTransactions = async (userId: string): Promise<Transaction[]
     }
     
     const transactionsRef = getUserTransactionsRef(userId);
-    console.log(`[Firebase] Collection reference created for user: ${userId}`);
     
     const q = query(
       transactionsRef,
       orderBy('date', 'desc')
     );
     
-    console.log(`[Firebase] Executing Firestore query for user: ${userId}`);
     const querySnapshot = await getDocs(q);
-    console.log(`[Firebase] Query returned ${querySnapshot.size} documents`);
     
     if (querySnapshot.size === 0) {
-      console.log(`[Firebase] No transactions found for user: ${userId}`);
+     
     }
     
     const transactions: Transaction[] = [];
@@ -82,8 +75,7 @@ export const getUserTransactions = async (userId: string): Promise<Transaction[]
     querySnapshot.forEach((doc) => {
       try {
         const data = doc.data();
-        console.log(`[Firebase] Processing document: ${doc.id}`, data);
-        
+
         if (!data.date) {
           console.warn(`[Firebase] Transaction ${doc.id} missing date field`);
           return; // Skip this document
@@ -94,11 +86,9 @@ export const getUserTransactions = async (userId: string): Promise<Transaction[]
         if (typeof data.date === 'number') {
           // If it's already a number, use it directly
           processedDate = data.date;
-          console.log(`[Firebase] Document ${doc.id} has numeric date: ${processedDate}`);
         } else if (data.date && typeof data.date.toDate === 'function') {
           // If it's a Firestore timestamp, convert to Date
           processedDate = data.date.toDate();
-          console.log(`[Firebase] Document ${doc.id} has timestamp date, converted to: ${processedDate}`);
         } else {
           // Fallback for other date formats
           console.warn(`[Firebase] Document ${doc.id} has unknown date format:`, data.date);
@@ -118,13 +108,12 @@ export const getUserTransactions = async (userId: string): Promise<Transaction[]
       }
     });
     
-    console.log(`[Firebase] Successfully processed ${transactions.length} transactions`);
     return transactions;
   } catch (error) {
     console.error('[Firebase] Error in getUserTransactions:', error);
     
     // Return empty array instead of throwing error
-    console.log('[Firebase] Returning empty transactions array due to error');
+   
     return [];
   }
 };
@@ -136,10 +125,10 @@ export const updateTransaction = async (transactionId: string, updates: Partial<
   }
 
   try {
-    console.log('[transactionService] Updating transaction:', transactionId, 'for user:', userId);
+   
     const transactionRef = doc(getUserTransactionsRef(userId), transactionId);
     await updateDoc(transactionRef, { ...updates, updatedAt: new Date().toISOString() });
-    console.log('[transactionService] Transaction updated successfully');
+   
   } catch (error) {
     console.error('[transactionService] Error updating transaction:', error);
     throw error;
@@ -153,10 +142,10 @@ export const deleteTransaction = async (transactionId: string, userId: string) =
   }
 
   try {
-    console.log('[transactionService] Deleting transaction:', transactionId, 'for user:', userId);
+   
     const transactionRef = doc(getUserTransactionsRef(userId), transactionId);
     await deleteDoc(transactionRef);
-    console.log('[transactionService] Transaction deleted successfully');
+   
   } catch (error) {
     console.error('[transactionService] Error deleting transaction:', error);
     throw error;

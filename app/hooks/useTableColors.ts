@@ -39,7 +39,7 @@ export function useTableColors() {
     const loadTableColorsFromFirebase = async () => {
       setIsLoading(true);
       try {
-        console.log(`[useTableColors] Loading table colors from Firebase for user: ${user.id}`);
+          
         
         // Get user settings from Firestore
         const settings = await userSettingsService.getUserSettings(user.id);
@@ -48,16 +48,15 @@ export function useTableColors() {
         initialLoadDoneRef.current[user.id] = true;
         
         if (settings && settings.tableColors) {
-          console.log('[useTableColors] Found table colors in Firebase:', settings.tableColors);
           
           // Update local storage
           setLocalTableColors(settings.tableColors);
         } else {
-          console.log('[useTableColors] No table colors found in Firebase, using local settings');
+          
           
           // If user has custom colors in localStorage but not in Firebase, save them to Firebase
           if (JSON.stringify(localTableColors) !== JSON.stringify(DEFAULT_TABLE_COLORS)) {
-            console.log('[useTableColors] Saving local table colors to Firebase:', localTableColors);
+            
             await userSettingsService.saveTableColors(user.id, localTableColors);
           }
         }
@@ -82,7 +81,6 @@ export function useTableColors() {
         ? newColors(localTableColors) 
         : newColors;
       
-      console.log(`[useTableColors] Saving table colors to Firebase for user: ${user.id}`, colors);
       userSettingsService.saveTableColors(user.id, colors)
         .catch(error => {
           console.error('[useTableColors] Error saving table colors to Firebase:', error);
