@@ -1065,6 +1065,11 @@ export function EnhancedTransactionTable({
                         variant="outlined"
                         fullWidth
                         placeholder="e.g., Groceries"
+                        sx={{ 
+                          "& .MuiOutlinedInput-root": { 
+                            backgroundColor: 'white' 
+                          }
+                        }}
                       />
                       
                       <TextField
@@ -1075,6 +1080,11 @@ export function EnhancedTransactionTable({
                         variant="outlined"
                         fullWidth
                         InputLabelProps={{ shrink: true }}
+                        sx={{ 
+                          "& .MuiOutlinedInput-root": { 
+                            backgroundColor: 'white' 
+                          }
+                        }}
                       />
                       
                       <TextField
@@ -1086,6 +1096,11 @@ export function EnhancedTransactionTable({
                         placeholder="0.00"
                         InputProps={{
                           startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
+                        }}
+                        sx={{ 
+                          "& .MuiOutlinedInput-root": { 
+                            backgroundColor: 'white' 
+                          }
                         }}
                       />
                       
@@ -1186,6 +1201,11 @@ export function EnhancedTransactionTable({
               variant="outlined"
               fullWidth
               inputProps={{ style: { fontSize: '1.1rem' } }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                }
+              }}
             />
             
             <TextField
@@ -1196,6 +1216,11 @@ export function EnhancedTransactionTable({
               variant="outlined"
               fullWidth
               InputLabelProps={{ shrink: true }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                }
+              }}
             />
             
             <TextField
@@ -1207,6 +1232,11 @@ export function EnhancedTransactionTable({
               inputProps={{ style: { fontSize: '1.1rem' } }}
               InputProps={{
                 startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
+              }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                }
               }}
             />
           </Stack>

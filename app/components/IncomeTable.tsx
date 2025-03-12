@@ -1407,6 +1407,11 @@ export function IncomeTable({
                     variant="outlined"
                     fullWidth
                     placeholder="e.g., Salary, Freelance work"
+                    sx={{ 
+                      "& .MuiOutlinedInput-root": { 
+                        backgroundColor: 'white' 
+                      }
+                    }}
                   />
                   
                   <TextField
@@ -1417,6 +1422,11 @@ export function IncomeTable({
                     variant="outlined"
                     fullWidth
                     InputLabelProps={{ shrink: true }}
+                    sx={{ 
+                      "& .MuiOutlinedInput-root": { 
+                        backgroundColor: 'white' 
+                      }
+                    }}
                   />
                   
                   <TextField
@@ -1437,6 +1447,11 @@ export function IncomeTable({
                     placeholder="0.00"
                     InputProps={{
                       startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
+                    }}
+                    sx={{ 
+                      "& .MuiOutlinedInput-root": { 
+                        backgroundColor: 'white' 
+                      }
                     }}
                   />
                   
@@ -1488,6 +1503,11 @@ export function IncomeTable({
               variant="outlined"
               fullWidth
               inputProps={{ style: { fontSize: '1.1rem' } }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                }
+              }}
             />
             
             <TextField
@@ -1498,6 +1518,11 @@ export function IncomeTable({
               variant="outlined"
               fullWidth
               InputLabelProps={{ shrink: true }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                }
+              }}
             />
             
             <TextField
@@ -1509,6 +1534,11 @@ export function IncomeTable({
               inputProps={{ style: { fontSize: '1.1rem' } }}
               InputProps={{
                 startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
+              }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                }
               }}
             />
           </Stack>
