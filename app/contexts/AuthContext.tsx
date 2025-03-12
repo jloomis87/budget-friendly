@@ -50,55 +50,79 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Listen for auth state changes
   useEffect(() => {
+    console.log('[AuthContext] Setting up auth state change listener');
+    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setIsLoading(true);
+      
       if (firebaseUser) {
+        console.log('[AuthContext] User authenticated:', firebaseUser.uid);
+        
         try {
           // Get user data from Firestore
+          console.log('[AuthContext] Fetching user data from Firestore');
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           const userDoc = await getDoc(userDocRef);
           
           if (userDoc.exists()) {
             // User exists in Firestore
+            console.log('[AuthContext] User document found in Firestore');
             const userData = userDoc.data() as Omit<User, 'id'>;
-            setUser({
+            
+            const userObj = {
               id: firebaseUser.uid,
               ...userData
-            });
+            };
+            
+            console.log('[AuthContext] Setting user state with Firestore data:', userObj);
+            setUser(userObj);
           } else {
             // User exists in Auth but not in Firestore
             // This is a fallback that should rarely happen
-            setUser({
+            console.log('[AuthContext] User exists in Auth but not in Firestore, creating fallback user');
+            
+            const userObj = {
               id: firebaseUser.uid,
               email: firebaseUser.email,
               name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
               createdAt: new Date().toISOString()
-            });
+            };
+            
+            console.log('[AuthContext] Setting user state with fallback data:', userObj);
+            setUser(userObj);
           }
         } catch (err) {
-          console.error('Error fetching user data:', err);
+          console.error('[AuthContext] Error fetching user data:', err);
           setError('Failed to load user data');
         }
       } else {
+        console.log('[AuthContext] No authenticated user found');
         setUser(null);
       }
+      
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log('[AuthContext] Cleaning up auth state change listener');
+      unsubscribe();
+    };
   }, []);
 
   // Login function with Firebase
   const login = async (email: string, password: string) => {
+    console.log(`[AuthContext] Attempting login for email: ${email}`);
     setIsLoading(true);
     setError(null);
     
     try {
       // Sign in with Firebase Authentication
-      await signInWithEmailAndPassword(auth, email, password);
+      console.log('[AuthContext] Calling Firebase signInWithEmailAndPassword');
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      console.log('[AuthContext] Login successful, user ID:', result.user.uid);
       // Auth state change listener will update the user state
     } catch (err: any) {
-      console.error('Login error:', err);
+      console.error('[AuthContext] Login error:', err);
       
       // Handle specific Firebase error codes
       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
@@ -114,18 +138,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Signup function with Firebase
   const signup = async (email: string, password: string, name: string) => {
+    console.log(`[AuthContext] Attempting signup for email: ${email}, name: ${name}`);
     setIsLoading(true);
     setError(null);
     
     try {
       // Create user with Firebase Authentication
+      console.log('[AuthContext] Calling Firebase createUserWithEmailAndPassword');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
+      console.log('[AuthContext] User created in Firebase Auth, ID:', firebaseUser.uid);
       
       // Update user profile with name
+      console.log('[AuthContext] Updating user profile with display name');
       await updateProfile(firebaseUser, { displayName: name });
       
       // Create user document in Firestore
+      console.log('[AuthContext] Creating user document in Firestore');
       const newUser: Omit<User, 'id'> = {
         email,
         name,
@@ -133,10 +162,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       
       await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+      console.log('[AuthContext] User document created in Firestore');
       
       // Auth state change listener will update the user state
     } catch (err: any) {
-      console.error('Signup error:', err);
+      console.error('[AuthContext] Signup error:', err);
       
       // Handle specific Firebase error codes
       if (err.code === 'auth/email-already-in-use') {

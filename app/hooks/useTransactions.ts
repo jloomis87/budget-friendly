@@ -56,17 +56,26 @@ export function useTransactions() {
   useEffect(() => {
     const loadTransactions = async () => {
       if (isAuthenticated && user) {
+        console.log('[useTransactions] User is authenticated, loading transactions from Firebase');
+        console.log('[useTransactions] Current user:', user);
+        
         setIsLoading(true);
         try {
-          console.log('Fetching transactions for user:', user.id);
+          console.log('[useTransactions] Fetching transactions for user ID:', user.id);
           const userTransactions = await transactionService.getUserTransactions(user.id);
-          console.log('Transactions fetched successfully:', userTransactions.length);
+          console.log('[useTransactions] Transactions fetched successfully:', userTransactions.length);
+          
+          // Log some info about the transactions to help with debugging
+          if (userTransactions.length > 0) {
+            console.log('[useTransactions] First few transactions:', userTransactions.slice(0, 3));
+          }
           
           // This is a successful result, even if the array is empty (user has no transactions)
           setTransactions(userTransactions);
           
           // Process loaded transactions
           if (userTransactions.length > 0) {
+            console.log('[useTransactions] Processing loaded transactions');
             // Calculate budget summary
             const summary = calculateBudgetSummary(userTransactions);
             setBudgetSummary(summary);
@@ -78,19 +87,22 @@ export function useTransactions() {
             // Generate suggestions
             const budgetSuggestions = getBudgetSuggestions(plan);
             setSuggestions(budgetSuggestions);
+            
+            console.log('[useTransactions] Transaction processing complete');
           } else {
             // Clear any previous data if there are no transactions
+            console.log('[useTransactions] No transactions found, clearing budget data');
             setBudgetSummary(null);
             setBudgetPlan(null);
             setSuggestions([]);
           }
         } catch (error) {
           // Log the detailed error for debugging
-          console.error('Detailed error loading transactions:', error);
+          console.error('[useTransactions] Detailed error loading transactions:', error);
           if (error instanceof Error) {
-            console.error('Error name:', error.name);
-            console.error('Error message:', error.message);
-            console.error('Error stack:', error.stack);
+            console.error('[useTransactions] Error name:', error.name);
+            console.error('[useTransactions] Error message:', error.message);
+            console.error('[useTransactions] Error stack:', error.stack);
           }
           
           // For now, just clear the data without showing an error message
@@ -112,6 +124,7 @@ export function useTransactions() {
         }
       } else {
         // If not authenticated, use local storage data
+        console.log('[useTransactions] User not authenticated, using local storage data');
         setTransactions(localTransactions);
         setBudgetSummary(localBudgetSummary);
         setBudgetPlan(localBudgetPlan);
@@ -125,6 +138,8 @@ export function useTransactions() {
   // Add a transaction
   const addTransaction = useCallback(async (transaction: Transaction) => {
     try {
+      console.log('[useTransactions] Adding transaction:', transaction);
+      
       const newTransaction = {
         ...transaction,
         date: transaction.date instanceof Date ? transaction.date : new Date(transaction.date)
@@ -132,19 +147,25 @@ export function useTransactions() {
       
       // If authenticated, save to Firestore
       if (isAuthenticated && user) {
+        console.log('[useTransactions] User authenticated, saving to Firebase. User ID:', user.id);
         setIsLoading(true);
         const transactionId = await transactionService.addTransaction(user.id, newTransaction);
+        console.log('[useTransactions] Transaction saved to Firebase with ID:', transactionId);
         
         // Add the id to the transaction
         newTransaction.id = transactionId;
+      } else {
+        console.log('[useTransactions] User not authenticated, transaction will be saved locally only');
       }
       
       // Update local state
       const updatedTransactions = [...transactions, newTransaction];
+      console.log('[useTransactions] Updating local state with new transaction');
       setTransactions(updatedTransactions);
       
       // If not authenticated, save to localStorage
       if (!isAuthenticated || !user) {
+        console.log('[useTransactions] Saving transaction to localStorage');
         setLocalTransactions(updatedTransactions);
       }
       
