@@ -106,7 +106,7 @@ export function BudgetApp() {
     resetTransactions,
     moveTransaction
   } = useTransactions();
-
+  
   // Color picker state
   const [tableColors, setTableColors] = useState<Record<string, string>>({
     'Essentials': '#f5f5f5', // Default light gray
@@ -129,7 +129,7 @@ export function BudgetApp() {
     results: {
       item(index: number): {
         item(index: number): {
-          transcript: string;
+                      transcript: string; 
           isFinal: boolean;
         };
       };
@@ -141,7 +141,7 @@ export function BudgetApp() {
     error: string;
     message: string;
   };
-  
+
   // Load data from local storage on component mount
   useEffect(() => {
     const loadFromLocalStorage = () => {
@@ -269,9 +269,9 @@ export function BudgetApp() {
     e.dataTransfer.setDragImage(dragPreview, 0, 0);
     
     // Remove the temporary element after a short delay
-    setTimeout(() => {
+      setTimeout(() => {
       document.body.removeChild(dragPreview);
-    }, 0);
+      }, 0);
   };
 
   // Handle drag over
@@ -279,7 +279,7 @@ export function BudgetApp() {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (dragOverCategory !== category) {
-      setDragOverCategory(category);
+    setDragOverCategory(category);
     }
   };
 
@@ -295,7 +295,7 @@ export function BudgetApp() {
       
       // Visual feedback for drop
       setRecentlyDropped(targetCategory);
-      setTimeout(() => {
+        setTimeout(() => {
         setRecentlyDropped(null);
       }, 1500);
     }
@@ -398,7 +398,7 @@ export function BudgetApp() {
             {/* Display transactions grouped by category */}
             {Object.entries(getTransactionsByCategory()).map(([category, categoryTransactions]) => (
               <EnhancedTransactionTable
-                key={category}
+                key={category} 
                 category={category}
                 transactions={categoryTransactions}
                 allTransactions={transactions}
@@ -411,8 +411,8 @@ export function BudgetApp() {
                 recentlyDropped={recentlyDropped}
               />
             ))}
-          </Box>
-        )}
+        </Box>
+      )}
       
         {/* Always show budget summary if we have transactions */}
         {transactions.length > 0 && budgetSummary && budgetPlan && (
@@ -475,6 +475,6 @@ export function BudgetApp() {
           </Box>
         </Popover>
       </Box>
-    </Box>
+            </Box>
   );
 } 

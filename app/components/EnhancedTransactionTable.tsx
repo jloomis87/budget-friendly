@@ -296,12 +296,14 @@ export function EnhancedTransactionTable({
                   }}>Amount</TableCell>
                   {isAnyRowEditing && (
                     <TableCell sx={{ 
-                      width: '90px', 
+                      width: '30px', 
                       color: isDark ? '#fff' : 'inherit',
                       fontWeight: 700,
                       fontSize: '1rem',
                       fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                       letterSpacing: '0.01em',
+                      padding: '0px 4px',
+                      textAlign: 'center',
                     }}>Actions</TableCell>
                   )}
                 </TableRow>
@@ -386,6 +388,15 @@ export function EnhancedTransactionTable({
                             fullWidth
                             size="small"
                             autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveEdit(transaction);
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                setEditingRow(null);
+                              }
+                            }}
                             InputProps={{
                               sx: {
                                 color: isDark ? '#fff' : 'inherit',
@@ -437,11 +448,20 @@ export function EnhancedTransactionTable({
                             onChange={(e) => handleEditingChange('date', e.target.value)}
                             variant="standard"
                             size="small"
-                            fullWidth
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveEdit(transaction);
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                setEditingRow(null);
+                              }
+                            }}
                             InputProps={{
                               sx: {
                                 color: isDark ? '#fff' : 'inherit',
                                 fontSize: '0.95rem',
+                                width: '110px',
                               }
                             }}
                           />
@@ -462,32 +482,47 @@ export function EnhancedTransactionTable({
                         fontSize: '0.95rem',
                         padding: '8px 8px',
                         width: '120px',
+                        textAlign: 'right',
                       }}>
                         {isEditing ? (
-                          <TextField
-                            value={editingRow?.amount || ''}
-                            onChange={(e) => handleEditingChange('amount', e.target.value)}
-                            variant="standard"
-                            size="small"
-                            fullWidth
-                            InputProps={{
-                              startAdornment: <span style={{ 
-                                marginRight: 4,
-                                color: isDark ? '#fff' : 'inherit',
-                              }}>$</span>,
-                              sx: {
-                                color: isDark ? '#fff' : 'inherit',
-                                fontSize: '0.95rem',
-                              }
-                            }}
-                          />
+                          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <TextField
+                              value={editingRow?.amount || ''}
+                              onChange={(e) => handleEditingChange('amount', e.target.value)}
+                              variant="standard"
+                              size="small"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleSaveEdit(transaction);
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  setEditingRow(null);
+                                }
+                              }}
+                              InputProps={{
+                                startAdornment: <span style={{ 
+                                  marginRight: 4,
+                                  color: isDark ? '#fff' : 'inherit',
+                                }}>$</span>,
+                                sx: {
+                                  color: isDark ? '#fff' : 'inherit',
+                                  fontSize: '0.95rem',
+                                  textAlign: 'right',
+                                  '& input': {
+                                    textAlign: 'right',
+                                    width: `${Math.max(70, (editingRow?.amount?.length || 1) * 8 + 10)}px`,
+                                    transition: 'width 0.1s'
+                                  }
+                                }
+                              }}
+                            />
+                          </Box>
                         ) : (
                           <Typography
                             sx={{
-                              color: isDark 
-                                ? '#fff' 
-                                : (transaction.amount < 0 ? 'error.main' : 'success.main'),
-                              fontWeight: 600,
+                              color: isDark ? '#fff' : 'inherit',
+                              fontWeight: 500,
                               fontSize: '0.95rem',
                               textAlign: 'right',
                             }}
@@ -500,9 +535,9 @@ export function EnhancedTransactionTable({
                         )}
                       </TableCell>
                       {isAnyRowEditing && (
-                        <TableCell>
+                        <TableCell sx={{ padding: '0px 4px' }}>
                           {isEditing ? (
-                            <Box sx={{ display: 'flex' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                               <IconButton 
                                 size="small"
                                 onClick={(e) => {
@@ -510,6 +545,7 @@ export function EnhancedTransactionTable({
                                   handleSaveEdit(transaction);
                                 }}
                                 color="primary"
+                                sx={{ padding: '4px' }}
                               >
                                 <SaveIcon fontSize="small" />
                               </IconButton>
@@ -519,6 +555,7 @@ export function EnhancedTransactionTable({
                                   e.stopPropagation(); // Prevent row click event
                                   setEditingRow(null);
                                 }}
+                                sx={{ padding: '4px' }}
                               >
                                 <CloseIcon fontSize="small" />
                               </IconButton>
@@ -527,6 +564,7 @@ export function EnhancedTransactionTable({
                                 onClick={(e) => handleDeleteClick(e, transaction, globalIndex)}
                                 color="error"
                                 sx={{
+                                  padding: '4px',
                                   '&:hover': {
                                     backgroundColor: 'rgba(211, 47, 47, 0.04)',
                                   }

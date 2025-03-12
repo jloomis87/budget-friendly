@@ -91,7 +91,7 @@ export function SpeechRecognition({
     
     // Automatically reset success/error states after a delay
     if (status === RecognitionStatus.SUCCESS || status === RecognitionStatus.ERROR) {
-      setTimeout(() => {
+              setTimeout(() => {
         setStatus(RecognitionStatus.IDLE);
         setFeedback('');
       }, 5000);
@@ -119,7 +119,7 @@ export function SpeechRecognition({
     // Cleanup
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.abort();
+          recognitionRef.current.abort();
       }
     };
   }, [isSpeechRecognitionSupported]);
@@ -183,7 +183,7 @@ export function SpeechRecognition({
         const transaction: Transaction = {
           description,
           amount: signedAmount,
-          date: new Date(),
+            date: new Date(),
           category
         };
         
@@ -243,9 +243,9 @@ export function SpeechRecognition({
 
   // Stop listening
   const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
+        if (recognitionRef.current) {
+          recognitionRef.current.stop();
+        }
   };
 
   // Get button color based on status
