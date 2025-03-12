@@ -9,7 +9,7 @@ import { EditOutlinedIcon, SaveIcon, CloseIcon, DragIndicatorIcon, DeleteIcon, A
 import { CategoryColorPicker } from './CategoryColorPicker';
 import type { Transaction } from '../services/fileParser';
 import { isColorDark } from '../utils/colorUtils';
-import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
+import { useTableColors } from '../hooks/useTableColors';
 
 interface EnhancedTransactionTableProps {
   category: string;
@@ -77,16 +77,7 @@ export function EnhancedTransactionTable({
   // Mobile add dialog state
   const [mobileAddDialogOpen, setMobileAddDialogOpen] = useState(false);
 
-  const [tableColors] = useLocalStorage<Record<string, string>>(
-    STORAGE_KEYS.TABLE_COLORS,
-    LEGACY_STORAGE_KEYS.TABLE_COLORS,
-    {
-      'Essentials': '#f5f5f5', // Default light gray
-      'Wants': '#f5f5f5',
-      'Savings': '#f5f5f5',
-      'Income': '#f5f5f5'
-    }
-  );
+  const [tableColors] = useTableColors();
 
   // Check if the table has a custom color and if it's dark
   const hasCustomColor = tableColors[category] !== '#f5f5f5';

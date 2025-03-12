@@ -27,7 +27,7 @@ import {
 } from '@mui/material';
 import { DeleteIcon, SaveIcon, CloseIcon, AddIcon, EditOutlinedIcon, CheckCircleOutlineIcon, CancelOutlinedIcon } from '../utils/materialIcons';
 import type { Transaction } from '../services/fileParser';
-import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
+import { useTableColors } from '../hooks/useTableColors';
 import { isColorDark } from '../utils/colorUtils';
 import { CategoryColorPicker } from './CategoryColorPicker';
 
@@ -64,16 +64,7 @@ export function IncomeTable({
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
   const [isAdding, setIsAdding] = useState(false);
 
-  const [tableColors] = useLocalStorage<Record<string, string>>(
-    STORAGE_KEYS.TABLE_COLORS,
-    LEGACY_STORAGE_KEYS.TABLE_COLORS,
-    {
-      'Essentials': '#f5f5f5',
-      'Wants': '#f5f5f5',
-      'Savings': '#f5f5f5',
-      'Income': '#f5f5f5'
-    }
-  );
+  const [tableColors] = useTableColors();
 
   // Initialize form errors state property if it doesn't already exist
   const [formErrors, setFormErrors] = useState<{

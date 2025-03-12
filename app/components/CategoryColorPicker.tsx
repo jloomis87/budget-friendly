@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { IconButton, Popover, Box, Typography, Button } from '@mui/material';
 import { HexColorPicker } from 'react-colorful';
 import { PaletteIcon } from '../utils/materialIcons';
-import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
+import { useTableColors } from '../hooks/useTableColors';
 import { isColorDark } from '../utils/colorUtils';
 
 interface CategoryColorPickerProps {
@@ -11,16 +11,7 @@ interface CategoryColorPickerProps {
 
 export function CategoryColorPicker({ category }: CategoryColorPickerProps) {
   const [colorPickerAnchor, setColorPickerAnchor] = useState<null | HTMLElement>(null);
-  const [tableColors, setTableColors] = useLocalStorage<Record<string, string>>(
-    STORAGE_KEYS.TABLE_COLORS,
-    LEGACY_STORAGE_KEYS.TABLE_COLORS,
-    {
-      'Essentials': '#f5f5f5', // Default light gray
-      'Wants': '#f5f5f5',
-      'Savings': '#f5f5f5',
-      'Income': '#f5f5f5'
-    }
-  );
+  const [tableColors, setTableColors] = useTableColors();
 
   // Handle opening the color picker
   const handleOpenColorPicker = (event: React.MouseEvent<HTMLElement>) => {
