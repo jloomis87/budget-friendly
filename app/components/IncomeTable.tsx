@@ -708,7 +708,9 @@ export function IncomeTable({
               justifyContent: 'space-between',
               alignItems: 'center',
               borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
-              color: isDark ? '#fff' : 'inherit'
+              color: isDark ? '#fff' : 'inherit',
+              pb: 2,
+              mb: 1 // Added 5px margin below the border
             }}>
               <Typography 
                 variant="h6" 
@@ -1456,7 +1458,9 @@ export function IncomeTable({
             <CardContent sx={{ 
               p: 2, 
               '&:last-child': { pb: 2 },
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+              borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+              pb: 2,
+              mb: 1 // Added 5px margin below the border
             }}>
               <Box sx={{ 
                 display: 'flex', 

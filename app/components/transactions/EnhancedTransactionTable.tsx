@@ -369,9 +369,18 @@ export function EnhancedTransactionTable({
           <Box sx={{ 
             display: 'flex', 
             justifyContent: 'space-between',
-            alignItems: 'center'
+            alignItems: 'center',
+            p: 2,
+            borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+            pb: 2,
+            mb: 1
           }}>
-            <Typography variant="h6">
+            <Typography variant="h6" sx={{
+              fontWeight: 'bold',
+              color: isDark ? '#fff' : 'inherit',
+              fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+              letterSpacing: '0.01em'
+            }}>
               {category}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

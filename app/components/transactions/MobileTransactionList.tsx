@@ -28,10 +28,14 @@ export function MobileTransactionList({
   formatDateForDisplay
 }: MobileTransactionListProps) {
   return (
-    <Box sx={{ mt: 2 }}>
+    <Box>
       {/* Empty state - when no transactions and not adding */}
       {transactions.length === 0 && !isAdding && (
-        <Typography variant="body2" sx={{ textAlign: 'center', py: 2, color: isDark ? '#fff' : 'text.secondary' }}>
+        <Typography variant="body2" sx={{ 
+          textAlign: 'center', 
+          p: 3, 
+          color: isDark ? '#fff' : 'text.secondary' 
+        }}>
           No {category.toLowerCase()} expenses yet. Add one or drag a transaction here.
         </Typography>
       )}
@@ -54,7 +58,12 @@ export function MobileTransactionList({
       
       {/* Mobile Add Button - Only show when not adding */}
       {!isAdding && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, mb: 3 }}>
+        <Box sx={{ 
+          p: 2, 
+          display: 'flex', 
+          justifyContent: 'center',
+          backgroundColor: 'rgba(255, 255, 255, 0.05)' 
+        }}>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -70,7 +79,7 @@ export function MobileTransactionList({
               }
             }}
           >
-            Add Expense
+            ADD EXPENSE
           </Button>
         </Box>
       )}
