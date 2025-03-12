@@ -347,50 +347,56 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                       <ListItemText 
                         primary={<Typography variant="body1" sx={{ fontWeight: 'medium' }}>Essentials (50%)</Typography>}
                         secondary={
-                          <Box sx={{ mt: 0.5 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                              <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
-                              <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.essentials)}</Box>
+                          <Typography component="div" variant="body2">
+                            <Box sx={{ mt: 0.5 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                                <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
+                                <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.essentials)}</Box>
+                              </Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
+                                <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.essentials)}</Box>
+                              </Box>
                             </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
-                              <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.essentials)}</Box>
-                            </Box>
-                          </Box>
+                          </Typography>
                         }
                       />
                     </ListItem>
-                    <ListItem sx={{ py: 1 }}>
+                    <ListItem>
                       <ListItemText 
                         primary={<Typography variant="body1" sx={{ fontWeight: 'medium' }}>Wants (30%)</Typography>}
                         secondary={
-                          <Box sx={{ mt: 0.5 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                              <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
-                              <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.wants)}</Box>
+                          <Typography component="div" variant="body2">
+                            <Box sx={{ mt: 0.5 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                                <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
+                                <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.wants)}</Box>
+                              </Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
+                                <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.wants)}</Box>
+                              </Box>
                             </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
-                              <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.wants)}</Box>
-                            </Box>
-                          </Box>
+                          </Typography>
                         }
                       />
                     </ListItem>
-                    <ListItem sx={{ py: 1 }}>
+                    <ListItem>
                       <ListItemText 
                         primary={<Typography variant="body1" sx={{ fontWeight: 'medium' }}>Savings (20%)</Typography>}
                         secondary={
-                          <Box sx={{ mt: 0.5 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                              <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
-                              <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.savings)}</Box>
+                          <Typography component="div" variant="body2">
+                            <Box sx={{ mt: 0.5 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                                <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
+                                <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.savings)}</Box>
+                              </Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
+                                <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.savings)}</Box>
+                              </Box>
                             </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                              <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
-                              <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.savings)}</Box>
-                            </Box>
-                          </Box>
+                          </Typography>
                         }
                       />
                     </ListItem>
