@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from './useLocalStorage';
 import { useAuth } from '../contexts/AuthContext';
 import * as userSettingsService from '../services/userSettingsService';
@@ -27,17 +27,25 @@ export function useTableColors() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   
+  // Use a ref to track if we've already loaded from Firebase for this user session
+  const initialLoadDoneRef = useRef<Record<string, boolean>>({});
+  
   // Load initial table colors from Firebase when the user is authenticated
   useEffect(() => {
+    // Skip if no user or if we've already loaded for this user
+    if (!user) return;
+    if (initialLoadDoneRef.current[user.id]) return;
+    
     const loadTableColorsFromFirebase = async () => {
-      if (!user) return;
-      
       setIsLoading(true);
       try {
         console.log(`[useTableColors] Loading table colors from Firebase for user: ${user.id}`);
         
         // Get user settings from Firestore
         const settings = await userSettingsService.getUserSettings(user.id);
+        
+        // Mark this user as loaded
+        initialLoadDoneRef.current[user.id] = true;
         
         if (settings && settings.tableColors) {
           console.log('[useTableColors] Found table colors in Firebase:', settings.tableColors);
@@ -61,7 +69,7 @@ export function useTableColors() {
     };
     
     loadTableColorsFromFirebase();
-  }, [user, setLocalTableColors]);
+  }, [user]); // Only depend on user, not on setLocalTableColors or localTableColors
 
   // Function to update table colors both locally and in Firebase
   const setTableColors = useCallback((newColors: Record<string, string> | ((prevColors: Record<string, string>) => Record<string, string>)) => {
