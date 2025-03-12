@@ -213,16 +213,19 @@ function BudgetAppContent() {
     setActiveStep((prevStep) => prevStep - 1);
   }, []);
 
-  const handleReset = useCallback(() => {
-    // Clear all data using the hook function
-    resetTransactions();
-    setActiveStep(0);
-    
-    setAlertMessage({
-      type: 'success',
-      message: 'All data has been reset. Start fresh with a new budget!'
-    });
-  }, [resetTransactions, setAlertMessage]);
+  const handleReset = useCallback(async () => {
+    try {
+      // Clear all data using the hook function
+      await resetTransactions();
+      setActiveStep(0);
+    } catch (error) {
+      console.error('Error resetting budget:', error);
+      setAlertMessage({
+        type: 'error',
+        message: 'Failed to reset your budget. Please try again.'
+      });
+    }
+  }, [resetTransactions, setActiveStep, setAlertMessage]);
 
   // Handle drag start
   const handleDragStart = useCallback((e: React.DragEvent, transaction: Transaction, index: number) => {

@@ -28,116 +28,88 @@ export function MobileAddDialog({
       fullWidth
       maxWidth="xs"
       PaperProps={{
-        style: {
-          backgroundColor: tableColor,
+        sx: {
+          borderRadius: 2,
+          overflow: 'hidden'
         }
       }}
     >
       <DialogTitle sx={{ 
-        pb: 1,
-        color: isDark ? '#fff' : 'inherit'
+        backgroundColor: tableColor,
+        color: isDark ? '#fff' : 'inherit',
+        fontWeight: 'bold',
+        py: 2,
+        px: 3
       }}>
         New {category} Expense
       </DialogTitle>
-      <DialogContent>
-        <Stack spacing={3} sx={{ mt: 1 }}>
-          <TextField
-            label="Description"
-            value={newDescription}
-            onChange={(e) => setNewDescription(e.target.value)}
-            variant="outlined"
-            fullWidth
-            placeholder="e.g., Groceries"
-            inputProps={{ style: { fontSize: '1.1rem' } }}
-            InputProps={{
-              notched: false,
-            }}
-            InputLabelProps={{
-              shrink: true,
-              sx: {
-                position: 'relative',
-                transform: 'none',
-                marginBottom: '8px', 
-                color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
-                fontWeight: 500,
-                fontSize: '0.9rem',
-                '&.Mui-focused': {
-                  color: isDark ? '#fff' : 'primary.main',
-                }
-              }
-            }}
-            sx={{ 
-              "& .MuiOutlinedInput-root": { 
-                backgroundColor: 'white',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                "&.Mui-focused": {
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: 'primary.main',
-                    borderWidth: 2,
-                  }
-                }
-              },
-              "& .MuiOutlinedInput-notchedOutline": {
-                borderColor: 'rgba(0, 0, 0, 0.23)'
-              },
-              "& .MuiFormLabel-root": {
-                position: 'relative',
-                transform: 'none',
-                marginBottom: '8px',
-              },
-              "& .MuiInputLabel-animated": {
-                transition: 'none',
-              },
-              "& .MuiFormLabel-filled + .MuiInputBase-root": {
-                marginTop: '0',
-              },
-              "& .MuiFormHelperText-root": {
-                marginTop: 1,
-                color: 'rgba(0, 0, 0, 0.6)',
-              }
-            }}
-          />
-          
-          <FormControl fullWidth variant="outlined" sx={{ 
-            "& .MuiOutlinedInput-root": { 
-              backgroundColor: 'white',
-              borderRadius: '4px',
-              overflow: 'hidden',
-              "&.Mui-focused": {
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: 'primary.main',
-                  borderWidth: 2,
-                }
-              }
-            },
-            "& .MuiOutlinedInput-notchedOutline": {
-              borderColor: 'rgba(0, 0, 0, 0.23)'
-            },
-            maxWidth: '150px'
-          }}>
+      <DialogContent sx={{ p: 2, mt: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+          <Box>
             <InputLabel 
               sx={{
-                position: 'relative',
-                transform: 'none',
-                marginBottom: '8px', 
-                color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
-                fontWeight: 500,
-                fontSize: '0.9rem',
-                '&.Mui-focused': {
-                  color: isDark ? '#fff' : 'primary.main',
-                }
+                color: 'text.secondary',
+                mb: 1,
+                fontSize: '0.875rem'
               }}
             >
-              Due Day
+              Description
+            </InputLabel>
+            <TextField
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              variant="outlined"
+              fullWidth
+              placeholder="e.g., Groceries"
+              InputProps={{
+                sx: {
+                  bgcolor: 'background.paper'
+                }
+              }}
+            />
+          </Box>
+          
+          <Box>
+            <InputLabel 
+              sx={{
+                color: 'text.secondary',
+                mb: 1,
+                fontSize: '0.875rem'
+              }}
+            >
+              Amount
+            </InputLabel>
+            <TextField
+              value={newAmount}
+              onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+              variant="outlined"
+              fullWidth
+              placeholder="0.00"
+              InputProps={{
+                startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>,
+                sx: {
+                  bgcolor: 'background.paper'
+                }
+              }}
+            />
+          </Box>
+          
+          <Box>
+            <InputLabel 
+              sx={{
+                color: 'text.secondary',
+                mb: 1,
+                fontSize: '0.875rem'
+              }}
+            >
+              Day of Month
             </InputLabel>
             <Select
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
-              label="Due Day"
-              notched={false}
+              fullWidth
               sx={{
-                mt: 1
+                bgcolor: 'background.paper'
               }}
             >
               {generateDayOptions().map(day => (
@@ -146,77 +118,19 @@ export function MobileAddDialog({
                 </MenuItem>
               ))}
             </Select>
-          </FormControl>
-          
-          <TextField
-            label="Amount"
-            value={newAmount}
-            onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-            variant="outlined"
-            fullWidth
-            placeholder="0.00"
-            inputProps={{ style: { fontSize: '1.1rem' } }}
-            InputProps={{
-              startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>,
-              notched: false,
-            }}
-            InputLabelProps={{
-              shrink: true,
-              sx: {
-                position: 'relative',
-                transform: 'none',
-                marginBottom: '8px', 
-                color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
-                fontWeight: 500,
-                fontSize: '0.9rem',
-                '&.Mui-focused': {
-                  color: isDark ? '#fff' : 'primary.main',
-                }
-              }
-            }}
-            sx={{ 
-              "& .MuiOutlinedInput-root": { 
-                backgroundColor: 'white',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                "&.Mui-focused": {
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: 'primary.main',
-                    borderWidth: 2,
-                  }
-                }
-              },
-              "& .MuiOutlinedInput-notchedOutline": {
-                borderColor: 'rgba(0, 0, 0, 0.23)'
-              },
-              "& .MuiFormLabel-root": {
-                position: 'relative',
-                transform: 'none',
-                marginBottom: '8px',
-              },
-              "& .MuiInputLabel-animated": {
-                transition: 'none',
-              },
-              "& .MuiFormLabel-filled + .MuiInputBase-root": {
-                marginTop: '0',
-              },
-              "& .MuiFormHelperText-root": {
-                marginTop: 1,
-                color: 'rgba(0, 0, 0, 0.6)',
-              }
-            }}
-          />
-        </Stack>
+          </Box>
+        </Box>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 3 }}>
+      <DialogActions sx={{ px: 3, py: 2, bgcolor: 'background.paper' }}>
+        <Box sx={{ flexGrow: 1 }} />
         <Button 
           onClick={onClose} 
-          variant="outlined"
           sx={{ 
-            borderRadius: 2, 
-            px: 3,
-            color: isDark ? '#fff' : undefined,
-            borderColor: isDark ? 'rgba(255, 255, 255, 0.5)' : undefined,
+            color: 'text.secondary',
+            mr: 1,
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+            height: 36
           }}
         >
           Cancel
@@ -224,7 +138,15 @@ export function MobileAddDialog({
         <Button 
           onClick={onAdd} 
           variant="contained"
-          sx={{ borderRadius: 2, px: 3 }}
+          disabled={!newDescription.trim() || !newAmount.trim()}
+          sx={{ 
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+            height: 36,
+            '&.Mui-disabled': {
+              opacity: 0.5,
+            }
+          }}
         >
           Add
         </Button>

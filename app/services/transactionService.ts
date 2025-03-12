@@ -8,44 +8,46 @@ import {
   query, 
   where, 
   orderBy,
-  Timestamp
+  Timestamp,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
-import type { Transaction } from './fileParser';
+import type { Transaction } from '../types/Transaction';
 
-// Collection references
-const TRANSACTIONS_COLLECTION = 'transactions';
+// Get the transactions subcollection for a user
+const getUserTransactionsRef = (userId: string) => {
+  if (!userId || typeof userId !== 'string') {
+    console.error('[Firebase] getUserTransactionsRef called with invalid userId:', userId);
+    throw new Error('Valid user ID string is required');
+  }
+  console.log('[Firebase] Creating collection reference for user:', userId);
+  return collection(db, 'users', userId, 'transactions');
+};
 
 // Add a transaction to Firestore
-export const addTransaction = async (userId: string, transaction: Transaction): Promise<string> => {
+export const addTransaction = async (userId: string, transactionData: Omit<Transaction, 'id'>): Promise<string> => {
+  if (!userId) {
+    throw new Error('User ID is required to add a transaction');
+  }
+
   try {
-    console.log(`[Firebase] Adding transaction for user ID: "${userId}"`, transaction);
-    
-    if (!userId) {
-      console.error('[Firebase] Error: addTransaction called with empty userId');
-      throw new Error('User ID is required');
-    }
-    
-    const transactionData = {
-      ...transaction,
-      // If date is a number (day of month), store it directly
-      // Otherwise, convert Date object to Timestamp
-      date: typeof transaction.date === 'number' 
-        ? transaction.date 
-        : Timestamp.fromDate(new Date(transaction.date)),
+    console.log('[transactionService] Adding transaction for user:', userId);
+    console.log('[transactionService] Transaction data:', transactionData);
+
+    const transactionsRef = getUserTransactionsRef(userId);
+    console.log('[transactionService] Collection path:', transactionsRef.path);
+
+    const docRef = await addDoc(transactionsRef, {
+      ...transactionData,
       userId,
-      createdAt: Timestamp.now()
-    };
-    
-    console.log('[Firebase] Prepared transaction data for saving:', transactionData);
-    
-    const docRef = await addDoc(collection(db, TRANSACTIONS_COLLECTION), transactionData);
-    console.log(`[Firebase] Transaction saved successfully with ID: ${docRef.id}`);
-    
+      createdAt: new Date().toISOString()
+    });
+
+    console.log('[transactionService] Transaction added successfully:', docRef.id);
     return docRef.id;
   } catch (error) {
-    console.error('[Firebase] Error adding transaction:', error);
-    throw new Error('Failed to add transaction');
+    console.error('[transactionService] Error adding transaction:', error);
+    throw error;
   }
 };
 
@@ -59,16 +61,15 @@ export const getUserTransactions = async (userId: string): Promise<Transaction[]
       return [];
     }
     
-    const transactionsRef = collection(db, TRANSACTIONS_COLLECTION);
-    console.log(`[Firebase] Collection reference created for: ${TRANSACTIONS_COLLECTION}`);
+    const transactionsRef = getUserTransactionsRef(userId);
+    console.log(`[Firebase] Collection reference created for user: ${userId}`);
     
     const q = query(
       transactionsRef,
-      where('userId', '==', userId),
       orderBy('date', 'desc')
     );
     
-    console.log(`[Firebase] Executing Firestore query with where clause: userId == ${userId}`);
+    console.log(`[Firebase] Executing Firestore query for user: ${userId}`);
     const querySnapshot = await getDocs(q);
     console.log(`[Firebase] Query returned ${querySnapshot.size} documents`);
     
@@ -129,47 +130,47 @@ export const getUserTransactions = async (userId: string): Promise<Transaction[]
 };
 
 // Update a transaction
-export const updateTransaction = async (
-  transactionId: string, 
-  updates: Partial<Transaction>
-): Promise<void> => {
+export const updateTransaction = async (transactionId: string, updates: Partial<Transaction>, userId: string) => {
+  if (!userId || !transactionId) {
+    throw new Error('User ID and transaction ID are required to update a transaction');
+  }
+
   try {
-    const transactionRef = doc(db, TRANSACTIONS_COLLECTION, transactionId);
-    
-    // Convert date to Firestore timestamp if it exists in updates and is not a number
-    const firestoreUpdates = { ...updates };
-    if (updates.date !== undefined) {
-      if (typeof updates.date === 'number') {
-        // If it's a number (day of month), store it directly
-        firestoreUpdates.date = updates.date;
-      } else {
-        // Otherwise, convert to Timestamp
-        firestoreUpdates.date = Timestamp.fromDate(new Date(updates.date));
-      }
-    }
-    
-    await updateDoc(transactionRef, firestoreUpdates);
+    console.log('[transactionService] Updating transaction:', transactionId, 'for user:', userId);
+    const transactionRef = doc(getUserTransactionsRef(userId), transactionId);
+    await updateDoc(transactionRef, { ...updates, updatedAt: new Date().toISOString() });
+    console.log('[transactionService] Transaction updated successfully');
   } catch (error) {
-    console.error('Error updating transaction:', error);
-    throw new Error('Failed to update transaction');
+    console.error('[transactionService] Error updating transaction:', error);
+    throw error;
   }
 };
 
 // Delete a transaction
-export const deleteTransaction = async (transactionId: string): Promise<void> => {
+export const deleteTransaction = async (transactionId: string, userId: string) => {
+  if (!userId || !transactionId) {
+    throw new Error('User ID and transaction ID are required to delete a transaction');
+  }
+
   try {
-    const transactionRef = doc(db, TRANSACTIONS_COLLECTION, transactionId);
+    console.log('[transactionService] Deleting transaction:', transactionId, 'for user:', userId);
+    const transactionRef = doc(getUserTransactionsRef(userId), transactionId);
     await deleteDoc(transactionRef);
+    console.log('[transactionService] Transaction deleted successfully');
   } catch (error) {
-    console.error('Error deleting transaction:', error);
-    throw new Error('Failed to delete transaction');
+    console.error('[transactionService] Error deleting transaction:', error);
+    throw error;
   }
 };
 
 // Move a transaction to a different category
 export const moveTransactionToCategory = async (
   transactionId: string, 
-  newCategory: string
+  newCategory: string,
+  userId: string
 ): Promise<void> => {
-  return updateTransaction(transactionId, { category: newCategory });
+  if (!userId) {
+    throw new Error('User ID is required to move a transaction');
+  }
+  return updateTransaction(transactionId, { category: newCategory }, userId);
 }; 

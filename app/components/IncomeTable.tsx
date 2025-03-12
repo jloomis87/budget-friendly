@@ -618,117 +618,201 @@ export function IncomeTable({
           )}
           
           {!isAdding && (
-            <Table size="small" sx={{ tableLayout: 'fixed' }}>
-              <TableHead>
-                <TableRow sx={{
-                  backgroundColor: isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.04)',
-                }}>
-                  <TableCell sx={{ 
-                    width: '5%', 
-                    color: isDark ? '#fff' : 'inherit',
-                    padding: '8px 4px 8px 8px',
-                  }}></TableCell>
-                  <TableCell sx={{ 
-                    width: '30%',
-                    fontWeight: 700,
-                    color: isDark ? '#fff' : 'inherit',
-                    fontSize: '1rem',
-                    fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+              <Button
+                onClick={() => {
+                  // Use the direct implementation to ensure it works
+                  console.log("Add Income button clicked in Getting Started");
+                  setNewDescription('');
+                  setNewAmount('');
+                  setNewDate(new Date().toISOString().split('T')[0]);
+                  setFormErrors({});
+                  setMobileAddDialogOpen(true);
+                }}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: isDark ? '#fff' : 'primary.main',
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(25, 118, 210, 0.08)',
+                  borderRadius: '20px',
+                  px: 2.5,
+                  py: 1,
+                  transition: 'all 0.2s ease',
+                  border: `1px dashed ${isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(25, 118, 210, 0.5)'}`,
+                  '&:hover': {
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(25, 118, 210, 0.15)',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                  },
+                }}
+              >
+                <AddIcon 
+                  fontSize="small" 
+                  sx={{ 
+                    mr: 0.8,
+                    animation: 'pulse 1.5s infinite',
+                    '@keyframes pulse': {
+                      '0%': { opacity: 0.6 },
+                      '50%': { opacity: 1 },
+                      '100%': { opacity: 0.6 }
+                    }
+                  }} 
+                />
+                <Typography 
+                  sx={{ 
+                    fontWeight: 500,
+                    fontSize: '0.9rem',
                     letterSpacing: '0.01em',
-                    paddingLeft: '8px',
-                  }}>Income Source</TableCell>
-                  <TableCell align="center" sx={{ 
-                    width: '30%',
-                    fontWeight: 700,
-                    color: isDark ? '#fff' : 'inherit',
-                    fontSize: '1rem',
-                    padding: '8px 8px',
-                    fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                    letterSpacing: '0.01em',
-                    textAlign: 'center',
-                  }}>Date</TableCell>
-                  <TableCell sx={{ 
-                    width: '28%',
-                    fontWeight: 700,
-                    color: isDark ? '#fff' : 'inherit',
-                    fontSize: '1rem',
-                    padding: '8px 8px',
-                    fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                    letterSpacing: '0.01em',
-                    textAlign: 'right',
-                  }}>Amount</TableCell>
-                  <TableCell sx={{ 
-                    width: '7%',
-                    fontWeight: 700,
-                    color: editingRow ? (isDark ? '#fff' : 'inherit') : (isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.04)'),
-                    fontSize: '1rem',
-                    fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                    letterSpacing: '0.01em',
-                    padding: '8px 4px',
-                    textAlign: 'center',
-                    borderLeft: editingRow ? `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}` : 'none',
-                  }}>{editingRow ? 'Actions' : ''}</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                <TableRow 
-                  sx={{
-                    backgroundColor: 'transparent',
-                    cursor: 'pointer',
-                    '&:hover': {
-                      backgroundColor: 'transparent',
-                    },
                   }}
-                  onClick={() => setIsAdding(true)}
                 >
-                  <TableCell colSpan={5} align="center" sx={{ py: 2 }}>
-                    <Box
-                      sx={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: isDark ? '#fff' : 'primary.main',
-                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(25, 118, 210, 0.08)',
-                        borderRadius: '20px',
-                        px: 2.5,
-                        py: 1,
-                        transition: 'all 0.2s ease',
-                        border: `1px dashed ${isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(25, 118, 210, 0.5)'}`,
-                        '&:hover': {
-                          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(25, 118, 210, 0.15)',
-                          transform: 'translateY(-1px)',
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-                        },
-                      }}
-                    >
-                      <AddIcon 
-                        fontSize="small" 
-                        sx={{ 
-                          mr: 0.8,
-                          animation: 'pulse 1.5s infinite',
-                          '@keyframes pulse': {
-                            '0%': { opacity: 0.6 },
-                            '50%': { opacity: 1 },
-                            '100%': { opacity: 0.6 }
-                          }
-                        }} 
-                      />
-                      <Typography 
-                        sx={{ 
-                          fontWeight: 500,
-                          fontSize: '0.9rem',
-                          letterSpacing: '0.01em',
-                        }}
-                      >
-                        Add Income
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+                  Add Income
+                </Typography>
+              </Button>
+            </Box>
           )}
         </Paper>
+        
+        {/* Include Mobile Add Dialog directly in this render path */}
+        <Dialog
+          open={mobileAddDialogOpen}
+          onClose={handleCloseMobileAdd}
+          fullWidth
+          maxWidth="sm"
+          PaperProps={{
+            sx: {
+              borderRadius: 2,
+              bgcolor: isDark ? 'rgba(30, 30, 30, 0.9)' : 'background.paper',
+              color: isDark ? '#fff' : 'inherit',
+              overflow: 'hidden'
+            }
+          }}
+        >
+          <DialogTitle sx={{ 
+            bgcolor: tableColors['Income'],
+            color: isColorDark(tableColors['Income']) ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+            fontWeight: 'bold',
+            pb: 3
+          }}>
+            Add Income Source
+          </DialogTitle>
+          <DialogContent sx={{ pt: 6, mt: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                label="Description"
+                fullWidth
+                value={newDescription}
+                onChange={(e) => setNewDescription(e.target.value)}
+                error={!!formErrors.description}
+                helperText={formErrors.description}
+                InputLabelProps={{
+                  sx: {
+                    color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
+                  }
+                }}
+                InputProps={{
+                  sx: {
+                    color: isDark ? '#fff' : undefined,
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
+                    }
+                  }
+                }}
+              />
+              <TextField
+                label="Amount"
+                fullWidth
+                value={newAmount}
+                onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                error={!!formErrors.amount}
+                helperText={formErrors.amount}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                  sx: {
+                    color: isDark ? '#fff' : undefined,
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
+                    }
+                  }
+                }}
+                InputLabelProps={{
+                  sx: {
+                    color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
+                  }
+                }}
+              />
+              <TextField
+                label="Date"
+                type="date"
+                fullWidth
+                value={newDate}
+                onChange={(e) => setNewDate(e.target.value)}
+                InputLabelProps={{
+                  shrink: true,
+                  sx: {
+                    color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
+                  }
+                }}
+                InputProps={{
+                  sx: {
+                    color: isDark ? '#fff' : undefined,
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
+                    }
+                  }
+                }}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ 
+            p: 3, 
+            bgcolor: isDark ? 'rgba(20, 20, 20, 0.9)' : '#f5f5f5',
+            borderTop: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+          }}>
+            <Box sx={{ display: 'flex', gap: 2, width: '100%', justifyContent: 'flex-end' }}>
+              <Button 
+                onClick={handleCloseMobileAdd}
+                sx={{ 
+                  color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
+                  '&:hover': {
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
+                    bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : undefined,
+                  }
+                }}
+                variant="outlined"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAddIncomeMobile}
+                variant="contained" 
+                sx={{ px: 3 }}
+                color="primary"
+              >
+                Add
+              </Button>
+            </Box>
+          </DialogActions>
+        </Dialog>
       </Box>
     );
   }
@@ -979,13 +1063,14 @@ export function IncomeTable({
         <DialogTitle sx={{ 
           bgcolor: tableColors['Income'],
           color: isColorDark(tableColors['Income']) ? '#fff' : 'rgba(0, 0, 0, 0.87)',
-          fontWeight: 'bold'
+          fontWeight: 'bold',
+          pb: 3
         }}>
           Edit Income Source
         </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
+        <DialogContent sx={{ pt: 6, mt: 2 }}>
           {editingRow && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
               <TextField
                 label="Income Source"
                 value={editingRow.description}
@@ -1057,15 +1142,19 @@ export function IncomeTable({
                         bgcolor: isDark ? 'rgba(30, 30, 30, 0.95)' : 'background.paper',
                         color: isDark ? '#fff' : 'inherit',
                         '& .MuiMenuItem-root': {
-                          color: isDark ? '#fff' : 'inherit',
+                          color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.87)',
                         },
                         '& .MuiMenuItem-root:hover': {
-                          bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : undefined,
+                          bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.04)',
                         }
                       }
                     }
                   }}
                   sx={{
+                    '& .MuiSelect-select': {
+                      color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                      bgcolor: isDark ? 'rgba(255, 255, 255, 0.15)' : '#fff',
+                    },
                     '& .MuiOutlinedInput-notchedOutline': {
                       borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : undefined,
                     },
@@ -1136,7 +1225,7 @@ export function IncomeTable({
           </Box>
         </DialogActions>
       </Dialog>
-
+      
       {/* Mobile Add Dialog */}
       <Dialog
         open={mobileAddDialogOpen}
@@ -1155,18 +1244,20 @@ export function IncomeTable({
         <DialogTitle sx={{ 
           bgcolor: tableColors['Income'],
           color: isColorDark(tableColors['Income']) ? '#fff' : 'rgba(0, 0, 0, 0.87)',
-          fontWeight: 'bold'
+          fontWeight: 'bold',
+          pb: 3
         }}>
           Add Income Source
         </DialogTitle>
-        <DialogContent sx={{ pt: 3 }}>
+        <DialogContent sx={{ pt: 6, mt: 2 }}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="Income Source"
+              label="Description"
+              fullWidth
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
-              fullWidth
-              variant="outlined"
+              error={!!formErrors.description}
+              helperText={formErrors.description}
               InputLabelProps={{
                 sx: {
                   color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
@@ -1174,39 +1265,38 @@ export function IncomeTable({
               }}
               InputProps={{
                 sx: {
+                  color: isDark ? '#fff' : undefined,
                   '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
                   },
                   '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
                   },
                   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.5)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
                   }
                 }
               }}
             />
-            
             <TextField
               label="Amount"
-              value={newAmount}
-              onChange={(e) => {
-                const value = e.target.value.replace(/[^\d.]/g, '');
-                setNewAmount(value);
-              }}
               fullWidth
-              variant="outlined"
+              value={newAmount}
+              onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+              error={!!formErrors.amount}
+              helperText={formErrors.amount}
               InputProps={{
                 startAdornment: <InputAdornment position="start">$</InputAdornment>,
                 sx: {
+                  color: isDark ? '#fff' : undefined,
                   '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
                   },
                   '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
                   },
                   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.5)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
                   }
                 }
               }}
@@ -1216,81 +1306,64 @@ export function IncomeTable({
                 }
               }}
             />
-            
-            <FormControl fullWidth variant="outlined">
-              <InputLabel id="new-date-label" sx={{ 
-                color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
-              }}>Day of Month</InputLabel>
-              <Select
-                labelId="new-date-label"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                label="Day of Month"
-                MenuProps={{
-                  PaperProps: {
-                    sx: {
-                      bgcolor: isDark ? 'rgba(30, 30, 30, 0.95)' : 'background.paper',
-                      color: isDark ? '#fff' : 'inherit',
-                      '& .MuiMenuItem-root': {
-                        color: isDark ? '#fff' : 'inherit',
-                      },
-                      '& .MuiMenuItem-root:hover': {
-                        bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : undefined,
-                      }
-                    }
-                  }
-                }}
-                sx={{
+            <TextField
+              label="Date"
+              type="date"
+              fullWidth
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+              InputLabelProps={{
+                shrink: true,
+                sx: {
+                  color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
+                }
+              }}
+              InputProps={{
+                sx: {
+                  color: isDark ? '#fff' : undefined,
                   '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
                   },
                   '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
                   },
                   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.5)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
                   }
-                }}
-              >
-                {generateDayOptions().map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+                }
+              }}
+            />
           </Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button 
-            onClick={handleCloseMobileAdd} 
-            sx={{ 
-              bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-              color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
-              '&:hover': {
-                bgcolor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-              }
-            }}
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleAddIncomeMobile} 
-            variant="contained"
-            disabled={!newDescription.trim() || !newAmount.trim()}
-            sx={{ 
-              bgcolor: 'primary.main',
-              '&:hover': {
-                bgcolor: 'primary.dark',
-              },
-              '&.Mui-disabled': {
-                bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.12)',
-                color: isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.26)',
-              }
-            }}
-          >
-            Add Income
-          </Button>
+        <DialogActions sx={{ 
+          p: 3, 
+          bgcolor: isDark ? 'rgba(20, 20, 20, 0.9)' : '#f5f5f5',
+          borderTop: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
+        }}>
+          <Box sx={{ display: 'flex', gap: 2, width: '100%', justifyContent: 'flex-end' }}>
+            <Button 
+              onClick={handleCloseMobileAdd}
+              sx={{ 
+                color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
+                '&:hover': {
+                  borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
+                  bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : undefined,
+                }
+              }}
+              variant="outlined"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddIncomeMobile}
+              variant="contained" 
+              sx={{ px: 3 }}
+              color="primary"
+            >
+              Add
+            </Button>
+          </Box>
         </DialogActions>
       </Dialog>
     </Box>
