@@ -262,11 +262,33 @@ export function useTransactions() {
   }, [transactions]);
 
   // Reset all transaction data
-  const resetTransactions = useCallback(() => {
-    setTransactions([]);
-    setBudgetSummary(null);
-    setBudgetPlan(null);
-    setSuggestions([]);
+  const resetTransactions = useCallback((newTransactions: Transaction[] = []) => {
+    setTransactions(newTransactions);
+    
+    if (newTransactions.length > 0) {
+      // If new transactions are provided, calculate everything
+      try {
+        // Calculate budget summary
+        const summary = calculateBudgetSummary(newTransactions);
+        setBudgetSummary(summary);
+        
+        // Create budget plan
+        const plan = create503020Plan(summary);
+        setBudgetPlan(plan);
+        
+        // Get suggestions
+        const budgetSuggestions = getBudgetSuggestions(plan);
+        setSuggestions(budgetSuggestions);
+      } catch (error) {
+        console.error('Error processing new transactions:', error);
+      }
+    } else {
+      // If clearing everything
+      setBudgetSummary(null);
+      setBudgetPlan(null);
+      setSuggestions([]);
+    }
+    
     setAlertMessage({
       type: 'success',
       message: 'Budget data has been reset.'

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 // Constants for localStorage keys
 export const STORAGE_KEYS = {
@@ -54,17 +55,35 @@ function notifyStorageListeners(key: string): void {
 /**
  * Get an item from localStorage with legacy key fallback
  */
-export const getStorageItem = (key: string, legacyKey: string) => {
-  const item = localStorage.getItem(key);
+export const getStorageItem = (key: string, legacyKey: string, userId?: string) => {
+  // If userId is provided, create a user-specific key
+  const personalizedKey = userId ? `${key}_${userId}` : key;
+  
+  const item = localStorage.getItem(personalizedKey);
   
   // If item doesn't exist, check legacy key
-  if (!item && legacyKey) {
-    const legacyItem = localStorage.getItem(legacyKey);
+  if (!item) {
+    // Try the non-personalized key as fallback
+    if (userId) {
+      const nonPersonalizedItem = localStorage.getItem(key);
+      if (nonPersonalizedItem) {
+        return nonPersonalizedItem;
+      }
+    }
     
-    if (legacyItem) {
-      // If found in legacy, migrate to new key
-      localStorage.setItem(key, legacyItem);
-      return legacyItem;
+    // Check legacy key
+    if (legacyKey) {
+      const legacyItem = localStorage.getItem(legacyKey);
+      
+      if (legacyItem) {
+        // If found in legacy, migrate to new key
+        if (userId) {
+          localStorage.setItem(personalizedKey, legacyItem);
+        } else {
+          localStorage.setItem(key, legacyItem);
+        }
+        return legacyItem;
+      }
     }
   }
   
@@ -75,34 +94,61 @@ export const getStorageItem = (key: string, legacyKey: string) => {
  * Custom hook for managing localStorage state with cross-component synchronization
  */
 export function useLocalStorage<T>(key: string, legacyKey: string, initialValue: T) {
+  // Get the current user ID for personalized storage
+  const { user } = useAuth();
+  const userId = user?.id;
+  
+  // Create a personalized key if user is logged in
+  const personalizedKey = userId ? `${key}_${userId}` : key;
+  
+  // Memoize the initial value to prevent it from causing rerenders
+  const memoizedInitialValue = useMemo(() => initialValue, []);
+  
+  // Initialize state only once
   const [storedValue, setStoredValue] = useState<T>(() => {
     try {
-      const item = getStorageItem(key, legacyKey);
-      return item ? JSON.parse(item) : initialValue;
+      const item = getStorageItem(key, legacyKey, userId);
+      return item ? JSON.parse(item) : memoizedInitialValue;
     } catch (error) {
       console.error('Error reading from localStorage:', error);
-      return initialValue;
+      return memoizedInitialValue;
     }
   });
 
+  // Update local state when user changes
+  useEffect(() => {
+    if (!userId) return; // Skip if no user ID (prevents unnecessary updates)
+    
+    try {
+      const item = getStorageItem(key, legacyKey, userId);
+      if (item) {
+        setStoredValue(JSON.parse(item));
+      }
+    } catch (error) {
+      console.error('Error reading from localStorage during user change:', error);
+    }
+  }, [userId, key, legacyKey]); // Remove initialValue from dependencies
+  
   // Update local state when another component changes the same key
   useEffect(() => {
     // Function to handle external updates
     const handleExternalUpdate = () => {
       try {
-        const item = localStorage.getItem(key);
-        setStoredValue(item ? JSON.parse(item) : initialValue);
+        const item = localStorage.getItem(personalizedKey);
+        if (item) {
+          setStoredValue(JSON.parse(item));
+        }
       } catch (error) {
         console.error('Error reading from localStorage during sync:', error);
       }
     };
     
     // Register this component with the event system
-    const unregister = registerStorageListener(key, handleExternalUpdate);
+    const unregister = registerStorageListener(personalizedKey, handleExternalUpdate);
     
     // Also listen for window storage events (for cross-tab synchronization)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === key) {
+      if (e.key === personalizedKey) {
         handleExternalUpdate();
       }
     };
@@ -114,7 +160,7 @@ export function useLocalStorage<T>(key: string, legacyKey: string, initialValue:
       unregister();
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [key, initialValue]);
+  }, [personalizedKey]); // Remove initialValue from dependencies
 
   // Update localStorage when the state changes
   const setValue = (value: T | ((val: T) => T)) => {
@@ -125,11 +171,11 @@ export function useLocalStorage<T>(key: string, legacyKey: string, initialValue:
       // Save to state
       setStoredValue(valueToStore);
       
-      // Save to localStorage
-      localStorage.setItem(key, JSON.stringify(valueToStore));
+      // Save to localStorage with personalized key if user is logged in
+      localStorage.setItem(personalizedKey, JSON.stringify(valueToStore));
       
       // Notify all other components using this key
-      notifyStorageListeners(key);
+      notifyStorageListeners(personalizedKey);
     } catch (error) {
       console.error('Error saving to localStorage:', error);
     }
