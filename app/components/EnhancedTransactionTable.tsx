@@ -73,6 +73,9 @@ export function EnhancedTransactionTable({
     index: number;
     identifier: string;
   } | null>(null);
+  
+  // Mobile add dialog state
+  const [mobileAddDialogOpen, setMobileAddDialogOpen] = useState(false);
 
   const [tableColors] = useLocalStorage<Record<string, string>>(
     STORAGE_KEYS.TABLE_COLORS,
@@ -194,7 +197,7 @@ export function EnhancedTransactionTable({
       description: newDescription.trim(),
       amount: -parsedAmount, // Expense is always negative
       date: new Date(newDate),
-      category
+      category: category as "Essentials" | "Wants" | "Savings" | "Income"
     };
     
     // Add transaction
@@ -312,6 +315,51 @@ export function EnhancedTransactionTable({
       onUpdateTransaction(mobileEditTransaction.index, updatedTransaction);
       handleCloseMobileEdit();
     }
+  };
+
+  // Handle opening mobile add dialog
+  const handleOpenMobileAdd = () => {
+    setNewDescription('');
+    setNewAmount('');
+    setNewDate(new Date().toISOString().split('T')[0]);
+    setMobileAddDialogOpen(true);
+  };
+  
+  // Handle closing mobile add dialog
+  const handleCloseMobileAdd = () => {
+    setMobileAddDialogOpen(false);
+    setNewDescription('');
+    setNewAmount('');
+    setNewDate(new Date().toISOString().split('T')[0]);
+  };
+  
+  // Handle adding transaction from mobile dialog
+  const handleAddTransactionMobile = () => {
+    // Validate inputs
+    if (!newDescription.trim()) {
+      // Show error or alert
+      return;
+    }
+    
+    const amountValue = parseFloat(newAmount);
+    if (isNaN(amountValue) || amountValue <= 0) {
+      // Show error or alert
+      return;
+    }
+    
+    // Create new transaction
+    const newTransaction: Transaction = {
+      description: newDescription.trim(),
+      amount: -Math.abs(amountValue), // Negative for expenses
+      date: new Date(newDate),
+      category: category as "Essentials" | "Wants" | "Savings" | "Income"
+    };
+    
+    // Add transaction
+    onAddTransaction(newTransaction);
+    
+    // Close dialog and reset form
+    handleCloseMobileAdd();
   };
 
   return (
@@ -1045,93 +1093,13 @@ export function EnhancedTransactionTable({
                 </>
               )}
               
-              {/* Mobile Add Form */}
-              {isAdding && (
-                <Card sx={{ 
-                  mb: 2, 
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                  bgcolor: isDark ? 'rgba(255,255,255,0.15)' : 'background.paper',
-                  borderRadius: 2,
-                }}>
-                  <CardContent>
-                    <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
-                      New {category} Expense
-                    </Typography>
-                    <Stack spacing={2} sx={{ mt: 1 }}>
-                      <TextField
-                        label="Description"
-                        value={newDescription}
-                        onChange={(e) => setNewDescription(e.target.value)}
-                        variant="outlined"
-                        fullWidth
-                        placeholder="e.g., Groceries"
-                        sx={{ 
-                          "& .MuiOutlinedInput-root": { 
-                            backgroundColor: 'white' 
-                          }
-                        }}
-                      />
-                      
-                      <TextField
-                        label="Date"
-                        type="date"
-                        value={newDate}
-                        onChange={(e) => setNewDate(e.target.value)}
-                        variant="outlined"
-                        fullWidth
-                        InputLabelProps={{ shrink: true }}
-                        sx={{ 
-                          "& .MuiOutlinedInput-root": { 
-                            backgroundColor: 'white' 
-                          }
-                        }}
-                      />
-                      
-                      <TextField
-                        label="Amount"
-                        value={newAmount}
-                        onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                        variant="outlined"
-                        fullWidth
-                        placeholder="0.00"
-                        InputProps={{
-                          startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
-                        }}
-                        sx={{ 
-                          "& .MuiOutlinedInput-root": { 
-                            backgroundColor: 'white' 
-                          }
-                        }}
-                      />
-                      
-                      <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                        <Button 
-                          variant="outlined" 
-                          onClick={() => setIsAdding(false)}
-                          sx={{ flex: 1, borderRadius: 2 }}
-                        >
-                          Cancel
-                        </Button>
-                        <Button 
-                          variant="contained" 
-                          onClick={handleAddTransaction}
-                          sx={{ flex: 1, borderRadius: 2 }}
-                        >
-                          Add
-                        </Button>
-                      </Box>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              )}
-              
               {/* Mobile Add Button - Only show when not adding */}
               {!isAdding && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
                   <Button
                     variant="contained"
                     startIcon={<AddIcon />}
-                    onClick={() => setIsAdding(true)}
+                    onClick={isMobile ? handleOpenMobileAdd : () => setIsAdding(true)}
                     sx={{ 
                       borderRadius: 2,
                       py: 1,
@@ -1204,6 +1172,14 @@ export function EnhancedTransactionTable({
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
                   backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
                 }
               }}
             />
@@ -1219,6 +1195,14 @@ export function EnhancedTransactionTable({
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
                   backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
                 }
               }}
             />
@@ -1236,6 +1220,14 @@ export function EnhancedTransactionTable({
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
                   backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
                 }
               }}
             />
@@ -1273,6 +1265,109 @@ export function EnhancedTransactionTable({
           >
             <DeleteIcon />
           </IconButton>
+        </DialogActions>
+      </Dialog>
+
+      {/* Mobile add dialog */}
+      <Dialog 
+        open={mobileAddDialogOpen} 
+        onClose={handleCloseMobileAdd}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          New {category} Expense
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 1 }}>
+            <TextField
+              label="Description"
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              variant="outlined"
+              fullWidth
+              placeholder="e.g., Groceries"
+              inputProps={{ style: { fontSize: '1.1rem' } }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
+                }
+              }}
+            />
+            
+            <TextField
+              label="Date"
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+              variant="outlined"
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
+                }
+              }}
+            />
+            
+            <TextField
+              label="Amount"
+              value={newAmount}
+              onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+              variant="outlined"
+              fullWidth
+              placeholder="0.00"
+              inputProps={{ style: { fontSize: '1.1rem' } }}
+              InputProps={{
+                startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
+              }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
+                }
+              }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button 
+            onClick={handleCloseMobileAdd} 
+            variant="outlined"
+            sx={{ borderRadius: 2, px: 3 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleAddTransactionMobile} 
+            variant="contained"
+            sx={{ borderRadius: 2, px: 3 }}
+          >
+            Add
+          </Button>
         </DialogActions>
       </Dialog>
     </>

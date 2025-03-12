@@ -104,11 +104,6 @@ export function IncomeTable({
     return String(date);
   };
 
-  // Create a unique identifier for a transaction
-  const getTransactionId = (transaction: Transaction) => {
-    return `${transaction.date instanceof Date ? transaction.date.toISOString() : String(transaction.date)}-${transaction.description}-${transaction.amount}-${transaction.category}`;
-  };
-
   // Handle editing row changes
   const handleEditingChange = (field: keyof EditingRow, value: string) => {
     if (editingRow) {
@@ -117,6 +112,38 @@ export function IncomeTable({
         [field]: value
       });
     }
+  };
+
+  // Find the global index of a transaction in the full transactions array
+  const findGlobalIndex = (transaction: Transaction): number => {
+    return transactions.findIndex(t => {
+      const dateMatch = getDateString(t.date) === getDateString(transaction.date);
+      return dateMatch && 
+        t.description === transaction.description && 
+        t.amount === transaction.amount &&
+        t.category === transaction.category;
+    });
+  };
+
+  // Helper to get date string for comparison 
+  const getDateString = (date: Date | string): string => {
+    if (date instanceof Date) {
+      return date.toISOString();
+    } else if (typeof date === 'string') {
+      // Try to convert string to date and then to ISO string
+      try {
+        return new Date(date).toISOString();
+      } catch (e) {
+        return date;
+      }
+    }
+    // Fallback
+    return String(date);
+  };
+
+  // Create a unique identifier for a transaction
+  const getTransactionId = (transaction: Transaction) => {
+    return `${transaction.date instanceof Date ? transaction.date.toISOString() : String(transaction.date)}-${transaction.description}-${transaction.amount}-${transaction.category}`;
   };
 
   // Handle saving a row edit
@@ -260,6 +287,9 @@ export function IncomeTable({
     identifier: string;
   } | null>(null);
   
+  // Mobile add dialog state
+  const [mobileAddDialogOpen, setMobileAddDialogOpen] = useState(false);
+
   // Handle opening mobile edit dialog
   const handleOpenMobileEdit = (transaction: Transaction, index: number) => {
     const transactionId = getTransactionId(transaction);
@@ -277,7 +307,7 @@ export function IncomeTable({
         : '');
     
     setEditingRow({
-      index,
+      index: findGlobalIndex(transaction),
       identifier: transactionId,
       amount: Math.abs(transaction.amount).toString(),
       date: dateString,
@@ -307,11 +337,62 @@ export function IncomeTable({
       handleCloseMobileEdit();
     }
   };
+
+  // Handle opening mobile add dialog
+  const handleOpenMobileAdd = () => {
+    setNewDescription('');
+    setNewAmount('');
+    setNewDate(new Date().toISOString().split('T')[0]);
+    setFormErrors({});
+    setMobileAddDialogOpen(true);
+  };
   
-  // Handle adding income on mobile
+  // Handle closing mobile add dialog
+  const handleCloseMobileAdd = () => {
+    setMobileAddDialogOpen(false);
+    setNewDescription('');
+    setNewAmount('');
+    setNewDate(new Date().toISOString().split('T')[0]);
+    setFormErrors({});
+  };
+  
+  // Handle adding income from mobile dialog
   const handleAddIncomeMobile = () => {
-    // Use the main add transaction function for consistency
-    handleAddTransaction();
+    // Reset form errors
+    const errors: {
+      description?: string;
+      amount?: string;
+    } = {};
+    
+    // Validate inputs
+    if (!newDescription.trim()) {
+      errors.description = 'Description is required';
+    }
+    
+    const amountValue = parseFloat(newAmount);
+    if (isNaN(amountValue) || amountValue <= 0) {
+      errors.amount = 'Please enter a valid amount';
+    }
+    
+    // If there are errors, update state and return
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+    
+    // Create new transaction
+    const newTransaction: Transaction = {
+      description: newDescription.trim(),
+      amount: Math.abs(amountValue), // Positive for income
+      date: new Date(newDate),
+      category: 'Income'
+    };
+    
+    // Add transaction
+    onAddTransaction(newTransaction);
+    
+    // Close dialog and reset form
+    handleCloseMobileAdd();
   };
 
   if (incomeTransactions.length === 0 && !isAdding) {
@@ -1284,9 +1365,9 @@ export function IncomeTable({
               }}>
                 <Typography variant="h6" sx={{ 
                   fontWeight: 'bold',
-                  color: isDark ? '#fff' : 'text.primary',
+                  color: isDark ? '#fff' : 'inherit',
                   fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                  letterSpacing: '0.01em'
+                  letterSpacing: '0.01em',
                 }}>
                   Income
                 </Typography>
@@ -1371,7 +1452,7 @@ export function IncomeTable({
                 <Button
                   variant="contained"
                   startIcon={<AddIcon />}
-                  onClick={() => setIsAdding(true)}
+                  onClick={handleOpenMobileAdd}
                   sx={{ 
                     borderRadius: 2,
                     py: 1,
@@ -1407,9 +1488,18 @@ export function IncomeTable({
                     variant="outlined"
                     fullWidth
                     placeholder="e.g., Salary, Freelance work"
+                    inputProps={{ style: { fontSize: '1.1rem' } }}
                     sx={{ 
                       "& .MuiOutlinedInput-root": { 
                         backgroundColor: 'white' 
+                      },
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: 'rgba(0, 0, 0, 0.23)'
+                      },
+                      "& .MuiInputLabel-outlined": {
+                        backgroundColor: 'white',
+                        paddingLeft: '5px',
+                        paddingRight: '5px'
                       }
                     }}
                   />
@@ -1425,6 +1515,14 @@ export function IncomeTable({
                     sx={{ 
                       "& .MuiOutlinedInput-root": { 
                         backgroundColor: 'white' 
+                      },
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: 'rgba(0, 0, 0, 0.23)'
+                      },
+                      "& .MuiInputLabel-outlined": {
+                        backgroundColor: 'white',
+                        paddingLeft: '5px',
+                        paddingRight: '5px'
                       }
                     }}
                   />
@@ -1436,7 +1534,7 @@ export function IncomeTable({
                       const value = e.target.value.replace(/[^0-9.]/g, '');
                       setNewAmount(value);
                       // Clear error when user types
-                      if (formErrors.amount && value) {
+                      if (formErrors.amount && value && !isNaN(parseFloat(value))) {
                         setFormErrors({...formErrors, amount: undefined});
                       }
                     }}
@@ -1445,12 +1543,21 @@ export function IncomeTable({
                     variant="outlined"
                     fullWidth
                     placeholder="0.00"
+                    inputProps={{ style: { fontSize: '1.1rem' } }}
                     InputProps={{
                       startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
                     }}
                     sx={{ 
                       "& .MuiOutlinedInput-root": { 
                         backgroundColor: 'white' 
+                      },
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: 'rgba(0, 0, 0, 0.23)'
+                      },
+                      "& .MuiInputLabel-outlined": {
+                        backgroundColor: 'white',
+                        paddingLeft: '5px',
+                        paddingRight: '5px'
                       }
                     }}
                   />
@@ -1506,6 +1613,14 @@ export function IncomeTable({
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
                   backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
                 }
               }}
             />
@@ -1521,6 +1636,14 @@ export function IncomeTable({
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
                   backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
                 }
               }}
             />
@@ -1538,6 +1661,14 @@ export function IncomeTable({
               sx={{ 
                 "& .MuiOutlinedInput-root": { 
                   backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
                 }
               }}
             />
@@ -1575,6 +1706,126 @@ export function IncomeTable({
           >
             <DeleteIcon />
           </IconButton>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Mobile add dialog */}
+      <Dialog 
+        open={mobileAddDialogOpen} 
+        onClose={handleCloseMobileAdd}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          New Income Source
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 1 }}>
+            <TextField
+              label="Description"
+              value={newDescription}
+              onChange={(e) => {
+                setNewDescription(e.target.value);
+                // Clear error when user types
+                if (formErrors.description && e.target.value.trim()) {
+                  setFormErrors({...formErrors, description: undefined});
+                }
+              }}
+              error={!!formErrors.description}
+              helperText={formErrors.description}
+              variant="outlined"
+              fullWidth
+              placeholder="e.g., Salary, Freelance work"
+              inputProps={{ style: { fontSize: '1.1rem' } }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
+                }
+              }}
+            />
+            
+            <TextField
+              label="Date"
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+              variant="outlined"
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
+                }
+              }}
+            />
+            
+            <TextField
+              label="Amount"
+              value={newAmount}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9.]/g, '');
+                setNewAmount(value);
+                // Clear error when user types
+                if (formErrors.amount && value && !isNaN(parseFloat(value))) {
+                  setFormErrors({...formErrors, amount: undefined});
+                }
+              }}
+              error={!!formErrors.amount}
+              helperText={formErrors.amount}
+              variant="outlined"
+              fullWidth
+              placeholder="0.00"
+              inputProps={{ style: { fontSize: '1.1rem' } }}
+              InputProps={{
+                startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
+              }}
+              sx={{ 
+                "& .MuiOutlinedInput-root": { 
+                  backgroundColor: 'white' 
+                },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                },
+                "& .MuiInputLabel-outlined": {
+                  backgroundColor: 'white',
+                  paddingLeft: '5px',
+                  paddingRight: '5px'
+                }
+              }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button 
+            onClick={handleCloseMobileAdd} 
+            variant="outlined"
+            sx={{ borderRadius: 2, px: 3 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleAddIncomeMobile} 
+            variant="contained"
+            sx={{ borderRadius: 2, px: 3 }}
+          >
+            Add
+          </Button>
         </DialogActions>
       </Dialog>
       
