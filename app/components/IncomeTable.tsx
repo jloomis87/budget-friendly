@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, 
   Paper, 
@@ -16,9 +16,16 @@ import {
   DialogActions,
   Button,
   TextField,
-  Tooltip
+  Tooltip,
+  useMediaQuery,
+  useTheme,
+  Card,
+  CardContent,
+  Grid,
+  Stack,
+  Divider
 } from '@mui/material';
-import { DeleteIcon, SaveIcon, CloseIcon, AddIcon, EditOutlinedIcon } from '../utils/materialIcons';
+import { DeleteIcon, SaveIcon, CloseIcon, AddIcon, EditOutlinedIcon, CheckCircleOutlineIcon, CancelOutlinedIcon } from '../utils/materialIcons';
 import type { Transaction } from '../services/fileParser';
 import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
 import { isColorDark } from '../utils/colorUtils';
@@ -67,6 +74,12 @@ export function IncomeTable({
       'Income': '#f5f5f5'
     }
   );
+
+  // Initialize form errors state property if it doesn't already exist
+  const [formErrors, setFormErrors] = useState<{
+    description?: string;
+    amount?: string;
+  }>({});
 
   // Filter only income transactions and sort by date (newest first)
   const incomeTransactions = transactions
@@ -179,28 +192,42 @@ export function IncomeTable({
     setTransactionToDelete(null);
   };
 
-  // Handle adding a new transaction
+  // Handle adding new income transaction
   const handleAddTransaction = () => {
     // Validate inputs
+    const errors: {description?: string; amount?: string} = {};
+    let isValid = true;
+    
     if (!newDescription.trim()) {
-      return; // Description is required
+      errors.description = 'Description is required';
+      isValid = false;
     }
     
     const parsedAmount = parseFloat(newAmount.replace(/[^0-9.]/g, ''));
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      return; // Valid amount is required
+      errors.amount = 'Please enter a valid amount';
+      isValid = false;
     }
     
-    // Create transaction object
-    const newTransaction: Transaction = {
+    if (!isValid) {
+      setFormErrors(errors);
+      return;
+    }
+    
+    // Clear form errors
+    setFormErrors({});
+    
+    // Create transaction object - Income transactions are positive
+    const newIncomeTransaction: Transaction = {
       description: newDescription.trim(),
-      amount: parsedAmount, // Income is always positive
+      amount: parsedAmount, // Income is positive
       date: new Date(newDate),
       category: 'Income'
     };
     
     // Add transaction
-    onAddTransaction(newTransaction);
+    onAddTransaction(newIncomeTransaction);
+    console.log('Adding income transaction:', newIncomeTransaction);
     
     // Reset form
     setNewDescription('');
@@ -220,6 +247,72 @@ export function IncomeTable({
 
   // Check if any row is currently being edited - used to determine if we need the Actions column
   const isAnyRowEditing = editingRow !== null;
+
+  // Add theme and media query for responsive design
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  
+  // Mobile edit dialog state
+  const [mobileEditDialogOpen, setMobileEditDialogOpen] = useState(false);
+  const [mobileEditTransaction, setMobileEditTransaction] = useState<{
+    transaction: Transaction;
+    index: number;
+    identifier: string;
+  } | null>(null);
+  
+  // Handle opening mobile edit dialog
+  const handleOpenMobileEdit = (transaction: Transaction, index: number) => {
+    const transactionId = getTransactionId(transaction);
+    setMobileEditTransaction({
+      transaction,
+      index,
+      identifier: transactionId
+    });
+    
+    // Set the editing row state with the same values
+    const dateString = transaction.date instanceof Date 
+      ? transaction.date.toISOString().split('T')[0]
+      : (typeof transaction.date === 'string' 
+        ? new Date(transaction.date).toISOString().split('T')[0]
+        : '');
+    
+    setEditingRow({
+      index,
+      identifier: transactionId,
+      amount: Math.abs(transaction.amount).toString(),
+      date: dateString,
+      description: transaction.description
+    });
+    
+    setMobileEditDialogOpen(true);
+  };
+  
+  // Handle closing mobile edit dialog
+  const handleCloseMobileEdit = () => {
+    setMobileEditDialogOpen(false);
+    setMobileEditTransaction(null);
+    setEditingRow(null);
+  };
+  
+  // Handle saving mobile edit
+  const handleSaveMobileEdit = () => {
+    if (mobileEditTransaction && editingRow) {
+      const updatedTransaction: Partial<Transaction> = {
+        description: editingRow.description,
+        date: new Date(editingRow.date),
+        amount: parseFloat(editingRow.amount)
+      };
+      
+      onUpdateTransaction(mobileEditTransaction.index, updatedTransaction);
+      handleCloseMobileEdit();
+    }
+  };
+  
+  // Handle adding income on mobile
+  const handleAddIncomeMobile = () => {
+    // Use the main add transaction function for consistency
+    handleAddTransaction();
+  };
 
   if (incomeTransactions.length === 0 && !isAdding) {
     return (
@@ -503,55 +596,82 @@ export function IncomeTable({
   }
 
   return (
-    <>
-      <Box sx={{ mb: 3 }}>
+    <Box sx={{ mb: 4 }}>
+      <Typography variant="h6" component="h2" sx={{ 
+        mb: 2, 
+        fontWeight: 600,
+        color: isDark ? '#fff' : 'inherit',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1
+      }}>
+        Income Summary
+        <Typography 
+          component="span" 
+          variant="subtitle1" 
+          sx={{ 
+            fontWeight: 600, 
+            color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
+            ml: 'auto'
+          }}
+        >
+          {totalIncome > 0 ? (
+            <>Total: ${totalIncome.toFixed(2)}</>
+          ) : (
+            <>No income</>
+          )}
+        </Typography>
+      </Typography>
+      
+      {/* Render regular table for desktop or optimized cards for mobile */}
+      {!isMobile ? (
+        // Original desktop table implementation
         <Paper sx={{ 
-          overflow: 'hidden', 
-          borderRadius: 2, 
-          boxShadow: 2,
+          overflow: 'hidden',
+          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'background.paper',
+          borderRadius: 2,
           ...getBackgroundStyles()
         }}>
-          <Box sx={{ 
-            p: 2, 
-            display: 'flex', 
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
-            color: isDark ? '#fff' : 'inherit'
-          }}>
-            <Typography 
-              variant="h6" 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center',
-                fontWeight: 'bold',
-                color: isDark ? '#fff' : 'inherit',
-                fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                letterSpacing: '0.01em',
-              }}
-            >
-              Income Summary
+          <Box>
+            {/* Add header with title and color picker */}
+            <Box sx={{ 
+              p: 2, 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+              color: isDark ? '#fff' : 'inherit'
+            }}>
               <Typography 
-                variant="body2" 
-                component="span" 
+                variant="h6" 
                 sx={{ 
-                  ml: 1,
-                  color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'
+                  display: 'flex', 
+                  alignItems: 'center',
+                  fontWeight: 'bold',
+                  color: isDark ? '#fff' : 'inherit',
+                  fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                  letterSpacing: '0.01em',
                 }}
               >
-                (Total: {new Intl.NumberFormat('en-US', {
-                  style: 'currency',
-                  currency: 'USD',
-                }).format(totalIncome)})
+                Income
+                <Typography 
+                  component="span" 
+                  variant="subtitle1" 
+                  sx={{ 
+                    ml: 1,
+                    fontWeight: 500, 
+                    color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'
+                  }}
+                >
+                  (Total: ${totalIncome.toFixed(2)})
+                </Typography>
               </Typography>
-            </Typography>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CategoryColorPicker category="Income" />
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CategoryColorPicker category="Income" />
+              </Box>
             </Box>
-          </Box>
-          
-          <Box>
+            
             <Table size="small" sx={{ tableLayout: 'fixed' }}>
               <TableHead>
                 <TableRow sx={{
@@ -1141,20 +1261,305 @@ export function IncomeTable({
             </Table>
           </Box>
         </Paper>
-      </Box>
-
-      {/* Delete Confirmation Dialog */}
+      ) : (
+        // Mobile card implementation
+        <Box>
+          {/* Single container for the entire income section */}
+          <Card sx={{ 
+            borderRadius: 2,
+            overflow: 'hidden',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            ...getBackgroundStyles()
+          }}>
+            {/* Header */}
+            <CardContent sx={{ 
+              p: 2, 
+              '&:last-child': { pb: 2 },
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 'bold',
+                  color: isDark ? '#fff' : 'text.primary',
+                  fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                  letterSpacing: '0.01em'
+                }}>
+                  Income
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="subtitle1" sx={{ 
+                    fontWeight: 600, 
+                    color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'text.primary'
+                  }}>
+                    (Total: ${totalIncome.toFixed(2)})
+                  </Typography>
+                  <CategoryColorPicker category="Income" />
+                </Box>
+              </Box>
+            </CardContent>
+            
+            {/* Empty state - No income and not adding */}
+            {incomeTransactions.length === 0 && !isAdding && (
+              <Box sx={{ 
+                p: 3, 
+                textAlign: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              }}>
+                <Typography variant="body1" color={isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'}>
+                  No income sources yet. Add your first income source below.
+                </Typography>
+              </Box>
+            )}
+            
+            {/* Income Transaction Items */}
+            {incomeTransactions.length > 0 && !isAdding && (
+              <>
+                {incomeTransactions.map((transaction, index) => {
+                  const transactionId = getTransactionId(transaction);
+                  const dateString = formatDateForDisplay(transaction.date);
+                  
+                  return (
+                    <Box 
+                      key={transactionId}
+                      sx={{ 
+                        p: 2, 
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                        cursor: 'pointer',
+                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.8)',
+                        '&:hover': {
+                          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.9)',
+                        }
+                      }}
+                      onClick={() => handleOpenMobileEdit(transaction, index)}
+                    >
+                      <Grid container spacing={1}>
+                        <Grid item xs={8}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 500, color: isDark ? '#fff' : 'text.primary' }}>
+                            {transaction.description}
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'text.secondary' }}>
+                            {dateString}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={4} sx={{ textAlign: 'right' }}>
+                          <Typography variant="subtitle1" sx={{ 
+                            fontWeight: 600, 
+                            color: '#4caf50' 
+                          }}>
+                            ${Math.abs(transaction.amount).toFixed(2)}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  );
+                })}
+              </>
+            )}
+            
+            {/* Add button at the bottom of card */}
+            {!isAdding ? (
+              <Box sx={{ 
+                p: 2, 
+                display: 'flex', 
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              }}>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => setIsAdding(true)}
+                  sx={{ 
+                    borderRadius: 2,
+                    py: 1,
+                    px: 3,
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : 'primary.main',
+                    color: isDark ? '#fff' : 'white',
+                    '&:hover': {
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.3)' : 'primary.dark',
+                    }
+                  }}
+                >
+                  ADD INCOME SOURCE
+                </Button>
+              </Box>
+            ) : (
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
+                  New Income Source
+                </Typography>
+                <Stack spacing={2} sx={{ mt: 1 }}>
+                  <TextField
+                    label="Description"
+                    value={newDescription}
+                    onChange={(e) => {
+                      setNewDescription(e.target.value);
+                      // Clear error when user types
+                      if (formErrors.description && e.target.value.trim()) {
+                        setFormErrors({...formErrors, description: undefined});
+                      }
+                    }}
+                    error={!!formErrors.description}
+                    helperText={formErrors.description}
+                    variant="outlined"
+                    fullWidth
+                    placeholder="e.g., Salary, Freelance work"
+                  />
+                  
+                  <TextField
+                    label="Date"
+                    type="date"
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    variant="outlined"
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  
+                  <TextField
+                    label="Amount"
+                    value={newAmount}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      setNewAmount(value);
+                      // Clear error when user types
+                      if (formErrors.amount && value) {
+                        setFormErrors({...formErrors, amount: undefined});
+                      }
+                    }}
+                    error={!!formErrors.amount}
+                    helperText={formErrors.amount}
+                    variant="outlined"
+                    fullWidth
+                    placeholder="0.00"
+                    InputProps={{
+                      startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
+                    }}
+                  />
+                  
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                    <Button 
+                      variant="outlined" 
+                      onClick={() => {
+                        setIsAdding(false);
+                        setFormErrors({});
+                        setNewDescription('');
+                        setNewAmount('');
+                        setNewDate(new Date().toISOString().split('T')[0]);
+                      }}
+                      sx={{ flex: 1, borderRadius: 2 }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      variant="contained" 
+                      onClick={handleAddIncomeMobile}
+                      sx={{ flex: 1, borderRadius: 2 }}
+                    >
+                      Add
+                    </Button>
+                  </Box>
+                </Stack>
+              </CardContent>
+            )}
+          </Card>
+        </Box>
+      )}
+      
+      {/* Mobile editing dialog */}
+      <Dialog 
+        open={mobileEditDialogOpen} 
+        onClose={handleCloseMobileEdit}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          Edit Income Source
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 1 }}>
+            <TextField
+              label="Description"
+              value={editingRow?.description || ''}
+              onChange={(e) => handleEditingChange('description', e.target.value)}
+              variant="outlined"
+              fullWidth
+              inputProps={{ style: { fontSize: '1.1rem' } }}
+            />
+            
+            <TextField
+              label="Date"
+              type="date"
+              value={editingRow?.date || ''}
+              onChange={(e) => handleEditingChange('date', e.target.value)}
+              variant="outlined"
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+            />
+            
+            <TextField
+              label="Amount"
+              value={editingRow?.amount || ''}
+              onChange={(e) => handleEditingChange('amount', e.target.value.replace(/[^0-9.]/g, ''))}
+              variant="outlined"
+              fullWidth
+              inputProps={{ style: { fontSize: '1.1rem' } }}
+              InputProps={{
+                startAdornment: <Box component="span" sx={{ mr: 1 }}>$</Box>
+              }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button 
+            onClick={handleCloseMobileEdit} 
+            variant="outlined"
+            sx={{ borderRadius: 2, px: 3 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSaveMobileEdit} 
+            variant="contained"
+            sx={{ borderRadius: 2, px: 3 }}
+          >
+            Save
+          </Button>
+          <Box sx={{ flex: 1 }} />
+          <IconButton 
+            onClick={() => {
+              if (mobileEditTransaction) {
+                setTransactionToDelete({
+                  transaction: mobileEditTransaction.transaction,
+                  index: mobileEditTransaction.index
+                });
+                setDeleteConfirmOpen(true);
+                handleCloseMobileEdit();
+              }
+            }}
+            color="error"
+            size="small"
+          >
+            <DeleteIcon />
+          </IconButton>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Delete confirmation dialog */}
       <Dialog
         open={deleteConfirmOpen}
-        onClose={cancelDelete}
-        aria-labelledby="delete-transaction-dialog-title"
-        aria-describedby="delete-transaction-dialog-description"
+        onClose={() => setDeleteConfirmOpen(false)}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
       >
-        <DialogTitle id="delete-transaction-dialog-title">
+        <DialogTitle id="alert-dialog-title">
           Confirm Deletion
         </DialogTitle>
         <DialogContent>
-          <DialogContentText id="delete-transaction-dialog-description">
+          <DialogContentText id="alert-dialog-description">
             Are you sure you want to delete the income "{transactionToDelete?.transaction.description}"
             for {new Intl.NumberFormat('en-US', {
               style: 'currency',
@@ -1164,7 +1569,7 @@ export function IncomeTable({
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={cancelDelete} color="primary">
+          <Button onClick={() => setDeleteConfirmOpen(false)} color="primary">
             Cancel
           </Button>
           <Button onClick={confirmDelete} color="error" autoFocus>
@@ -1172,6 +1577,6 @@ export function IncomeTable({
           </Button>
         </DialogActions>
       </Dialog>
-    </>
+    </Box>
   );
 } 
