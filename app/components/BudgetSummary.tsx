@@ -348,12 +348,14 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                         primary={<Typography variant="body1" sx={{ fontWeight: 'medium' }}>Essentials (50%)</Typography>}
                         secondary={
                           <Box sx={{ mt: 0.5 }}>
-                            <Typography variant="body2">
-                              Recommended: <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.essentials)}</Box>
-                            </Typography>
-                            <Typography variant="body2">
-                              Actual: <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.essentials)}</Box>
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                              <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
+                              <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.essentials)}</Box>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
+                              <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.essentials)}</Box>
+                            </Box>
                           </Box>
                         }
                       />
@@ -363,12 +365,14 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                         primary={<Typography variant="body1" sx={{ fontWeight: 'medium' }}>Wants (30%)</Typography>}
                         secondary={
                           <Box sx={{ mt: 0.5 }}>
-                            <Typography variant="body2">
-                              Recommended: <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.wants)}</Box>
-                            </Typography>
-                            <Typography variant="body2">
-                              Actual: <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.wants)}</Box>
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                              <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
+                              <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.wants)}</Box>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
+                              <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.wants)}</Box>
+                            </Box>
                           </Box>
                         }
                       />
@@ -378,12 +382,14 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                         primary={<Typography variant="body1" sx={{ fontWeight: 'medium' }}>Savings (20%)</Typography>}
                         secondary={
                           <Box sx={{ mt: 0.5 }}>
-                            <Typography variant="body2">
-                              Recommended: <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.savings)}</Box>
-                            </Typography>
-                            <Typography variant="body2">
-                              Actual: <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.savings)}</Box>
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                              <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
+                              <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.savings)}</Box>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
+                              <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.savings)}</Box>
+                            </Box>
                           </Box>
                         }
                       />
