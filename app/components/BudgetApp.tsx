@@ -236,20 +236,10 @@ function BudgetAppContent() {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', transaction.description);
     
-    // Customize drag image if needed
-    const dragPreview = document.createElement('div');
-    dragPreview.textContent = transaction.description;
-    dragPreview.style.backgroundColor = 'rgba(25, 118, 210, 0.1)';
-    dragPreview.style.padding = '4px 8px';
-    dragPreview.style.borderRadius = '4px';
-    dragPreview.style.fontSize = '14px';
-    document.body.appendChild(dragPreview);
-    e.dataTransfer.setDragImage(dragPreview, 0, 0);
+    // Add a class to the body to indicate dragging is in progress
+    document.body.classList.add('dragging-active');
     
-    // Remove the temporary element after a short delay
-    setTimeout(() => {
-      document.body.removeChild(dragPreview);
-    }, 0);
+    // Note: The custom drag image is now created in the TransactionRow component
   }, []);
 
   // Handle drag over
@@ -265,6 +255,9 @@ function BudgetAppContent() {
   const handleDrop = useCallback((e: React.DragEvent, targetCategory: string) => {
     e.preventDefault();
     setDragOverCategory(null);
+    
+    // Remove the dragging class
+    document.body.classList.remove('dragging-active');
     
     // Ensure we have a dragged transaction and it's not already in this category
     if (draggedTransaction && draggedTransaction.transaction.category !== targetCategory) {
@@ -285,6 +278,16 @@ function BudgetAppContent() {
   // Clear any drag/drop/animation states when mouse leaves a draggable area
   const handleDragLeave = useCallback(() => {
     setDragOverCategory(null);
+  }, []);
+  
+  // Handle drag end (in case drop doesn't happen)
+  const handleDragEnd = useCallback(() => {
+    // Remove the dragging class
+    document.body.classList.remove('dragging-active');
+    
+    // Reset states
+    setDragOverCategory(null);
+    setDraggedTransaction(null);
   }, []);
 
   // Handle opening the color picker
@@ -346,6 +349,11 @@ function BudgetAppContent() {
           onUpdateTransaction={updateTransaction}
           onDeleteTransaction={deleteTransaction}
           onAddTransaction={addTransaction}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          dragOverCategory={dragOverCategory}
+          recentlyDropped={recentlyDropped}
         />
         
         {/* Display transactions grouped by category */}
@@ -377,7 +385,8 @@ function BudgetAppContent() {
     handleDragOver, 
     handleDrop, 
     dragOverCategory, 
-    recentlyDropped
+    recentlyDropped,
+    handleDragEnd
   ]);
 
   // Memoize the budget summary component to prevent unnecessary re-renders
@@ -1124,6 +1133,21 @@ export function BudgetApp() {
             height: '100%',
             backgroundColor: '#f5f7fa',
             zIndex: -999
+          },
+          // Add drag and drop styles
+          '.dragging-active': {
+            cursor: 'grabbing !important'
+          },
+          '.dragging-active *': {
+            cursor: 'grabbing !important'
+          },
+          // Add transition effects for drag targets
+          '.drag-target': {
+            transition: 'transform 0.2s, box-shadow 0.2s'
+          },
+          '.drag-target-hover': {
+            transform: 'scale(1.01)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15) !important'
           }
         }}
       />

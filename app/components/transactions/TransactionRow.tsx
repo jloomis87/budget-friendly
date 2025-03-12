@@ -24,6 +24,70 @@ export function TransactionRow({
   formatDateForDisplay,
   onClick
 }: TransactionRowProps) {
+  // Create a custom drag image when dragging starts
+  const handleDragStart = (e: React.DragEvent) => {
+    // Create a custom drag image that looks like the row
+    const dragPreview = document.createElement('div');
+    dragPreview.style.backgroundColor = isDark ? '#333' : '#f5f5f5';
+    dragPreview.style.border = '1px solid #ccc';
+    dragPreview.style.borderRadius = '4px';
+    dragPreview.style.padding = '8px 12px';
+    dragPreview.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+    dragPreview.style.width = '250px';
+    dragPreview.style.display = 'flex';
+    dragPreview.style.alignItems = 'center';
+    dragPreview.style.color = isDark ? '#fff' : '#333';
+    
+    // Add an icon
+    const icon = document.createElement('span');
+    icon.innerHTML = '↕️';
+    icon.style.marginRight = '8px';
+    dragPreview.appendChild(icon);
+    
+    // Add description
+    const text = document.createElement('div');
+    text.textContent = transaction.description;
+    text.style.fontWeight = '500';
+    text.style.flex = '1';
+    dragPreview.appendChild(text);
+    
+    // Add amount
+    const amount = document.createElement('div');
+    amount.textContent = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(transaction.amount);
+    amount.style.marginLeft = '8px';
+    dragPreview.appendChild(amount);
+    
+    // Add to DOM temporarily
+    document.body.appendChild(dragPreview);
+    
+    // Set the drag image
+    e.dataTransfer.setDragImage(dragPreview, 125, 20);
+    
+    // Set other drag properties
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', transaction.description);
+    
+    // Add a class to the body to indicate dragging is in progress
+    document.body.classList.add('dragging-active');
+    
+    // Call the parent handler
+    onDragStart(e, transaction, globalIndex);
+    
+    // Remove the element after a short delay
+    setTimeout(() => {
+      document.body.removeChild(dragPreview);
+    }, 0);
+  };
+  
+  // Handle drag end
+  const handleDragEnd = () => {
+    // Remove the dragging class
+    document.body.classList.remove('dragging-active');
+  };
+
   return (
     <TableRow 
       sx={{
@@ -41,24 +105,39 @@ export function TransactionRow({
               : 'rgba(0, 0, 0, 0.08)'),
         },
         color: isDark ? '#fff' : 'inherit',
+        opacity: 1, // Ensure full opacity by default
+        transition: 'opacity 0.2s, transform 0.2s',
       }}
       draggable={!isEditing}
-      onDragStart={(e) => onDragStart(e, transaction, globalIndex)}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onClick={onClick}
     >
       <TableCell sx={{ 
-        padding: '8px 4px 8px 8px',
+        padding: '8px 16px 8px 16px',
+        color: isDark ? '#fff' : 'inherit',
       }}>
         {isEditing ? (
-          null // Empty cell when editing, delete moved to Actions column
-        ) : (
-          <DragIndicatorIcon 
-            fontSize="small" 
-            sx={{ 
-              color: isDark ? 'rgba(255, 255, 255, 0.5)' : 'action.disabled',
-              cursor: 'grab',
-            }} 
+          <TextField
+            fullWidth
+            variant="outlined"
+            size="small"
+            value={editingRow?.description || ''}
+            onChange={(e) => onEditingChange('description', e.target.value)}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.09)' : 'rgba(255, 255, 255, 0.9)',
+                color: isDark ? '#fff' : 'inherit',
+              },
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : 'rgba(0, 0, 0, 0.23)',
+              },
+            }}
           />
+        ) : (
+          <Typography variant="body2" sx={{ fontWeight: 500 }}>
+            {transaction.description}
+          </Typography>
         )}
       </TableCell>
       <TableCell sx={{ 

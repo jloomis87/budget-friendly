@@ -157,7 +157,9 @@ export function EnhancedTransactionTable({
     if (dragOverCategory === category) {
       return {
         backgroundColor: 'rgba(25, 118, 210, 0.08)', // Light blue when being dragged over
-        transition: 'background-color 0.3s ease'
+        transition: 'background-color 0.3s ease',
+        transform: 'scale(1.01)',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
       };
     }
     if (recentlyDropped === category) {
@@ -342,15 +344,21 @@ export function EnhancedTransactionTable({
     <>
       <Box 
         sx={{ mt: 3, mb: 3 }}
-        onDragOver={(e) => onDragOver(e, category)}
-        onDrop={(e) => onDrop(e, category)}
       >
-        <Paper sx={{ 
-          overflow: 'hidden', 
-          boxShadow: 2,
-          borderRadius: 2,
-          ...getBackgroundStyles()
-        }}>
+        <Paper 
+          elevation={1} 
+          sx={{ 
+            mb: 3, 
+            borderRadius: 2,
+            overflow: 'hidden',
+            ...getBackgroundStyles(),
+            transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.3s'
+          }}
+          className={`drag-target ${dragOverCategory === category ? 'drag-target-hover' : ''}`}
+          onDragOver={(e) => onDragOver(e, category)}
+          onDrop={(e) => onDrop(e, category)}
+          onDragLeave={() => {}}
+        >
           <Box sx={{ 
             display: 'flex', 
             justifyContent: 'space-between',
@@ -394,6 +402,9 @@ export function EnhancedTransactionTable({
             handleOpenMobileAdd={handleOpenMobileAdd}
             setIsAdding={setIsAdding}
             formatDateForDisplay={utils.formatDateForDisplay}
+            onDragStart={onDragStart}
+            allTransactions={allTransactions}
+            findGlobalIndex={(transaction, allTrans) => utils.findGlobalIndex(transaction, allTrans)}
           />
         </Paper>
       </Box>

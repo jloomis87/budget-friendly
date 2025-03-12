@@ -88,6 +88,22 @@ export interface MobileTransactionCardProps {
   handleOpenMobileEdit: (transaction: Transaction, index: number) => void;
   index: number;
   formatDateForDisplay: (date: Date | string | number) => string;
+  onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
+  globalIndex: number;
+}
+
+export interface MobileTransactionListProps {
+  category: string;
+  transactions: Transaction[];
+  isDark: boolean;
+  isAdding: boolean;
+  handleOpenMobileEdit: (transaction: Transaction, index: number) => void;
+  handleOpenMobileAdd: () => void;
+  setIsAdding: (value: boolean) => void;
+  formatDateForDisplay: (date: Date | string | number) => string;
+  onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
+  allTransactions?: Transaction[];
+  findGlobalIndex?: (transaction: Transaction, allTransactions: Transaction[]) => number;
 }
 
 export interface DeleteConfirmationDialogProps {

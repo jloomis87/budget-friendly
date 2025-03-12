@@ -3,17 +3,7 @@ import { Box, Typography, Button } from '@mui/material';
 import { AddIcon } from '../../utils/materialIcons';
 import { MobileTransactionCard } from './MobileTransactionCard';
 import type { Transaction } from '../../services/fileParser';
-
-interface MobileTransactionListProps {
-  category: string;
-  transactions: Transaction[];
-  isDark: boolean;
-  isAdding: boolean;
-  handleOpenMobileEdit: (transaction: Transaction, index: number) => void;
-  handleOpenMobileAdd: () => void;
-  setIsAdding: (value: boolean) => void;
-  formatDateForDisplay: (date: Date | string | number) => string;
-}
+import type { MobileTransactionListProps } from './types';
 
 export function MobileTransactionList({
   category,
@@ -23,8 +13,19 @@ export function MobileTransactionList({
   handleOpenMobileEdit,
   handleOpenMobileAdd,
   setIsAdding,
-  formatDateForDisplay
+  formatDateForDisplay,
+  onDragStart,
+  allTransactions,
+  findGlobalIndex
 }: MobileTransactionListProps) {
+  // Function to find the global index of a transaction
+  const getGlobalIndex = (transaction: Transaction): number => {
+    if (findGlobalIndex && allTransactions) {
+      return findGlobalIndex(transaction, allTransactions);
+    }
+    return -1; // Fallback if not provided
+  };
+
   return (
     <Box>
       {/* Empty state - when no transactions and not adding */}
@@ -49,6 +50,8 @@ export function MobileTransactionList({
               handleOpenMobileEdit={handleOpenMobileEdit}
               index={index}
               formatDateForDisplay={formatDateForDisplay}
+              onDragStart={onDragStart}
+              globalIndex={getGlobalIndex(transaction)}
             />
           ))}
         </>

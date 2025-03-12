@@ -30,7 +30,7 @@ import {
   FormControl,
   InputLabel
 } from '@mui/material';
-import { DeleteIcon, SaveIcon, CloseIcon, AddIcon, EditOutlinedIcon, CheckCircleOutlineIcon, CancelOutlinedIcon } from '../utils/materialIcons';
+import { DeleteIcon, SaveIcon, CloseIcon, AddIcon, EditOutlinedIcon, CheckCircleOutlineIcon, CancelOutlinedIcon, DragIndicatorIcon } from '../utils/materialIcons';
 import type { Transaction } from '../services/fileParser';
 import { useTableColors } from '../hooks/useTableColors';
 import { isColorDark } from '../utils/colorUtils';
@@ -41,6 +41,11 @@ interface IncomeTableProps {
   onUpdateTransaction: (index: number, updatedTransaction: Partial<Transaction>) => void;
   onDeleteTransaction: (index: number) => void;
   onAddTransaction: (transaction: Transaction) => void;
+  onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
+  onDragOver?: (e: React.DragEvent, category: string) => void;
+  onDrop?: (e: React.DragEvent, targetCategory: string) => void;
+  dragOverCategory?: string | null;
+  recentlyDropped?: string | null;
 }
 
 interface EditingRow {
@@ -55,7 +60,12 @@ export function IncomeTable({
   transactions,
   onUpdateTransaction,
   onDeleteTransaction,
-  onAddTransaction
+  onAddTransaction,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  dragOverCategory,
+  recentlyDropped
 }: IncomeTableProps) {
   // State for tracking if we're showing delete buttons (hover effect)
   // const [showDeleteButtons, setShowDeleteButtons] = useState(false);
@@ -273,9 +283,25 @@ export function IncomeTable({
   const hasCustomColor = tableColors['Income'] !== '#f5f5f5';
   const isDark = tableColors['Income'] && isColorDark(tableColors['Income']);
 
-  // Get background color styles
+  // Background styling based on drag state and custom color
   const getBackgroundStyles = () => {
-    return hasCustomColor ? { backgroundColor: tableColors['Income'] } : {};
+    if (dragOverCategory === 'Income') {
+      return {
+        backgroundColor: 'rgba(25, 118, 210, 0.08)', // Light blue when being dragged over
+        transition: 'background-color 0.3s ease',
+        transform: 'scale(1.01)',
+        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
+      };
+    }
+    if (recentlyDropped === 'Income') {
+      return {
+        backgroundColor: 'rgba(76, 175, 80, 0.08)', // Light green when recently received an item
+        transition: 'background-color 0.8s ease'
+      };
+    }
+    return tableColors['Income'] && tableColors['Income'] !== '#f5f5f5' 
+      ? { backgroundColor: tableColors['Income'] } 
+      : {};
   };
 
   // Check if any row is currently being edited - used to determine if we need the Actions column
@@ -340,13 +366,26 @@ export function IncomeTable({
   // Handle saving mobile edit
   const handleSaveMobileEdit = () => {
     if (mobileEditTransaction && editingRow) {
+      const day = parseInt(editingRow.date, 10);
+      
       const updatedTransaction: Partial<Transaction> = {
         description: editingRow.description,
-        date: new Date(editingRow.date),
-        amount: parseFloat(editingRow.amount)
+        date: day, // Store as day number
+        amount: parseFloat(editingRow.amount) // Income is always positive
       };
       
-      onUpdateTransaction(mobileEditTransaction.index, updatedTransaction);
+      // Find the global index in the full transactions array
+      const globalIndex = findGlobalIndex(mobileEditTransaction.transaction);
+      
+      console.log('Mobile Edit - Updating transaction:', {
+        originalTransaction: mobileEditTransaction.transaction,
+        updatedFields: updatedTransaction,
+        localIndex: mobileEditTransaction.index,
+        globalIndex: globalIndex
+      });
+      
+      // Use the global index instead of the local category index
+      onUpdateTransaction(globalIndex, updatedTransaction);
       handleCloseMobileEdit();
     }
   };
@@ -814,18 +853,23 @@ export function IncomeTable({
   }
 
   return (
-    <Box sx={{ mb: 4 }}>
-      {/* Always use mobile view */}
-      <Card sx={{ 
-        borderRadius: 2,
-        overflow: 'hidden',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        ...getBackgroundStyles()
-      }}>
-        {/* Header */}
-        <CardContent sx={{ 
+    <Box sx={{ mt: 3, mb: 3 }}>
+      <Paper 
+        elevation={1} 
+        sx={{ 
+          mb: 3, 
+          borderRadius: 2,
+          overflow: 'hidden',
+          ...getBackgroundStyles(),
+          transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.3s'
+        }}
+        className={`drag-target ${dragOverCategory === 'Income' ? 'drag-target-hover' : ''}`}
+        onDragOver={(e) => onDragOver && onDragOver(e, 'Income')}
+        onDrop={(e) => onDrop && onDrop(e, 'Income')}
+        onDragLeave={() => {}}
+      >
+        <Box sx={{ 
           p: 2, 
-          '&:last-child': { pb: 2 },
           borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
           pb: 2,
           mb: 1 // Added 5px margin below the border
@@ -858,7 +902,7 @@ export function IncomeTable({
               <CategoryColorPicker category="Income" />
             </Box>
           </Box>
-        </CardContent>
+        </Box>
         
         {/* Empty state - No income and not adding */}
         {incomeTransactions.length === 0 && !isAdding && (
@@ -881,11 +925,71 @@ export function IncomeTable({
               .map((transaction, index) => {
               const transactionId = getTransactionId(transaction);
               const dateString = formatDateForDisplay(transaction.date);
+              const globalIndex = findGlobalIndex(transaction);
+              
+              // Create a custom drag handler for the income item
+              const handleDragStart = (e: React.DragEvent) => {
+                // Create a custom drag image that looks like the card
+                const dragPreview = document.createElement('div');
+                dragPreview.style.backgroundColor = isDark ? '#333' : '#f5f5f5';
+                dragPreview.style.border = '1px solid #ccc';
+                dragPreview.style.borderRadius = '4px';
+                dragPreview.style.padding = '8px 12px';
+                dragPreview.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+                dragPreview.style.width = '250px';
+                dragPreview.style.display = 'flex';
+                dragPreview.style.alignItems = 'center';
+                dragPreview.style.color = isDark ? '#fff' : '#333';
+                
+                // Add an icon
+                const icon = document.createElement('span');
+                icon.innerHTML = '↕️';
+                icon.style.marginRight = '8px';
+                dragPreview.appendChild(icon);
+                
+                // Add description
+                const text = document.createElement('div');
+                text.textContent = transaction.description;
+                text.style.fontWeight = '500';
+                text.style.flex = '1';
+                dragPreview.appendChild(text);
+                
+                // Add amount
+                const amount = document.createElement('div');
+                amount.textContent = new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: 'USD',
+                }).format(transaction.amount);
+                amount.style.marginLeft = '8px';
+                dragPreview.appendChild(amount);
+                
+                // Add to DOM temporarily
+                document.body.appendChild(dragPreview);
+                
+                // Set the drag image
+                e.dataTransfer.setDragImage(dragPreview, 125, 20);
+                
+                // Set other drag properties
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', transaction.description);
+                
+                // Call the parent handler
+                if (onDragStart) {
+                  onDragStart(e, transaction, globalIndex);
+                }
+                
+                // Remove the element after a short delay
+                setTimeout(() => {
+                  document.body.removeChild(dragPreview);
+                }, 0);
+              };
               
               return (
                 <Box 
                   key={transactionId}
                   onClick={() => handleOpenMobileEdit(transaction, index)}
+                  draggable={true}
+                  onDragStart={handleDragStart}
                   sx={{
                     mx: '5px',
                     mb: '5px',
@@ -900,9 +1004,11 @@ export function IncomeTable({
                     '&:hover': {
                       backgroundColor: isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.7)',
                       boxShadow: '0 3px 6px rgba(0,0,0,0.15)',
-                    }
+                    },
                   }}
                 >
+                  {/* Remove the drag indicator */}
+                  
                   {/* Description and Amount on top line */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                     <Typography
@@ -954,7 +1060,7 @@ export function IncomeTable({
                       pointerEvents: 'none'
                     }}
                   >
-                    (click to edit)
+                    (click to edit or hold and drag)
                   </Typography>
                 </Box>
               );
@@ -987,7 +1093,7 @@ export function IncomeTable({
             </Button>
           </Box>
         )}
-      </Card>
+      </Paper>
 
       {/* Delete Confirmation Dialog */}
       <Dialog
