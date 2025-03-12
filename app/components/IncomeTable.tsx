@@ -15,9 +15,10 @@ import {
   DialogContentText,
   DialogActions,
   Button,
-  TextField 
+  TextField,
+  Tooltip
 } from '@mui/material';
-import { DeleteIcon, SaveIcon, CloseIcon } from '../utils/materialIcons';
+import { DeleteIcon, SaveIcon, CloseIcon, AddIcon, EditOutlinedIcon } from '../utils/materialIcons';
 import type { Transaction } from '../services/fileParser';
 import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
 import { isColorDark } from '../utils/colorUtils';
@@ -27,6 +28,7 @@ interface IncomeTableProps {
   transactions: Transaction[];
   onUpdateTransaction: (index: number, updatedTransaction: Partial<Transaction>) => void;
   onDeleteTransaction: (index: number) => void;
+  onAddTransaction: (transaction: Transaction) => void;
 }
 
 interface EditingRow {
@@ -40,13 +42,21 @@ interface EditingRow {
 export function IncomeTable({
   transactions,
   onUpdateTransaction,
-  onDeleteTransaction
+  onDeleteTransaction,
+  onAddTransaction
 }: IncomeTableProps) {
   // State for tracking if we're showing delete buttons (hover effect)
-  const [showDeleteButtons, setShowDeleteButtons] = useState(false);
+  // const [showDeleteButtons, setShowDeleteButtons] = useState(false);
   const [editingRow, setEditingRow] = useState<EditingRow | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
   const [transactionToDelete, setTransactionToDelete] = React.useState<{ transaction: Transaction, index: number } | null>(null);
+
+  // State for new transaction form
+  const [newDescription, setNewDescription] = useState('');
+  const [newAmount, setNewAmount] = useState('');
+  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isAdding, setIsAdding] = useState(false);
+
   const [tableColors] = useLocalStorage<Record<string, string>>(
     STORAGE_KEYS.TABLE_COLORS,
     LEGACY_STORAGE_KEYS.TABLE_COLORS,
@@ -169,6 +179,36 @@ export function IncomeTable({
     setTransactionToDelete(null);
   };
 
+  // Handle adding a new transaction
+  const handleAddTransaction = () => {
+    // Validate inputs
+    if (!newDescription.trim()) {
+      return; // Description is required
+    }
+    
+    const parsedAmount = parseFloat(newAmount.replace(/[^0-9.]/g, ''));
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      return; // Valid amount is required
+    }
+    
+    // Create transaction object
+    const newTransaction: Transaction = {
+      description: newDescription.trim(),
+      amount: parsedAmount, // Income is always positive
+      date: new Date(newDate),
+      category: 'Income'
+    };
+    
+    // Add transaction
+    onAddTransaction(newTransaction);
+    
+    // Reset form
+    setNewDescription('');
+    setNewAmount('');
+    setNewDate(new Date().toISOString().split('T')[0]);
+    setIsAdding(false);
+  };
+
   // Check if the table has a custom color and if it's dark
   const hasCustomColor = tableColors['Income'] !== '#f5f5f5';
   const isDark = tableColors['Income'] && isColorDark(tableColors['Income']);
@@ -181,15 +221,290 @@ export function IncomeTable({
   // Check if any row is currently being edited - used to determine if we need the Actions column
   const isAnyRowEditing = editingRow !== null;
 
-  if (incomeTransactions.length === 0) {
-    return null;
+  if (incomeTransactions.length === 0 && !isAdding) {
+    return (
+      <Box sx={{ mb: 3 }}>
+        <Paper sx={{ 
+          overflow: 'hidden', 
+          borderRadius: 2, 
+          boxShadow: 2,
+          ...getBackgroundStyles()
+        }}>
+          <Box sx={{ 
+            p: 2, 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+            color: isDark ? '#fff' : 'inherit'
+          }}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                fontWeight: 'bold',
+                color: isDark ? '#fff' : 'inherit',
+                fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                letterSpacing: '0.01em',
+              }}
+            >
+              Income Summary
+            </Typography>
+            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CategoryColorPicker category="Income" />
+            </Box>
+          </Box>
+          
+          {isAdding && (
+            <Box>
+              <Table size="small" sx={{ tableLayout: 'fixed' }}>
+                <TableHead>
+                  <TableRow sx={{
+                    backgroundColor: isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.04)',
+                  }}>
+                    <TableCell sx={{ 
+                      width: '28px', 
+                      color: isDark ? '#fff' : 'inherit',
+                      padding: '8px 4px 8px 8px',
+                    }}></TableCell>
+                    <TableCell sx={{ 
+                      width: '45%',
+                      fontWeight: 700,
+                      color: isDark ? '#fff' : 'inherit',
+                      fontSize: '1rem',
+                      fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      letterSpacing: '0.01em',
+                    }}>Income Source</TableCell>
+                    <TableCell sx={{ 
+                      width: '120px',
+                      fontWeight: 700,
+                      color: isDark ? '#fff' : 'inherit',
+                      fontSize: '1rem',
+                      padding: '8px 8px',
+                      fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      letterSpacing: '0.01em',
+                      textAlign: 'right',
+                    }}>Amount</TableCell>
+                    <TableCell sx={{ 
+                      width: '30px',
+                      fontWeight: 700,
+                      color: isDark ? '#fff' : 'inherit',
+                      fontSize: '1rem',
+                      fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                      letterSpacing: '0.01em',
+                      padding: '0px 4px',
+                      textAlign: 'center',
+                    }}>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  <TableRow sx={{
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                  }}>
+                    <TableCell></TableCell>
+                    <TableCell>
+                      <TextField
+                        value={newDescription}
+                        onChange={(e) => setNewDescription(e.target.value)}
+                        placeholder="Income Source"
+                        variant="standard"
+                        size="small"
+                        fullWidth
+                        sx={{
+                          '& input': {
+                            color: isDark ? '#fff' : 'inherit',
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newDescription && newAmount) {
+                            e.preventDefault();
+                            handleAddTransaction();
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setIsAdding(false);
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <TextField
+                          value={newAmount}
+                          onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                          placeholder="0.00"
+                          variant="standard"
+                          size="small"
+                          sx={{
+                            '& input': {
+                              color: isDark ? '#fff' : 'inherit',
+                              textAlign: 'right',
+                              width: `${Math.max(70, (newAmount?.length || 1) * 8 + 10)}px`,
+                              transition: 'width 0.1s'
+                            }
+                          }}
+                          InputProps={{
+                            startAdornment: <span style={{ 
+                              marginRight: 4,
+                              color: isDark ? '#fff' : 'inherit',
+                            }}>$</span>,
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newDescription && newAmount) {
+                              e.preventDefault();
+                              handleAddTransaction();
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setIsAdding(false);
+                            }
+                          }}
+                        />
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton 
+                          size="small" 
+                          onClick={handleAddTransaction}
+                          sx={{ color: isDark ? '#fff' : 'primary.main' }}
+                        >
+                          <SaveIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => setIsAdding(false)}
+                          sx={{ color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary' }}
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </Box>
+          )}
+          
+          {!isAdding && (
+            <Table size="small" sx={{ tableLayout: 'fixed' }}>
+              <TableHead>
+                <TableRow sx={{
+                  backgroundColor: isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.04)',
+                }}>
+                  <TableCell sx={{ 
+                    width: '5%', 
+                    color: isDark ? '#fff' : 'inherit',
+                    padding: '8px 4px 8px 8px',
+                  }}></TableCell>
+                  <TableCell sx={{ 
+                    width: '30%',
+                    fontWeight: 700,
+                    color: isDark ? '#fff' : 'inherit',
+                    fontSize: '1rem',
+                    fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    letterSpacing: '0.01em',
+                    paddingLeft: '8px',
+                  }}>Income Source</TableCell>
+                  <TableCell align="center" sx={{ 
+                    width: '30%',
+                    fontWeight: 700,
+                    color: isDark ? '#fff' : 'inherit',
+                    fontSize: '1rem',
+                    padding: '8px 8px',
+                    fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    letterSpacing: '0.01em',
+                    textAlign: 'center',
+                  }}>Date</TableCell>
+                  <TableCell sx={{ 
+                    width: '28%',
+                    fontWeight: 700,
+                    color: isDark ? '#fff' : 'inherit',
+                    fontSize: '1rem',
+                    padding: '8px 8px',
+                    fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    letterSpacing: '0.01em',
+                    textAlign: 'right',
+                  }}>Amount</TableCell>
+                  <TableCell sx={{ 
+                    width: '7%',
+                    fontWeight: 700,
+                    color: editingRow ? (isDark ? '#fff' : 'inherit') : (isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.04)'),
+                    fontSize: '1rem',
+                    fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    letterSpacing: '0.01em',
+                    padding: '8px 4px',
+                    textAlign: 'center',
+                    borderLeft: editingRow ? `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}` : 'none',
+                  }}>{editingRow ? 'Actions' : ''}</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                <TableRow 
+                  sx={{
+                    backgroundColor: 'transparent',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      backgroundColor: 'transparent',
+                    },
+                  }}
+                  onClick={() => setIsAdding(true)}
+                >
+                  <TableCell colSpan={5} align="center" sx={{ py: 2 }}>
+                    <Box
+                      sx={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: isDark ? '#fff' : 'primary.main',
+                        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(25, 118, 210, 0.08)',
+                        borderRadius: '20px',
+                        px: 2.5,
+                        py: 1,
+                        transition: 'all 0.2s ease',
+                        border: `1px dashed ${isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(25, 118, 210, 0.5)'}`,
+                        '&:hover': {
+                          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(25, 118, 210, 0.15)',
+                          transform: 'translateY(-1px)',
+                          boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                        },
+                      }}
+                    >
+                      <AddIcon 
+                        fontSize="small" 
+                        sx={{ 
+                          mr: 0.8,
+                          animation: 'pulse 1.5s infinite',
+                          '@keyframes pulse': {
+                            '0%': { opacity: 0.6 },
+                            '50%': { opacity: 1 },
+                            '100%': { opacity: 0.6 }
+                          }
+                        }} 
+                      />
+                      <Typography 
+                        sx={{ 
+                          fontWeight: 500,
+                          fontSize: '0.9rem',
+                          letterSpacing: '0.01em',
+                        }}
+                      >
+                        Add Income
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          )}
+        </Paper>
+      </Box>
+    );
   }
 
   return (
     <>
-      <Box sx={{ mb: 3 }}
-           onMouseEnter={() => setShowDeleteButtons(true)}
-           onMouseLeave={() => setShowDeleteButtons(false)}>
+      <Box sx={{ mb: 3 }}>
         <Paper sx={{ 
           overflow: 'hidden', 
           borderRadius: 2, 
@@ -231,7 +546,9 @@ export function IncomeTable({
               </Typography>
             </Typography>
             
-            <CategoryColorPicker category="Income" />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CategoryColorPicker category="Income" />
+            </Box>
           </Box>
           
           <Box>
@@ -241,29 +558,31 @@ export function IncomeTable({
                   backgroundColor: isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.04)',
                 }}>
                   <TableCell sx={{ 
-                    width: '28px', 
+                    width: '5%', 
                     color: isDark ? '#fff' : 'inherit',
                     padding: '8px 4px 8px 8px',
                   }}></TableCell>
                   <TableCell sx={{ 
-                    width: '45%',
+                    width: '30%',
                     fontWeight: 700,
                     color: isDark ? '#fff' : 'inherit',
                     fontSize: '1rem',
                     fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                     letterSpacing: '0.01em',
+                    paddingLeft: '8px',
                   }}>Income Source</TableCell>
-                  <TableCell sx={{ 
-                    width: '120px',
+                  <TableCell align="center" sx={{ 
+                    width: '30%',
                     fontWeight: 700,
                     color: isDark ? '#fff' : 'inherit',
                     fontSize: '1rem',
                     padding: '8px 8px',
                     fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                     letterSpacing: '0.01em',
+                    textAlign: 'center',
                   }}>Date</TableCell>
                   <TableCell sx={{ 
-                    width: '120px',
+                    width: '28%',
                     fontWeight: 700,
                     color: isDark ? '#fff' : 'inherit',
                     fontSize: '1rem',
@@ -272,18 +591,17 @@ export function IncomeTable({
                     letterSpacing: '0.01em',
                     textAlign: 'right',
                   }}>Amount</TableCell>
-                  {isAnyRowEditing && (
-                    <TableCell sx={{ 
-                      width: '30px',
-                      fontWeight: 700,
-                      color: isDark ? '#fff' : 'inherit',
-                      fontSize: '1rem',
-                      fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                      letterSpacing: '0.01em',
-                      padding: '0px 4px',
-                      textAlign: 'center',
-                    }}>Actions</TableCell>
-                  )}
+                  <TableCell sx={{ 
+                    width: '7%',
+                    fontWeight: 700,
+                    color: editingRow ? (isDark ? '#fff' : 'inherit') : (isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.04)'),
+                    fontSize: '1rem',
+                    fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    letterSpacing: '0.01em',
+                    padding: '8px 4px',
+                    textAlign: 'center',
+                    borderLeft: editingRow ? `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}` : 'none',
+                  }}>{editingRow ? 'Actions' : ''}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -344,23 +662,25 @@ export function IncomeTable({
                       <TableCell sx={{ 
                         color: isDark ? '#fff' : 'inherit',
                         padding: '8px 4px 8px 8px',
-                      }}></TableCell>
+                      }}>
+                      </TableCell>
                       <TableCell sx={{ 
                         color: isDark ? '#fff' : 'inherit',
                         fontWeight: 500,
                         fontSize: '0.95rem',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
                       }}>
                         {isEditing ? (
                           <TextField
                             value={editingRow?.description || ''}
                             onChange={(e) => handleEditingChange('description', e.target.value)}
                             variant="standard"
-                            fullWidth
                             size="small"
-                            autoFocus
+                            fullWidth
+                            sx={{
+                              '& input': {
+                                color: isDark ? '#fff' : 'inherit',
+                              }
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
@@ -370,48 +690,17 @@ export function IncomeTable({
                                 setEditingRow(null);
                               }
                             }}
-                            InputProps={{
-                              sx: {
-                                color: isDark ? '#fff' : 'inherit',
-                                fontSize: '0.95rem',
-                              }
-                            }}
                           />
                         ) : (
-                          <Box sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center',
-                            '& .edit-hint': {
-                              opacity: 0,
-                              transition: 'opacity 0.2s ease'
-                            },
-                            '&:hover .edit-hint': {
-                              opacity: 0.5
-                            },
-                            color: isDark ? '#fff' : 'inherit'
-                          }}>
-                            <Typography
-                              sx={{
-                                color: isDark ? '#fff' : 'inherit',
-                                fontWeight: 500,
-                                fontSize: '0.95rem',
-                              }}
-                            >{transaction.description}</Typography>
-                            <Typography 
-                              className="edit-hint" 
-                              variant="caption" 
-                              color={isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'}
-                              sx={{ ml: 1 }}
-                            >
-                              (Click to edit)
-                            </Typography>
-                          </Box>
+                          transaction.description
                         )}
                       </TableCell>
                       <TableCell sx={{ 
                         color: isDark ? '#fff' : 'inherit',
+                        fontWeight: 500,
                         fontSize: '0.95rem',
                         padding: '8px 8px',
+                        textAlign: 'center',
                       }}>
                         {isEditing ? (
                           <TextField
@@ -420,7 +709,16 @@ export function IncomeTable({
                             onChange={(e) => handleEditingChange('date', e.target.value)}
                             variant="standard"
                             size="small"
-                            fullWidth
+                            sx={{
+                              width: '140px',
+                              margin: '0 auto',
+                              '& input': {
+                                color: isDark ? '#fff' : 'inherit',
+                                textAlign: 'center',
+                                fontSize: '0.9rem',
+                                padding: '4px 0',
+                              }
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
@@ -430,28 +728,14 @@ export function IncomeTable({
                                 setEditingRow(null);
                               }
                             }}
-                            InputProps={{
-                              sx: {
-                                color: isDark ? '#fff' : 'inherit',
-                                fontSize: '0.95rem',
-                                width: '110px',
-                              }
-                            }}
                           />
                         ) : (
-                          <Typography
-                            sx={{
-                              color: isDark ? '#fff' : 'inherit',
-                              fontWeight: 500,
-                              fontSize: '0.95rem',
-                            }}
-                          >
-                            {formatDateForDisplay(transaction.date)}
-                          </Typography>
+                          formatDateForDisplay(transaction.date)
                         )}
                       </TableCell>
                       <TableCell sx={{ 
                         color: isDark ? '#fff' : 'inherit',
+                        fontWeight: 500,
                         fontSize: '0.95rem',
                         padding: '8px 8px',
                         textAlign: 'right',
@@ -460,7 +744,7 @@ export function IncomeTable({
                           <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                             <TextField
                               value={editingRow?.amount || ''}
-                              onChange={(e) => handleEditingChange('amount', e.target.value)}
+                              onChange={(e) => handleEditingChange('amount', e.target.value.replace(/[^0-9.]/g, ''))}
                               variant="standard"
                               size="small"
                               onKeyDown={(e) => {
@@ -506,51 +790,321 @@ export function IncomeTable({
                           </Typography>
                         )}
                       </TableCell>
-                      {isAnyRowEditing && (
-                        <TableCell sx={{ padding: '0px 4px' }}>
-                          {isEditing ? (
-                            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                      <TableCell sx={{ 
+                        padding: '8px 4px',
+                        textAlign: 'center',
+                        borderLeft: isEditing ? `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}` : 'none',
+                      }}>
+                        {isEditing && (
+                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                            <Tooltip title="Save">
                               <IconButton 
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation(); // Prevent row click event
-                                  handleSaveEdit(transaction);
-                                }}
-                                color="primary"
-                                sx={{ padding: '4px' }}
-                              >
-                                <SaveIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton 
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation(); // Prevent row click event
-                                  setEditingRow(null);
-                                }}
-                                sx={{ padding: '4px' }}
-                              >
-                                <CloseIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton 
-                                size="small"
-                                onClick={(e) => handleDeleteClick(e, transaction)}
-                                color="error"
-                                sx={{
+                                size="small" 
+                                onClick={() => handleSaveEdit(transaction)}
+                                sx={{ 
+                                  color: '#4caf50',
+                                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                  border: '1px solid rgba(0, 0, 0, 0.15)',
+                                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
                                   padding: '4px',
                                   '&:hover': {
-                                    backgroundColor: 'rgba(211, 47, 47, 0.04)',
-                                  }
+                                    color: '#2e7d32',
+                                    backgroundColor: '#ffffff',
+                                    border: '1px solid rgba(76, 175, 80, 0.5)',
+                                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.2)',
+                                  },
                                 }}
                               >
-                                <DeleteIcon fontSize="small" />
+                                <SaveIcon 
+                                  fontSize="small" 
+                                  sx={{ 
+                                    fontSize: '1.2rem',
+                                    filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.1))'
+                                  }}
+                                />
                               </IconButton>
-                            </Box>
-                          ) : null}
-                        </TableCell>
-                      )}
+                            </Tooltip>
+                            <Tooltip title="Cancel">
+                              <IconButton 
+                                size="small" 
+                                onClick={() => setEditingRow(null)}
+                                sx={{ 
+                                  color: '#f44336',
+                                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                  border: '1px solid rgba(0, 0, 0, 0.15)',
+                                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
+                                  padding: '4px',
+                                  '&:hover': {
+                                    color: '#f44336',
+                                    backgroundColor: '#ffffff',
+                                    border: '1px solid rgba(244, 67, 54, 0.5)',
+                                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.2)',
+                                  },
+                                }}
+                              >
+                                <CloseIcon 
+                                  fontSize="small" 
+                                  sx={{ 
+                                    fontSize: '1.2rem',
+                                    filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.1))'
+                                  }}
+                                />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteClick(e, transaction);
+                                }}
+                                sx={{
+                                  color: 'rgba(0, 0, 0, 0.6)',
+                                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                  border: '1px solid rgba(0, 0, 0, 0.15)',
+                                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
+                                  padding: '4px',
+                                  '&:hover': {
+                                    color: '#f44336',
+                                    backgroundColor: '#ffffff',
+                                    border: '1px solid rgba(244, 67, 54, 0.5)',
+                                    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.2)',
+                                  },
+                                }}
+                              >
+                                <DeleteIcon 
+                                  fontSize="small" 
+                                  sx={{ 
+                                    fontSize: '1.2rem',
+                                    filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.1))'
+                                  }}
+                                />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
+
+                {/* Add new transaction row */}
+                {isAdding && (
+                  <TableRow sx={{
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                  }}>
+                    <TableCell></TableCell>
+                    <TableCell>
+                      <TextField
+                        value={newDescription}
+                        onChange={(e) => setNewDescription(e.target.value)}
+                        placeholder="Income Source"
+                        variant="standard"
+                        size="small"
+                        fullWidth
+                        sx={{
+                          '& input': {
+                            color: isDark ? '#fff' : 'inherit',
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newDescription && newAmount) {
+                            e.preventDefault();
+                            handleAddTransaction();
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setIsAdding(false);
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                        <TextField
+                          type="date"
+                          value={newDate}
+                          onChange={(e) => setNewDate(e.target.value)}
+                          variant="standard"
+                          size="small"
+                          sx={{
+                            width: '140px',
+                            margin: '0 auto',
+                            '& input': {
+                              color: isDark ? '#fff' : 'inherit',
+                              textAlign: 'center',
+                              fontSize: '0.9rem',
+                              padding: '4px 0',
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newDescription && newAmount) {
+                              e.preventDefault();
+                              handleAddTransaction();
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setIsAdding(false);
+                            }
+                          }}
+                        />
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <TextField
+                          value={newAmount}
+                          onChange={(e) => setNewAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                          placeholder="0.00"
+                          variant="standard"
+                          size="small"
+                          sx={{
+                            '& input': {
+                              color: isDark ? '#fff' : 'inherit',
+                              textAlign: 'right',
+                              width: `${Math.max(70, (newAmount?.length || 1) * 8 + 10)}px`,
+                              transition: 'width 0.1s'
+                            }
+                          }}
+                          InputProps={{
+                            startAdornment: <span style={{ 
+                              marginRight: 4,
+                              color: isDark ? '#fff' : 'inherit',
+                            }}>$</span>,
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newDescription && newAmount) {
+                              e.preventDefault();
+                              handleAddTransaction();
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setIsAdding(false);
+                            }
+                          }}
+                        />
+                      </Box>
+                    </TableCell>
+                    <TableCell sx={{ 
+                      padding: '8px 4px',
+                      textAlign: 'center',
+                      borderLeft: isAdding ? `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}` : 'none',
+                    }}>
+                      <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                        <Tooltip title="Save">
+                          <IconButton 
+                            size="small" 
+                            onClick={handleAddTransaction}
+                            sx={{ 
+                              color: '#4caf50',
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                              border: '1px solid rgba(0, 0, 0, 0.15)',
+                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
+                              padding: '4px',
+                              '&:hover': {
+                                color: '#2e7d32',
+                                backgroundColor: '#ffffff',
+                                border: '1px solid rgba(76, 175, 80, 0.5)',
+                                boxShadow: '0 2px 5px rgba(0, 0, 0, 0.2)',
+                              },
+                            }}
+                          >
+                            <SaveIcon 
+                              fontSize="small" 
+                              sx={{ 
+                                fontSize: '1.2rem',
+                                filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.1))'
+                              }}
+                            />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Cancel">
+                          <IconButton 
+                            size="small" 
+                            onClick={() => setIsAdding(false)}
+                            sx={{ 
+                              color: '#f44336',
+                              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                              border: '1px solid rgba(0, 0, 0, 0.15)',
+                              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.12)',
+                              padding: '4px',
+                              '&:hover': {
+                                color: '#f44336',
+                                backgroundColor: '#ffffff',
+                                border: '1px solid rgba(244, 67, 54, 0.5)',
+                                boxShadow: '0 2px 5px rgba(0, 0, 0, 0.2)',
+                              },
+                            }}
+                          >
+                            <CloseIcon 
+                              fontSize="small" 
+                              sx={{ 
+                                fontSize: '1.2rem',
+                                filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.1))'
+                              }}
+                            />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                )}
+
+                {/* Add Income row (when not in adding mode) */}
+                {!isAdding && (
+                  <TableRow 
+                    sx={{
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      '&:hover': {
+                        backgroundColor: 'transparent',
+                      },
+                    }}
+                    onClick={() => setIsAdding(true)}
+                  >
+                    <TableCell colSpan={5} align="center" sx={{ py: 2 }}>
+                      <Box
+                        sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: isDark ? '#fff' : 'primary.main',
+                          backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(25, 118, 210, 0.08)',
+                          borderRadius: '20px',
+                          px: 2.5,
+                          py: 1,
+                          transition: 'all 0.2s ease',
+                          border: `1px dashed ${isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(25, 118, 210, 0.5)'}`,
+                          '&:hover': {
+                            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(25, 118, 210, 0.15)',
+                            transform: 'translateY(-1px)',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                          },
+                        }}
+                      >
+                        <AddIcon 
+                          fontSize="small" 
+                          sx={{ 
+                            mr: 0.8,
+                            animation: 'pulse 1.5s infinite',
+                            '@keyframes pulse': {
+                              '0%': { opacity: 0.6 },
+                              '50%': { opacity: 1 },
+                              '100%': { opacity: 0.6 }
+                            }
+                          }} 
+                        />
+                        <Typography 
+                          sx={{ 
+                            fontWeight: 500,
+                            fontSize: '0.9rem',
+                            letterSpacing: '0.01em',
+                          }}
+                        >
+                          Add Income
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                )}
+
                 <TableRow sx={{
                   backgroundColor: isDark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.08)',
                   fontWeight: 'bold',
@@ -581,7 +1135,7 @@ export function IncomeTable({
                       currency: 'USD',
                     }).format(totalIncome)}
                   </TableCell>
-                  {isAnyRowEditing && <TableCell></TableCell>}
+                  <TableCell></TableCell>
                 </TableRow>
               </TableBody>
             </Table>
@@ -589,17 +1143,18 @@ export function IncomeTable({
         </Paper>
       </Box>
 
+      {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteConfirmOpen}
         onClose={cancelDelete}
-        aria-labelledby="delete-income-dialog-title"
-        aria-describedby="delete-income-dialog-description"
+        aria-labelledby="delete-transaction-dialog-title"
+        aria-describedby="delete-transaction-dialog-description"
       >
-        <DialogTitle id="delete-income-dialog-title">
+        <DialogTitle id="delete-transaction-dialog-title">
           Confirm Deletion
         </DialogTitle>
         <DialogContent>
-          <DialogContentText id="delete-income-dialog-description">
+          <DialogContentText id="delete-transaction-dialog-description">
             Are you sure you want to delete the income "{transactionToDelete?.transaction.description}"
             for {new Intl.NumberFormat('en-US', {
               style: 'currency',

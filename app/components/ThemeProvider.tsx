@@ -23,10 +23,20 @@ const theme = createTheme({
     MuiCssBaseline: {
       styleOverrides: {
         // This will ensure MUI styles take precedence over Tailwind
+        html: {
+          backgroundColor: '#f5f7fa',
+          height: '100%',
+        },
         body: {
           margin: 0,
           padding: 0,
           fontFamily: '"Inter", "Helvetica", "Arial", sans-serif',
+          backgroundColor: '#f5f7fa',
+          height: '100%',
+          minHeight: '100vh',
+        },
+        '#__next': {
+          minHeight: '100vh',
           backgroundColor: '#f5f7fa',
         },
       },

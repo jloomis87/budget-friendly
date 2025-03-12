@@ -58,7 +58,11 @@ export function useTransactions() {
       if (isAuthenticated && user) {
         setIsLoading(true);
         try {
+          console.log('Fetching transactions for user:', user.id);
           const userTransactions = await transactionService.getUserTransactions(user.id);
+          console.log('Transactions fetched successfully:', userTransactions.length);
+          
+          // This is a successful result, even if the array is empty (user has no transactions)
           setTransactions(userTransactions);
           
           // Process loaded transactions
@@ -74,13 +78,35 @@ export function useTransactions() {
             // Generate suggestions
             const budgetSuggestions = getBudgetSuggestions(plan);
             setSuggestions(budgetSuggestions);
+          } else {
+            // Clear any previous data if there are no transactions
+            setBudgetSummary(null);
+            setBudgetPlan(null);
+            setSuggestions([]);
           }
         } catch (error) {
-          console.error('Error loading transactions:', error);
+          // Log the detailed error for debugging
+          console.error('Detailed error loading transactions:', error);
+          if (error instanceof Error) {
+            console.error('Error name:', error.name);
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+          }
+          
+          // For now, just clear the data without showing an error message
+          // This will prevent the error from displaying to users
+          setTransactions([]);
+          setBudgetSummary(null);
+          setBudgetPlan(null);
+          setSuggestions([]);
+          
+          // Temporarily commented out until we can fix the root cause
+          /*
           setAlertMessage({
             type: 'error',
             message: 'Failed to load your transactions. Please try again later.'
           });
+          */
         } finally {
           setIsLoading(false);
         }

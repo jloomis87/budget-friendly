@@ -7,7 +7,6 @@ import { EditOutlinedIcon, SaveIcon, CloseIcon, DragIndicatorIcon, PaletteIcon, 
 import { HexColorPicker } from 'react-colorful';
 import { TransactionTable } from './TransactionTable';
 import { BudgetSummary } from './BudgetSummary';
-import { SpeechRecognition } from './SpeechRecognition';
 import type { Transaction } from '../services/fileParser';
 import {
   calculateBudgetSummary,
@@ -23,103 +22,6 @@ import { useTransactions } from '../hooks/useTransactions';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { UserMenu } from './auth/UserMenu';
 import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
-
-// Simple fallback component in case the import fails
-// You can replace this with the actual implementation when needed
-const SimplifiedManualTransactionEntry = React.memo(({ 
-  onAddTransaction 
-}: { 
-  onAddTransaction: (transaction: Transaction) => void 
-}) => {
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [description, setDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<'Income' | 'Essentials' | 'Wants' | 'Savings'>('Income');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const parsedAmount = parseFloat(amount);
-    if (!isNaN(parsedAmount) && description) {
-      const signedAmount = category === 'Income' ? Math.abs(parsedAmount) : -Math.abs(parsedAmount);
-      
-      onAddTransaction({
-        date: new Date(date),
-        description,
-        amount: signedAmount,
-        category
-      });
-      
-      // Reset form
-      setDescription('');
-      setAmount('');
-    }
-  };
-
-  return (
-    <Box component="form" onSubmit={handleSubmit}>
-      <Grid container spacing={2} alignItems="center">
-        <Grid item xs={12} sm={2}>
-          <TextField
-            label="Date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            fullWidth
-            required
-            InputLabelProps={{ shrink: true }}
-          />
-        </Grid>
-        <Grid item xs={12} sm={4}>
-          <TextField
-            label="Description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            fullWidth
-            required
-          />
-        </Grid>
-        <Grid item xs={12} sm={2}>
-          <TextField
-            label="Amount"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            fullWidth
-            required
-            type="number"
-            InputProps={{
-              startAdornment: <span style={{ marginRight: 8 }}>$</span>,
-            }}
-          />
-        </Grid>
-        <Grid item xs={12} sm={2}>
-          <FormControl fullWidth required>
-            <InputLabel>Category</InputLabel>
-            <Select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as any)}
-            >
-              <MenuItem value="Income">Income</MenuItem>
-              <MenuItem value="Essentials">Essentials</MenuItem>
-              <MenuItem value="Wants">Wants</MenuItem>
-              <MenuItem value="Savings">Savings</MenuItem>
-            </Select>
-          </FormControl>
-        </Grid>
-        <Grid item xs={12} sm={2}>
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-            fullWidth
-          >
-            Add
-          </Button>
-        </Grid>
-      </Grid>
-    </Box>
-  );
-});
 
 // Add this interface for alert messages
 interface AlertMessage {
@@ -189,31 +91,6 @@ function BudgetAppContent() {
   const [colorPickerAnchor, setColorPickerAnchor] = useState<null | HTMLElement>(null);
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
   
-  // State for speech recognition
-  const [speechFeedback, setSpeechFeedback] = useState<string | null>(null);
-  const [isListening, setIsListening] = useState<boolean>(false);
-  
-  // Ref for speech recognition
-  const recognitionRef = useRef<any>(null);
-  
-  // TypeScript declarations for Web Speech API
-  type SpeechRecognitionEvent = {
-    results: {
-      item(index: number): {
-        item(index: number): {
-                      transcript: string; 
-          isFinal: boolean;
-        };
-      };
-      length: number;
-    };
-  };
-  
-  type SpeechRecognitionErrorEvent = {
-    error: string;
-    message: string;
-  };
-
   // Auth state
   const { isAuthenticated, isLoading: authLoading, user, logout, login, signup, error } = useAuth();
   const [activeAuthTab, setActiveAuthTab] = useState(0);
@@ -466,6 +343,7 @@ function BudgetAppContent() {
           transactions={transactions}
           onUpdateTransaction={updateTransaction}
           onDeleteTransaction={deleteTransaction}
+          onAddTransaction={addTransaction}
         />
         
         {/* Display transactions grouped by category */}
@@ -477,6 +355,7 @@ function BudgetAppContent() {
             allTransactions={transactions}
             onUpdateTransaction={updateTransaction}
             onDeleteTransaction={deleteTransaction}
+            onAddTransaction={addTransaction}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
@@ -489,7 +368,8 @@ function BudgetAppContent() {
   }, [
     transactions, 
     updateTransaction, 
-    deleteTransaction, 
+    deleteTransaction,
+    addTransaction,
     getTransactionsByCategory, 
     handleDragStart, 
     handleDragOver, 
@@ -585,6 +465,8 @@ function BudgetAppContent() {
             '@keyframes floatingParticles': {
               '0%': { backgroundPosition: '0px 0px' },
               '100%': { backgroundPosition: '1000px 1000px' }
+            },
+            'html, body': { 
             }
           }}
         />
@@ -955,6 +837,8 @@ function BudgetAppContent() {
       width: '100%', 
       backgroundColor: 'background.default',
       mx: 'auto', // Center the content
+      minHeight: '100vh', // Ensure it covers the full viewport height
+      pb: 4, // Add padding at the bottom
     }}>
       <Box 
         sx={{ 
@@ -1094,24 +978,72 @@ function BudgetAppContent() {
       
       {/* Main Content */}
       <Box sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
-        <Paper sx={{ p: 3, borderRadius: 2, mb: 3, backgroundColor: 'background.paper' }}>
-          <Typography variant="h6" gutterBottom>
-            Manual Transaction Entry
-          </Typography>
-          <Typography variant="body2" color="text.secondary" paragraph>
-            Enter your transactions below to create your budget plan.
-          </Typography>
-          
-          <SimplifiedManualTransactionEntry onAddTransaction={addTransaction} />
-          
-          {/* Add Speech Recognition */}
-          <SpeechRecognition 
-            onAddTransaction={addTransaction} 
-            onUpdateTransaction={updateTransactionByDescription}
-            transactions={transactions}
-          />
-        </Paper>
-
+        
+        {/* Getting Started - Only show when no transactions exist */}
+        {transactions.length === 0 && (
+          <Paper sx={{ p: 3, borderRadius: 2, mb: 3, backgroundColor: 'background.paper' }}>
+            <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+              Getting Started
+            </Typography>
+            <Typography variant="body1" paragraph>
+              Welcome to BudgetFriendly! Let's set up your finances to create your personalized budget plan.
+            </Typography>
+            
+            <Box sx={{ 
+              p: 2, 
+              borderRadius: 1, 
+              bgcolor: 'primary.light', 
+              color: 'primary.contrastText',
+              mb: 3
+            }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 500, mb: 1 }}>
+                Step 1: Add your income sources
+              </Typography>
+              <Typography variant="body2">
+                Start by adding your income sources like salary, freelance work, or other earnings.
+                This will help calculate your available funds for budgeting.
+              </Typography>
+            </Box>
+            
+            {/* Include a simplified Income form */}
+            <Box sx={{ mb: 3 }}>
+              <IncomeTable 
+                transactions={transactions}
+                onUpdateTransaction={updateTransaction}
+                onDeleteTransaction={deleteTransaction}
+                onAddTransaction={addTransaction}
+              />
+            </Box>
+            
+            <Typography variant="subtitle1" sx={{ fontWeight: 500, mt: 3 }}>
+              What's Next?
+            </Typography>
+            <Typography variant="body2">
+              After adding your income, you'll be able to:
+            </Typography>
+            <List dense>
+              <ListItem>
+                <ListItemIcon sx={{ minWidth: '30px' }}>
+                  <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
+                </ListItemIcon>
+                <ListItemText primary="Add your expenses in different categories" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon sx={{ minWidth: '30px' }}>
+                  <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
+                </ListItemIcon>
+                <ListItemText primary="See a breakdown of your spending" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon sx={{ minWidth: '30px' }}>
+                  <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
+                </ListItemIcon>
+                <ListItemText primary="Get personalized budget recommendations" />
+              </ListItem>
+            </List>
+          </Paper>
+        )}
+        
         {/* Display transactions */}
         {transactionTables}
       
@@ -1173,6 +1105,26 @@ function BudgetAppContent() {
 export function BudgetApp() {
   return (
     <AuthProvider>
+      {/* Add global styles to fix the black background */}
+      <GlobalStyles
+        styles={{
+          'html, body': {
+            backgroundColor: '#f5f7fa !important',
+            minHeight: '100vh'
+          },
+          'body::after': {
+            content: '""',
+            display: 'block',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: '#f5f7fa',
+            zIndex: -999
+          }
+        }}
+      />
       <BudgetAppContent />
     </AuthProvider>
   );

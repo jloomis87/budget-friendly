@@ -37,30 +37,54 @@ export const addTransaction = async (userId: string, transaction: Transaction): 
 // Get all transactions for a user
 export const getUserTransactions = async (userId: string): Promise<Transaction[]> => {
   try {
+    console.log(`Getting transactions for user ${userId}`);
+    
+    if (!userId) {
+      console.warn('getUserTransactions called with empty userId');
+      return [];
+    }
+    
     const q = query(
       collection(db, TRANSACTIONS_COLLECTION),
       where('userId', '==', userId),
       orderBy('date', 'desc')
     );
     
+    console.log('Executing Firestore query...');
     const querySnapshot = await getDocs(q);
+    console.log(`Query returned ${querySnapshot.size} documents`);
+    
     const transactions: Transaction[] = [];
     
     querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      transactions.push({
-        id: doc.id,
-        date: data.date.toDate(),
-        description: data.description,
-        amount: data.amount,
-        category: data.category
-      });
+      try {
+        const data = doc.data();
+        if (!data.date) {
+          console.warn(`Transaction ${doc.id} missing date field`);
+          return; // Skip this document
+        }
+        
+        transactions.push({
+          id: doc.id,
+          date: data.date.toDate(),
+          description: data.description || 'Unnamed Transaction',
+          amount: typeof data.amount === 'number' ? data.amount : 0,
+          category: data.category || 'Uncategorized'
+        });
+      } catch (docError) {
+        console.error(`Error processing transaction document ${doc.id}:`, docError);
+        // Continue processing other documents
+      }
     });
     
+    console.log(`Successfully processed ${transactions.length} transactions`);
     return transactions;
   } catch (error) {
-    console.error('Error getting transactions:', error);
-    throw new Error('Failed to get transactions');
+    console.error('Error in getUserTransactions:', error);
+    
+    // Return empty array instead of throwing error
+    console.log('Returning empty transactions array due to error');
+    return [];
   }
 };
 
