@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { getUserPreferences, saveTableColors } from '../services/userPreferencesService';
 
 // Constants for localStorage keys
 export const STORAGE_KEYS = {
@@ -92,10 +93,11 @@ export const getStorageItem = (key: string, legacyKey: string, userId?: string) 
 
 /**
  * Custom hook for managing localStorage state with cross-component synchronization
+ * For table colors, it will also sync with Firebase if the user is authenticated
  */
 export function useLocalStorage<T>(key: string, legacyKey: string, initialValue: T) {
   // Get the current user ID for personalized storage
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const userId = user?.id;
   
   // Create a personalized key if user is logged in
@@ -103,6 +105,9 @@ export function useLocalStorage<T>(key: string, legacyKey: string, initialValue:
   
   // Memoize the initial value to prevent it from causing rerenders
   const memoizedInitialValue = useMemo(() => initialValue, []);
+  
+  // Track if we've loaded from Firebase
+  const [loadedFromFirebase, setLoadedFromFirebase] = useState(false);
   
   // Initialize state only once
   const [storedValue, setStoredValue] = useState<T>(() => {
@@ -114,6 +119,40 @@ export function useLocalStorage<T>(key: string, legacyKey: string, initialValue:
       return memoizedInitialValue;
     }
   });
+
+  // Load from Firebase when user is authenticated
+  useEffect(() => {
+    // Only sync table colors with Firebase
+    if (!isAuthenticated || !userId || key !== STORAGE_KEYS.TABLE_COLORS) return;
+    
+    const loadFromFirebase = async () => {
+      try {
+        console.log('[useLocalStorage] Loading table colors from Firebase for user:', userId);
+        const userPrefs = await getUserPreferences(userId);
+        
+        if (userPrefs?.tableColors) {
+          console.log('[useLocalStorage] Found table colors in Firebase:', userPrefs.tableColors);
+          setStoredValue(userPrefs.tableColors as unknown as T);
+          localStorage.setItem(personalizedKey, JSON.stringify(userPrefs.tableColors));
+          setLoadedFromFirebase(true);
+        } else {
+          console.log('[useLocalStorage] No table colors found in Firebase, saving current colors');
+          // Save current colors to Firebase
+          if (storedValue && Object.keys(storedValue).length > 0) {
+            await saveTableColors(userId, storedValue as unknown as Record<string, string>);
+          }
+          setLoadedFromFirebase(true);
+        }
+      } catch (error) {
+        console.error('[useLocalStorage] Error loading from Firebase:', error);
+        setLoadedFromFirebase(true); // Mark as loaded even on error to prevent infinite retries
+      }
+    };
+    
+    if (!loadedFromFirebase) {
+      loadFromFirebase();
+    }
+  }, [isAuthenticated, userId, key, personalizedKey, storedValue, loadedFromFirebase]);
 
   // Update local state when user changes
   useEffect(() => {
@@ -173,6 +212,22 @@ export function useLocalStorage<T>(key: string, legacyKey: string, initialValue:
       
       // Save to localStorage with personalized key if user is logged in
       localStorage.setItem(personalizedKey, JSON.stringify(valueToStore));
+      
+      // If this is table colors and user is authenticated, save to Firebase
+      if (key === STORAGE_KEYS.TABLE_COLORS && isAuthenticated && userId && loadedFromFirebase) {
+        console.log('[useLocalStorage] Saving table colors to Firebase:', valueToStore);
+        saveTableColors(userId, valueToStore as unknown as Record<string, string>)
+          .then(success => {
+            if (success) {
+              console.log('[useLocalStorage] Successfully saved table colors to Firebase');
+            } else {
+              console.error('[useLocalStorage] Failed to save table colors to Firebase');
+            }
+          })
+          .catch(error => {
+            console.error('[useLocalStorage] Error saving table colors to Firebase:', error);
+          });
+      }
       
       // Notify all other components using this key
       notifyStorageListeners(personalizedKey);

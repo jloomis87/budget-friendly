@@ -14,6 +14,11 @@ service cloud.firestore {
       allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
     
+    // Allow authenticated users to read, write, update and delete their own preferences
+    match /userPreferences/{userId} {
+      allow create, read, update: if request.auth != null && request.auth.uid == userId;
+    }
+    
     // Deny access to all other documents
     match /{document=**} {
       allow read, write: if false;
