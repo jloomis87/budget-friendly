@@ -5,7 +5,6 @@ import { GlobalStyles } from '@mui/material';
 // Import custom icon components to avoid the directory import issue
 import { EditOutlinedIcon, SaveIcon, CloseIcon, DragIndicatorIcon, PaletteIcon, DeleteIcon } from '../utils/materialIcons';
 import { HexColorPicker } from 'react-colorful';
-import { TransactionTable } from './TransactionTable';
 import { BudgetSummary } from './BudgetSummary';
 import type { Transaction } from '../services/fileParser';
 import {

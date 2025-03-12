@@ -690,12 +690,19 @@ const parseChaseStatement = (text: string): Transaction[] => {
       const amount = parseAmount(amountStr);
       
       // Skip if we already have an income transaction with the same date and description
-      const isDuplicate = transactions.some(t => 
-        t.date.toDateString() === date.toDateString() && 
-        t.description === description && 
-        t.amount > 0 && 
-        amount < 0
-      );
+      const isDuplicate = transactions.some(t => {
+        // Compare dates by converting both to strings in a consistent way
+        const dateMatch = typeof t.date === 'number' && typeof date === 'number'
+          ? t.date === date
+          : (typeof t.date === 'object' && typeof date === 'object'
+            ? t.date.toDateString() === date.toDateString()
+            : String(t.date) === String(date));
+        
+        return dateMatch && 
+          t.description === description && 
+          t.amount > 0 && 
+          amount < 0;
+      });
       
       if (!isDuplicate) {
         transactions.push({

@@ -88,9 +88,25 @@ export const getUserTransactions = async (userId: string): Promise<Transaction[]
           return; // Skip this document
         }
         
+        // Check if date is a number or a timestamp object
+        let processedDate;
+        if (typeof data.date === 'number') {
+          // If it's already a number, use it directly
+          processedDate = data.date;
+          console.log(`[Firebase] Document ${doc.id} has numeric date: ${processedDate}`);
+        } else if (data.date && typeof data.date.toDate === 'function') {
+          // If it's a Firestore timestamp, convert to Date
+          processedDate = data.date.toDate();
+          console.log(`[Firebase] Document ${doc.id} has timestamp date, converted to: ${processedDate}`);
+        } else {
+          // Fallback for other date formats
+          console.warn(`[Firebase] Document ${doc.id} has unknown date format:`, data.date);
+          processedDate = new Date(); // Default to current date as fallback
+        }
+        
         transactions.push({
           id: doc.id,
-          date: data.date.toDate(),
+          date: processedDate,
           description: data.description || 'Unnamed Transaction',
           amount: typeof data.amount === 'number' ? data.amount : 0,
           category: data.category || 'Uncategorized'

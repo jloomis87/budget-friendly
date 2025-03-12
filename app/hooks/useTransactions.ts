@@ -254,11 +254,22 @@ export function useTransactions() {
       ...updatedFields
     };
     
-    // If date is being updated, ensure it's a Date object
-    if (updatedFields.date) {
-      updatedTransaction.date = updatedFields.date instanceof Date 
-        ? updatedFields.date 
-        : new Date(updatedFields.date);
+    // If date is being updated, ensure it's in the correct format
+    if (updatedFields.date !== undefined) {
+      if (typeof updatedFields.date === 'number') {
+        // If it's a day number, keep it as-is
+        updatedTransaction.date = updatedFields.date;
+      } else if (updatedFields.date instanceof Date) {
+        // If it's already a Date object, keep it as-is
+        updatedTransaction.date = updatedFields.date;
+      } else {
+        // If it's a string or something else, try to convert to Date
+        try {
+          updatedTransaction.date = new Date(updatedFields.date);
+        } catch (e) {
+          console.error('Invalid date format:', updatedFields.date, e);
+        }
+      }
     }
     
     try {
@@ -498,14 +509,26 @@ export function useTransactions() {
       'Savings': []
     };
     
+    console.log('[useTransactions] getTransactionsByCategory - Total transactions:', transactions.length);
+    
     // Group transactions (excluding Income)
     transactions.forEach(transaction => {
+      console.log('[useTransactions] Processing transaction:', transaction);
+      
       if (transaction.category && transaction.category !== 'Income' && 
           (transaction.category === 'Essentials' || 
            transaction.category === 'Wants' || 
            transaction.category === 'Savings')) {
         grouped[transaction.category].push(transaction);
+      } else {
+        console.log('[useTransactions] Skipped transaction - Category:', transaction.category);
       }
+    });
+    
+    console.log('[useTransactions] Grouped transactions count:', {
+      Essentials: grouped['Essentials'].length,
+      Wants: grouped['Wants'].length,
+      Savings: grouped['Savings'].length
     });
     
     return grouped;
