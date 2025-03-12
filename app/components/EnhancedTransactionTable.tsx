@@ -3,7 +3,7 @@ import {
   Box, Paper, Typography, Table, TableHead, 
   TableBody, TableRow, TableCell, IconButton, TextField,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Tooltip,
-  useMediaQuery, useTheme, Card, CardContent, Grid, Stack, Divider
+  useMediaQuery, useTheme, Card, CardContent, Grid, Stack, Divider, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import { EditOutlinedIcon, SaveIcon, CloseIcon, DragIndicatorIcon, DeleteIcon, AddIcon, CheckCircleOutlineIcon, CancelOutlinedIcon } from '../utils/materialIcons';
 import { CategoryColorPicker } from './CategoryColorPicker';
@@ -53,12 +53,12 @@ export function EnhancedTransactionTable({
   // State for new transaction form
   const [newDescription, setNewDescription] = useState('');
   const [newAmount, setNewAmount] = useState('');
-  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newDate, setNewDate] = useState('1');
   const [isAdding, setIsAdding] = useState(false);
   const [newTransaction, setNewTransaction] = useState({
     description: '',
     amount: '',
-    date: new Date().toISOString().split('T')[0],
+    date: '1',
   });
   const [showSummary, setShowSummary] = useState(true);
   
@@ -83,24 +83,31 @@ export function EnhancedTransactionTable({
   const hasCustomColor = tableColors[category] !== '#f5f5f5';
   const isDark = tableColors[category] && isColorDark(tableColors[category]);
 
-  // Handle editing row changes
-  const handleEditingChange = (field: keyof EditingRow, value: string) => {
-    if (editingRow) {
-      setEditingRow({
-        ...editingRow,
-        [field]: value
-      });
+  // New function to generate options for day dropdown (1-31)
+  const generateDayOptions = () => {
+    const days = [];
+    for (let i = 1; i <= 31; i++) {
+      days.push(i);
     }
+    return days;
   };
 
   // Helper to get date string for comparison 
-  const getDateString = (date: Date | string): string => {
-    if (date instanceof Date) {
-      return date.toISOString();
+  const getDateString = (date: Date | string | number): string => {
+    if (typeof date === 'number') {
+      // If it's a day number, just return the string representation
+      return date.toString();
+    } else if (date instanceof Date) {
+      // For backwards compatibility, extract the day from the date
+      return date.getDate().toString();
     } else if (typeof date === 'string') {
-      // Try to convert string to date and then to ISO string
+      // Try to convert string to date and extract day, or return as is if it's already a day
+      if (/^\d{1,2}$/.test(date)) {
+        // It's already a day number as string
+        return date;
+      }
       try {
-        return new Date(date).toISOString();
+        return new Date(date).getDate().toString();
       } catch (e) {
         return date;
       }
@@ -125,6 +132,16 @@ export function EnhancedTransactionTable({
     return `${getDateString(transaction.date)}-${transaction.description}-${transaction.amount}-${transaction.category}`;
   };
 
+  // Handle editing row changes
+  const handleEditingChange = (field: keyof EditingRow, value: string) => {
+    if (editingRow) {
+      setEditingRow({
+        ...editingRow,
+        [field]: value
+      });
+    }
+  };
+
   // Handle saving a row edit
   const handleSaveEdit = (transaction: Transaction) => {
     if (editingRow) {
@@ -141,12 +158,14 @@ export function EnhancedTransactionTable({
         updates.amount = signedAmount;
       }
       
-      // Update date if changed
+      // Update date if changed - now storing day of month as a number
       if (editingRow.date) {
         try {
-          // Fix for date offset issue - create date object without timezone conversion
-          const [year, month, day] = editingRow.date.split('-').map(Number);
-          updates.date = new Date(year, month - 1, day);
+          // Convert the day string to a number
+          const day = parseInt(editingRow.date, 10);
+          if (!isNaN(day) && day >= 1 && day <= 31) {
+            updates.date = day;
+          }
         } catch (e) {
           // Invalid date, ignore
         }
@@ -187,7 +206,7 @@ export function EnhancedTransactionTable({
     const newTransaction: Transaction = {
       description: newDescription.trim(),
       amount: -parsedAmount, // Expense is always negative
-      date: new Date(newDate),
+      date: parseInt(newDate, 10), // Store as day number
       category: category as "Essentials" | "Wants" | "Savings" | "Income"
     };
     
@@ -197,7 +216,7 @@ export function EnhancedTransactionTable({
     // Reset form
     setNewDescription('');
     setNewAmount('');
-    setNewDate(new Date().toISOString().split('T')[0]);
+    setNewDate('1'); // Default to day 1
     setIsAdding(false);
   };
 
@@ -219,12 +238,20 @@ export function EnhancedTransactionTable({
   };
 
   // Helper to format date for display
-  const formatDateForDisplay = (date: Date | string): string => {
-    if (date instanceof Date) {
-      return date.toLocaleDateString();
+  const formatDateForDisplay = (date: Date | string | number): string => {
+    if (typeof date === 'number') {
+      // If it's a day number, format it as "Day X"
+      return `Day ${date}`;
+    } else if (date instanceof Date) {
+      // For backwards compatibility, extract the day
+      return `Day ${date.getDate()}`;
     } else if (typeof date === 'string') {
+      // Check if it's already a day number as string
+      if (/^\d{1,2}$/.test(date)) {
+        return `Day ${date}`;
+      }
       try {
-        return new Date(date).toLocaleDateString();
+        return `Day ${new Date(date).getDate()}`;
       } catch (e) {
         return date;
       }
@@ -270,17 +297,19 @@ export function EnhancedTransactionTable({
     });
     
     // Set the editing row state with the same values
-    const dateString = transaction.date instanceof Date 
-      ? transaction.date.toISOString().split('T')[0]
-      : (typeof transaction.date === 'string' 
-        ? new Date(transaction.date).toISOString().split('T')[0]
-        : '');
+    const dayValue = typeof transaction.date === 'number' 
+      ? transaction.date.toString() 
+      : (transaction.date instanceof Date 
+        ? transaction.date.getDate().toString() 
+        : (typeof transaction.date === 'string' && /^\d{1,2}$/.test(transaction.date)
+          ? transaction.date
+          : new Date(transaction.date as string).getDate().toString()));
     
     setEditingRow({
       index: findGlobalIndex(transaction),
       identifier: transactionId,
       amount: Math.abs(transaction.amount).toString(),
-      date: dateString,
+      date: dayValue,
       description: transaction.description
     });
     
@@ -299,7 +328,7 @@ export function EnhancedTransactionTable({
     if (mobileEditTransaction && editingRow) {
       const updatedTransaction: Partial<Transaction> = {
         description: editingRow.description,
-        date: new Date(editingRow.date),
+        date: parseInt(editingRow.date, 10), // Store as day number
         amount: parseFloat(editingRow.amount) * (category === 'Income' ? 1 : -1)
       };
       
@@ -312,7 +341,7 @@ export function EnhancedTransactionTable({
   const handleOpenMobileAdd = () => {
     setNewDescription('');
     setNewAmount('');
-    setNewDate(new Date().toISOString().split('T')[0]);
+    setNewDate('1');
     setMobileAddDialogOpen(true);
   };
   
@@ -321,7 +350,7 @@ export function EnhancedTransactionTable({
     setMobileAddDialogOpen(false);
     setNewDescription('');
     setNewAmount('');
-    setNewDate(new Date().toISOString().split('T')[0]);
+    setNewDate('1');
   };
   
   // Handle adding transaction from mobile dialog
@@ -342,7 +371,7 @@ export function EnhancedTransactionTable({
     const newTransaction: Transaction = {
       description: newDescription.trim(),
       amount: -Math.abs(amountValue), // Negative for expenses
-      date: new Date(newDate),
+      date: parseInt(newDate, 10), // Store as day number
       category: category as "Essentials" | "Wants" | "Savings" | "Income"
     };
     
@@ -584,32 +613,32 @@ export function EnhancedTransactionTable({
                             textAlign: 'center',
                           }}>
                             {isEditing ? (
-                              <TextField
-                                type="date"
-                                value={editingRow?.date || ''}
-                                onChange={(e) => handleEditingChange('date', e.target.value)}
-                                variant="standard"
-                                size="small"
-                                sx={{
-                                  width: '140px',
-                                  margin: '0 auto',
-                                  '& input': {
-                                    color: isDark ? '#fff' : 'inherit',
-                                    textAlign: 'center',
-                                    fontSize: '0.9rem',
-                                    padding: '4px 0',
-                                  }
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSaveEdit(transaction);
-                                  } else if (e.key === 'Escape') {
-                                    e.preventDefault();
-                                    setEditingRow(null);
-                                  }
-                                }}
-                              />
+                              <FormControl fullWidth variant="outlined" sx={{ 
+                                "& .MuiOutlinedInput-root": { 
+                                  backgroundColor: 'white' 
+                                },
+                                "& .MuiOutlinedInput-notchedOutline": {
+                                  borderColor: 'rgba(0, 0, 0, 0.23)'
+                                },
+                                "& .MuiInputLabel-outlined": {
+                                  backgroundColor: 'white',
+                                  paddingLeft: '5px',
+                                  paddingRight: '5px'
+                                }
+                              }}>
+                                <InputLabel>Due Date (Day of Month)</InputLabel>
+                                <Select
+                                  value={editingRow?.date || '1'}
+                                  onChange={(e) => handleEditingChange('date', e.target.value)}
+                                  label="Due Date (Day of Month)"
+                                >
+                                  {generateDayOptions().map(day => (
+                                    <MenuItem key={day} value={day.toString()}>
+                                      {day}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
                             ) : (
                               formatDateForDisplay(transaction.date)
                             )}
@@ -807,32 +836,20 @@ export function EnhancedTransactionTable({
                       </TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                          <TextField
-                            type="date"
-                            value={newDate}
-                            onChange={(e) => setNewDate(e.target.value)}
-                            variant="standard"
-                            size="small"
-                            sx={{
-                              width: '140px',
-                              margin: '0 auto',
-                              '& input': {
-                                color: isDark ? '#fff' : 'inherit',
-                                textAlign: 'center',
-                                fontSize: '0.9rem',
-                                padding: '4px 0',
-                              }
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && newDescription && newAmount) {
-                                e.preventDefault();
-                                handleAddTransaction();
-                              } else if (e.key === 'Escape') {
-                                e.preventDefault();
-                                setIsAdding(false);
-                              }
-                            }}
-                          />
+                          <FormControl variant="standard" sx={{ width: '80px', margin: '0 auto' }}>
+                            <InputLabel>Day</InputLabel>
+                            <Select
+                              value={newDate}
+                              onChange={(e) => setNewDate(e.target.value)}
+                              label="Day"
+                            >
+                              {generateDayOptions().map(day => (
+                                <MenuItem key={day} value={day.toString()}>
+                                  {day}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
                         </Box>
                       </TableCell>
                       <TableCell>
@@ -1175,28 +1192,32 @@ export function EnhancedTransactionTable({
               }}
             />
             
-            <TextField
-              label="Date"
-              type="date"
-              value={editingRow?.date || ''}
-              onChange={(e) => handleEditingChange('date', e.target.value)}
-              variant="outlined"
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-              sx={{ 
-                "& .MuiOutlinedInput-root": { 
-                  backgroundColor: 'white' 
-                },
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: 'rgba(0, 0, 0, 0.23)'
-                },
-                "& .MuiInputLabel-outlined": {
-                  backgroundColor: 'white',
-                  paddingLeft: '5px',
-                  paddingRight: '5px'
-                }
-              }}
-            />
+            <FormControl fullWidth variant="outlined" sx={{ 
+              "& .MuiOutlinedInput-root": { 
+                backgroundColor: 'white' 
+              },
+              "& .MuiOutlinedInput-notchedOutline": {
+                borderColor: 'rgba(0, 0, 0, 0.23)'
+              },
+              "& .MuiInputLabel-outlined": {
+                backgroundColor: 'white',
+                paddingLeft: '5px',
+                paddingRight: '5px'
+              }
+            }}>
+              <InputLabel>Due Date (Day of Month)</InputLabel>
+              <Select
+                value={editingRow?.date || '1'}
+                onChange={(e) => handleEditingChange('date', e.target.value)}
+                label="Due Date (Day of Month)"
+              >
+                {generateDayOptions().map(day => (
+                  <MenuItem key={day} value={day.toString()}>
+                    {day}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             
             <TextField
               label="Amount"
@@ -1294,28 +1315,32 @@ export function EnhancedTransactionTable({
               }}
             />
             
-            <TextField
-              label="Date"
-              type="date"
-              value={newDate}
-              onChange={(e) => setNewDate(e.target.value)}
-              variant="outlined"
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-              sx={{ 
-                "& .MuiOutlinedInput-root": { 
-                  backgroundColor: 'white' 
-                },
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: 'rgba(0, 0, 0, 0.23)'
-                },
-                "& .MuiInputLabel-outlined": {
-                  backgroundColor: 'white',
-                  paddingLeft: '5px',
-                  paddingRight: '5px'
-                }
-              }}
-            />
+            <FormControl fullWidth variant="outlined" sx={{ 
+              "& .MuiOutlinedInput-root": { 
+                backgroundColor: 'white' 
+              },
+              "& .MuiOutlinedInput-notchedOutline": {
+                borderColor: 'rgba(0, 0, 0, 0.23)'
+              },
+              "& .MuiInputLabel-outlined": {
+                backgroundColor: 'white',
+                paddingLeft: '5px',
+                paddingRight: '5px'
+              }
+            }}>
+              <InputLabel>Due Date (Day of Month)</InputLabel>
+              <Select
+                value={newDate}
+                onChange={(e) => setNewDate(e.target.value)}
+                label="Due Date (Day of Month)"
+              >
+                {generateDayOptions().map(day => (
+                  <MenuItem key={day} value={day.toString()}>
+                    {day}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             
             <TextField
               label="Amount"

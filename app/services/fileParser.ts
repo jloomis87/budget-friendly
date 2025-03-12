@@ -6,7 +6,7 @@ let pdfWorkerInitialized = false;
 
 // Define the transaction interface
 export interface Transaction {
-  date: Date;
+  date: Date | number; // Updated to allow day of month as number
   description: string;
   amount: number;
   category?: 'Essentials' | 'Wants' | 'Savings' | 'Income';

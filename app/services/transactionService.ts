@@ -28,7 +28,11 @@ export const addTransaction = async (userId: string, transaction: Transaction): 
     
     const transactionData = {
       ...transaction,
-      date: Timestamp.fromDate(new Date(transaction.date)),
+      // If date is a number (day of month), store it directly
+      // Otherwise, convert Date object to Timestamp
+      date: typeof transaction.date === 'number' 
+        ? transaction.date 
+        : Timestamp.fromDate(new Date(transaction.date)),
       userId,
       createdAt: Timestamp.now()
     };
@@ -116,10 +120,16 @@ export const updateTransaction = async (
   try {
     const transactionRef = doc(db, TRANSACTIONS_COLLECTION, transactionId);
     
-    // Convert date to Firestore timestamp if it exists in updates
+    // Convert date to Firestore timestamp if it exists in updates and is not a number
     const firestoreUpdates = { ...updates };
-    if (updates.date) {
-      firestoreUpdates.date = Timestamp.fromDate(new Date(updates.date));
+    if (updates.date !== undefined) {
+      if (typeof updates.date === 'number') {
+        // If it's a number (day of month), store it directly
+        firestoreUpdates.date = updates.date;
+      } else {
+        // Otherwise, convert to Timestamp
+        firestoreUpdates.date = Timestamp.fromDate(new Date(updates.date));
+      }
     }
     
     await updateDoc(transactionRef, firestoreUpdates);
