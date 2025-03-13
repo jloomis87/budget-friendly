@@ -10,7 +10,16 @@ import {
   ListItemText,
   Alert,
   AlertTitle,
-  useTheme
+  useTheme,
+  LinearProgress,
+  Chip,
+  Stack,
+  Card,
+  CardContent,
+  CardHeader,
+  Avatar,
+  Tooltip,
+  Icon
 } from '@mui/material';
 import type { BudgetSummary as BudgetSummaryType, BudgetPlan } from '../services/budgetCalculator';
 
@@ -199,228 +208,559 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
     },
   };
 
+  // Calculate progress percentages for visual indicators
+  const getProgressColor = (actual: number, recommended: number) => {
+    const ratio = actual / recommended;
+    if (ratio <= 1.05) return 'success.main'; // Within 5% of recommendation
+    if (ratio <= 1.2) return 'warning.main';  // Within 20% of recommendation
+    return 'error.main';                      // More than 20% over recommendation
+  };
+
+  // Helper to get category icon
+  const getCategoryIcon = (category: string) => {
+    switch(category) {
+      case 'Essentials':
+        return '🏠';
+      case 'Wants':
+        return '🛍️';
+      case 'Savings':
+        return '💰';
+      default:
+        return '📊';
+    }
+  };
+
   return (
     <Box sx={{ mb: 4 }}>
-      <Typography variant="h5" gutterBottom>
+      <Typography 
+        variant="h4" 
+        gutterBottom 
+        sx={{ 
+          fontWeight: 700, 
+          color: 'primary.dark',
+          mb: 3,
+          position: 'relative',
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            bottom: -8,
+            left: 0,
+            width: 60,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: 'primary.main'
+          }
+        }}
+      >
         Budget Summary
       </Typography>
 
       <Grid container spacing={3}>
-        {/* Summary Cards */}
-        <Grid item xs={12} md={4}>
-          <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom>
-              Income & Expenses
-            </Typography>
-            <List dense>
-              <ListItem>
-                <ListItemText 
-                  primary="Total Income" 
-                  secondary={formatCurrency(summary.totalIncome)} 
-                  secondaryTypographyProps={{ color: 'success.main', fontWeight: 'bold' }}
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemText 
-                  primary="Total Expenses" 
-                  secondary={formatCurrency(summary.totalExpenses)} 
-                  secondaryTypographyProps={{ color: 'error.main', fontWeight: 'bold' }}
-                />
-              </ListItem>
-              <Divider sx={{ my: 1 }} />
-              <ListItem>
-                <ListItemText 
-                  primary="Net Cashflow" 
-                  secondary={formatCurrency(summary.netCashflow)} 
-                  secondaryTypographyProps={{ 
-                    color: summary.netCashflow >= 0 ? 'success.main' : 'error.main',
-                    fontWeight: 'bold'
-                  }}
-                />
-              </ListItem>
-            </List>
-          </Paper>
+        {/* Top Summary Cards */}
+        <Grid item xs={12}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={4}>
+              <Card 
+                elevation={2} 
+                sx={{ 
+                  height: '100%',
+                  borderRadius: 2,
+                  transition: 'transform 0.2s',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 4
+                  }
+                }}
+              >
+                <CardContent sx={{ p: 2.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Avatar sx={{ bgcolor: 'success.light', mr: 1.5 }}>💵</Avatar>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      Total Income
+                    </Typography>
+                  </Box>
+                  <Typography 
+                    variant="h4" 
+                    sx={{ 
+                      fontWeight: 700, 
+                      color: 'success.main',
+                      mb: 1
+                    }}
+                  >
+                    {formatCurrency(summary.totalIncome)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={12} sm={4}>
+              <Card 
+                elevation={2} 
+                sx={{ 
+                  height: '100%',
+                  borderRadius: 2,
+                  transition: 'transform 0.2s',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 4
+                  }
+                }}
+              >
+                <CardContent sx={{ p: 2.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Avatar sx={{ bgcolor: 'error.light', mr: 1.5 }}>💸</Avatar>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      Total Expenses
+                    </Typography>
+                  </Box>
+                  <Typography 
+                    variant="h4" 
+                    sx={{ 
+                      fontWeight: 700, 
+                      color: 'error.main',
+                      mb: 1
+                    }}
+                  >
+                    {formatCurrency(summary.totalExpenses)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={12} sm={4}>
+              <Card 
+                elevation={2} 
+                sx={{ 
+                  height: '100%',
+                  borderRadius: 2,
+                  transition: 'transform 0.2s',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 4
+                  },
+                  bgcolor: summary.netCashflow >= 0 ? 'success.light' : 'error.light',
+                }}
+              >
+                <CardContent sx={{ p: 2.5 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    <Avatar 
+                      sx={{ 
+                        bgcolor: summary.netCashflow >= 0 ? 'success.main' : 'error.main',
+                        color: 'white',
+                        mr: 1.5 
+                      }}
+                    >
+                      {summary.netCashflow >= 0 ? '✓' : '!'}
+                    </Avatar>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: summary.netCashflow >= 0 ? 'success.dark' : 'error.dark' }}>
+                      Net Cashflow
+                    </Typography>
+                  </Box>
+                  <Typography 
+                    variant="h4" 
+                    sx={{ 
+                      fontWeight: 700, 
+                      color: summary.netCashflow >= 0 ? 'success.dark' : 'error.dark',
+                      mb: 1
+                    }}
+                  >
+                    {formatCurrency(summary.netCashflow)}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
         </Grid>
 
         {/* Expense Categories */}
         <Grid item xs={12} md={4}>
-          <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom>
-              Expense Categories
-            </Typography>
-            <List dense>
-              <ListItem>
-                <ListItemText 
-                  primary="Essentials" 
-                  secondary={`${formatCurrency(summary.categories.essentials)} (${formatPercentage(summary.percentages.essentials)})`} 
-                  secondaryTypographyProps={{ color: 'primary.main' }}
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemText 
-                  primary="Wants" 
-                  secondary={`${formatCurrency(summary.categories.wants)} (${formatPercentage(summary.percentages.wants)})`} 
-                  secondaryTypographyProps={{ color: 'secondary.main' }}
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemText 
-                  primary="Savings" 
-                  secondary={`${formatCurrency(summary.categories.savings)} (${formatPercentage(summary.percentages.savings)})`} 
-                  secondaryTypographyProps={{ color: 'success.main' }}
-                />
-              </ListItem>
-            </List>
-          </Paper>
+          <Card 
+            elevation={2} 
+            sx={{ 
+              height: '100%',
+              borderRadius: 2,
+              overflow: 'hidden'
+            }}
+          >
+            <CardHeader
+              title="Expense Categories"
+              titleTypographyProps={{ 
+                variant: 'h6', 
+                fontWeight: 600,
+                color: 'text.primary'
+              }}
+              sx={{ 
+                bgcolor: 'background.default',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                pb: 1.5
+              }}
+            />
+            <CardContent sx={{ p: 0 }}>
+              <List sx={{ width: '100%' }}>
+                {[
+                  { 
+                    name: 'Essentials', 
+                    amount: summary.categories.essentials, 
+                    percentage: summary.percentages.essentials,
+                    color: 'primary.main',
+                    icon: '🏠'
+                  },
+                  { 
+                    name: 'Wants', 
+                    amount: summary.categories.wants, 
+                    percentage: summary.percentages.wants,
+                    color: 'secondary.main',
+                    icon: '🛍️'
+                  },
+                  { 
+                    name: 'Savings', 
+                    amount: summary.categories.savings, 
+                    percentage: summary.percentages.savings,
+                    color: 'success.main',
+                    icon: '💰'
+                  }
+                ].map((category, index) => (
+                  <React.Fragment key={category.name}>
+                    <ListItem sx={{ px: 3, py: 2 }}>
+                      <Box sx={{ width: '100%' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                          <Avatar 
+                            sx={{ 
+                              width: 32, 
+                              height: 32, 
+                              mr: 1.5, 
+                              bgcolor: 'transparent',
+                              fontSize: '1.2rem'
+                            }}
+                          >
+                            {category.icon}
+                          </Avatar>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                            {category.name}
+                          </Typography>
+                          <Box sx={{ flexGrow: 1 }} />
+                          <Chip 
+                            label={formatPercentage(category.percentage)} 
+                            size="small"
+                            sx={{ 
+                              bgcolor: `${category.color}20`, 
+                              color: category.color,
+                              fontWeight: 600
+                            }} 
+                          />
+                        </Box>
+                        
+                        <Typography 
+                          variant="h6" 
+                          sx={{ 
+                            fontWeight: 700, 
+                            color: category.color,
+                            mb: 1
+                          }}
+                        >
+                          {formatCurrency(category.amount)}
+                        </Typography>
+                        
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={Math.min(category.percentage, 100)} 
+                          sx={{ 
+                            height: 8, 
+                            borderRadius: 4,
+                            bgcolor: `${category.color}20`,
+                            '& .MuiLinearProgress-bar': {
+                              bgcolor: category.color
+                            }
+                          }} 
+                        />
+                      </Box>
+                    </ListItem>
+                    {index < 2 && <Divider />}
+                  </React.Fragment>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
         </Grid>
 
         {/* Pie Chart */}
         <Grid item xs={12} md={4}>
-          <Paper elevation={2} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Typography variant="h6" gutterBottom>
-              Spending Distribution
-            </Typography>
-            <Box sx={{ width: '100%', maxWidth: 250, mt: 2 }}>
-              {isBrowser && (
-                <React.Suspense fallback={<Typography>Loading chart...</Typography>}>
-                  <LazyCharts 
-                    pieData={pieChartData} 
-                    barData={barChartData} 
-                    barOptions={barChartOptions} 
-                    showPie={true}
-                    showBar={false}
-                    key={`pie-chart-instance-${Date.now()}`}
-                  />
-                </React.Suspense>
-              )}
-            </Box>
-          </Paper>
+          <Card 
+            elevation={2} 
+            sx={{ 
+              height: '100%',
+              borderRadius: 2,
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <CardHeader
+              title="Spending Distribution"
+              titleTypographyProps={{ 
+                variant: 'h6', 
+                fontWeight: 600,
+                color: 'text.primary'
+              }}
+              sx={{ 
+                bgcolor: 'background.default',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                pb: 1.5
+              }}
+            />
+            <CardContent sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexGrow: 1,
+              p: 3
+            }}>
+              <Box sx={{ width: '100%', height: 250, display: 'flex', justifyContent: 'center' }}>
+                {isBrowser && (
+                  <React.Suspense fallback={<Typography>Loading chart...</Typography>}>
+                    <LazyCharts 
+                      pieData={pieChartData} 
+                      barData={barChartData} 
+                      barOptions={barChartOptions} 
+                      showPie={true}
+                      showBar={false}
+                      key={`pie-chart-instance-${Date.now()}`}
+                    />
+                  </React.Suspense>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
         </Grid>
 
         {/* 50/30/20 Plan */}
+        <Grid item xs={12} md={4}>
+          <Card 
+            elevation={2} 
+            sx={{ 
+              height: '100%',
+              borderRadius: 2,
+              overflow: 'hidden'
+            }}
+          >
+            <CardHeader
+              title="Budget Health"
+              titleTypographyProps={{ 
+                variant: 'h6', 
+                fontWeight: 600,
+                color: 'text.primary'
+              }}
+              sx={{ 
+                bgcolor: 'background.default',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                pb: 1.5
+              }}
+            />
+            <CardContent sx={{ p: 0 }}>
+              <List sx={{ width: '100%' }}>
+                {[
+                  { 
+                    name: 'Essentials', 
+                    target: '50%',
+                    recommended: plan.recommended.essentials,
+                    actual: plan.actual.essentials,
+                    icon: '🏠'
+                  },
+                  { 
+                    name: 'Wants', 
+                    target: '30%',
+                    recommended: plan.recommended.wants,
+                    actual: plan.actual.wants,
+                    icon: '🛍️'
+                  },
+                  { 
+                    name: 'Savings', 
+                    target: '20%',
+                    recommended: plan.recommended.savings,
+                    actual: plan.actual.savings,
+                    icon: '💰'
+                  }
+                ].map((category, index) => {
+                  const progressColor = getProgressColor(category.actual, category.recommended);
+                  const progressPercentage = Math.min((category.actual / category.recommended) * 100, 150);
+                  
+                  return (
+                    <React.Fragment key={category.name}>
+                      <ListItem sx={{ px: 3, py: 2 }}>
+                        <Box sx={{ width: '100%' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <Avatar 
+                              sx={{ 
+                                width: 32, 
+                                height: 32, 
+                                mr: 1.5, 
+                                bgcolor: 'transparent',
+                                fontSize: '1.2rem'
+                              }}
+                            >
+                              {category.icon}
+                            </Avatar>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                              {category.name} <span style={{ fontWeight: 400, fontSize: '0.9rem' }}>({category.target})</span>
+                            </Typography>
+                          </Box>
+                          
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                            <Tooltip title="Recommended amount">
+                              <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 600 }}>
+                                Target: {formatCurrency(category.recommended)}
+                              </Typography>
+                            </Tooltip>
+                            <Tooltip title="Your actual spending">
+                              <Typography variant="body2" sx={{ color: progressColor, fontWeight: 600 }}>
+                                Actual: {formatCurrency(category.actual)}
+                              </Typography>
+                            </Tooltip>
+                          </Box>
+                          
+                          <Box sx={{ position: 'relative', pt: 1 }}>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={progressPercentage} 
+                              sx={{ 
+                                height: 10, 
+                                borderRadius: 5,
+                                bgcolor: 'grey.200',
+                                '& .MuiLinearProgress-bar': {
+                                  bgcolor: progressColor
+                                }
+                              }} 
+                            />
+                            <Box 
+                              sx={{ 
+                                position: 'absolute', 
+                                top: 0, 
+                                left: '100%', 
+                                height: '100%', 
+                                borderLeft: '2px dashed',
+                                borderColor: 'primary.main',
+                                zIndex: 2
+                              }} 
+                            />
+                          </Box>
+                        </Box>
+                      </ListItem>
+                      {index < 2 && <Divider />}
+                    </React.Fragment>
+                  );
+                })}
+              </List>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* 50/30/20 Chart */}
         <Grid item xs={12}>
-          <Paper elevation={2} sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
-              50/30/20 Budget Plan
-            </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={7}>
-                <Box sx={{ 
-                  height: 400, 
-                  width: '100%',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  mb: { xs: 3, md: 0 }
-                }}>
-                  {isBrowser && (
-                    <React.Suspense fallback={<Typography>Loading chart...</Typography>}>
-                      <LazyCharts 
-                        pieData={pieChartData} 
-                        barData={barChartData} 
-                        barOptions={barChartOptions} 
-                        showPie={false}
-                        showBar={true}
-                        key={`bar-chart-instance-${Date.now()}`}
-                      />
-                    </React.Suspense>
-                  )}
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={5}>
-                <Box sx={{ 
-                  p: 2, 
-                  bgcolor: 'background.paper', 
-                  borderRadius: 1,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center'
-                }}>
-                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', mb: 2 }}>
-                    Recommended vs. Actual
-                  </Typography>
-                  <List dense>
-                    <ListItem sx={{ py: 1 }}>
-                      <ListItemText 
-                        primary={<Typography variant="body1" sx={{ fontWeight: 'medium' }}>Essentials (50%)</Typography>}
-                        secondary={
-                          <Typography component="div" variant="body2">
-                            <Box sx={{ mt: 0.5 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                                <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
-                                <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.essentials)}</Box>
-                              </Box>
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
-                                <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.essentials)}</Box>
-                              </Box>
-                            </Box>
-                          </Typography>
-                        }
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText 
-                        primary={<Typography variant="body1" sx={{ fontWeight: 'medium' }}>Wants (30%)</Typography>}
-                        secondary={
-                          <Typography component="div" variant="body2">
-                            <Box sx={{ mt: 0.5 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                                <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
-                                <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.wants)}</Box>
-                              </Box>
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
-                                <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.wants)}</Box>
-                              </Box>
-                            </Box>
-                          </Typography>
-                        }
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText 
-                        primary={<Typography variant="body1" sx={{ fontWeight: 'medium' }}>Savings (20%)</Typography>}
-                        secondary={
-                          <Typography component="div" variant="body2">
-                            <Box sx={{ mt: 0.5 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-                                <Box component="span" sx={{ mr: 1 }}>Recommended:</Box>
-                                <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>{formatCurrency(plan.recommended.savings)}</Box>
-                              </Box>
-                              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                <Box component="span" sx={{ mr: 1 }}>Actual:</Box>
-                                <Box component="span" sx={{ fontWeight: 'bold', color: 'warning.main' }}>{formatCurrency(plan.actual.savings)}</Box>
-                              </Box>
-                            </Box>
-                          </Typography>
-                        }
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
+          <Card 
+            elevation={2} 
+            sx={{ 
+              borderRadius: 2,
+              overflow: 'hidden'
+            }}
+          >
+            <CardHeader
+              title="50/30/20 Budget Comparison"
+              titleTypographyProps={{ 
+                variant: 'h6', 
+                fontWeight: 600,
+                color: 'text.primary'
+              }}
+              sx={{ 
+                bgcolor: 'background.default',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                pb: 1.5
+              }}
+            />
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ 
+                height: 400, 
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}>
+                {isBrowser && (
+                  <React.Suspense fallback={<Typography>Loading chart...</Typography>}>
+                    <LazyCharts 
+                      pieData={pieChartData} 
+                      barData={barChartData} 
+                      barOptions={barChartOptions} 
+                      showPie={false}
+                      showBar={true}
+                      key={`bar-chart-instance-${Date.now()}`}
+                    />
+                  </React.Suspense>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
         </Grid>
 
         {/* Budget Suggestions */}
         <Grid item xs={12}>
-          <Paper elevation={2} sx={{ p: 3, bgcolor: 'info.light', color: 'info.contrastText' }}>
-            <Typography variant="h6" gutterBottom sx={{ color: 'info.dark' }}>
-              Budget Suggestions
-            </Typography>
-            <List dense>
-              {suggestions.map((suggestion, index) => (
-                <ListItem key={index} sx={{ py: 0.5 }}>
-                  <ListItemText primary={suggestion} />
-                </ListItem>
-              ))}
-            </List>
-          </Paper>
+          <Card 
+            elevation={2} 
+            sx={{ 
+              borderRadius: 2,
+              overflow: 'hidden',
+              bgcolor: 'info.light',
+              border: '1px solid',
+              borderColor: 'info.main',
+              boxShadow: `0 0 20px ${theme.palette.info.light}`
+            }}
+          >
+            <CardHeader
+              avatar={
+                <Avatar sx={{ bgcolor: 'info.main' }}>💡</Avatar>
+              }
+              title="Budget Suggestions"
+              titleTypographyProps={{ 
+                variant: 'h6', 
+                fontWeight: 600,
+                color: 'info.dark'
+              }}
+              sx={{ 
+                borderBottom: '1px solid',
+                borderColor: 'info.main',
+                pb: 1.5
+              }}
+            />
+            <CardContent sx={{ p: 0 }}>
+              <List>
+                {suggestions.map((suggestion, index) => (
+                  <ListItem key={index} sx={{ 
+                    py: 1.5,
+                    px: 3,
+                    borderBottom: index < suggestions.length - 1 ? '1px solid' : 'none',
+                    borderColor: 'info.main',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.2)'
+                    }
+                  }}>
+                    <ListItemText 
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box component="span" sx={{ mr: 1, fontSize: '1.2rem' }}>•</Box>
+                          <Typography variant="body1" sx={{ color: 'info.dark', fontWeight: 500 }}>
+                            {suggestion}
+                          </Typography>
+                        </Box>
+                      } 
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
     </Box>

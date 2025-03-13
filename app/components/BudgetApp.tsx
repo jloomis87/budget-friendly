@@ -443,15 +443,48 @@ function BudgetAppContent() {
     if (!transactions.length || !budgetSummary || !budgetPlan) return null;
     
     return (
-      <Box sx={{ mt: 4 }}>
-        <Paper sx={{ p: 3, borderRadius: 2, backgroundColor: 'background.paper' }}>
+      <Box sx={{ 
+        mt: 4,
+        mb: 6,
+        position: 'relative',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 20,
+          left: 0,
+          right: 0,
+          height: '100%',
+          background: 'linear-gradient(180deg, rgba(37,99,235,0.05) 0%, rgba(59,130,246,0) 100%)',
+          borderRadius: 3,
+          zIndex: -1,
+        }
+      }}>
+        <Box sx={{ 
+          p: { xs: 2, sm: 3 }, 
+          borderRadius: 3, 
+          backgroundColor: 'background.paper',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.08)',
+          border: '1px solid',
+          borderColor: 'divider',
+          overflow: 'hidden',
+          position: 'relative',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: 4,
+            background: 'linear-gradient(90deg, rgba(37,99,235,1) 0%, rgba(59,130,246,1) 100%)',
+          }
+        }}>
           <BudgetActions onReset={handleReset} />
           <BudgetSummary 
             summary={budgetSummary} 
             plan={budgetPlan} 
             suggestions={suggestions}
           />
-        </Paper>
+        </Box>
       </Box>
     );
   }, [transactions.length, budgetSummary, budgetPlan, suggestions, handleReset]);
