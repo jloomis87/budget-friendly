@@ -21,6 +21,7 @@ import { useTransactions } from '../hooks/useTransactions';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { UserMenu } from './auth/UserMenu';
 import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
+import { ThemeProvider } from '../contexts/ThemeContext';
 
 // Add this interface for alert messages
 interface AlertMessage {
@@ -937,9 +938,13 @@ function BudgetAppContent() {
         sx={{ 
           p: 2,
           mb: 3,
-          background: 'linear-gradient(90deg, rgba(37,99,235,1) 0%, rgba(59,130,246,1) 100%)',
+          background: theme => theme.palette.mode === 'dark' 
+            ? 'linear-gradient(90deg, rgba(30,58,138,1) 0%, rgba(37,99,235,1) 100%)' 
+            : 'linear-gradient(90deg, rgba(37,99,235,1) 0%, rgba(59,130,246,1) 100%)',
           borderRadius: { xs: 0, sm: '0 0 1rem 1rem' },
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          boxShadow: theme => theme.palette.mode === 'dark'
+            ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.24)'
+            : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -966,6 +971,9 @@ function BudgetAppContent() {
             top: 16,
             right: 24,
             zIndex: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
           }}
         >
           {isAuthenticated ? (
@@ -1198,42 +1206,32 @@ function BudgetAppContent() {
 export function BudgetApp() {
   return (
     <AuthProvider>
-      {/* Add global styles to fix the black background */}
-      <GlobalStyles
-        styles={{
-          'html, body': {
-            backgroundColor: '#f5f7fa !important',
-            minHeight: '100vh'
-          },
-          'body::after': {
-            content: '""',
-            display: 'block',
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            backgroundColor: '#f5f7fa',
-            zIndex: -999
-          },
-          // Add drag and drop styles
-          '.dragging-active': {
-            cursor: 'grabbing !important'
-          },
-          '.dragging-active *': {
-            cursor: 'grabbing !important'
-          },
-          // Add transition effects for drag targets
-          '.drag-target': {
-            transition: 'transform 0.2s, box-shadow 0.2s'
-          },
-          '.drag-target-hover': {
-            transform: 'scale(1.01)',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15) !important'
-          }
-        }}
-      />
-      <BudgetAppContent />
+      <ThemeProvider>
+        {/* Add global styles to fix the black background */}
+        <GlobalStyles
+          styles={{
+            'html, body': {
+              minHeight: '100vh'
+            },
+            // Add drag and drop styles
+            '.dragging-active': {
+              cursor: 'grabbing !important'
+            },
+            '.dragging-active *': {
+              cursor: 'grabbing !important'
+            },
+            // Add transition effects for drag targets
+            '.drag-target': {
+              transition: 'transform 0.2s, box-shadow 0.2s'
+            },
+            '.drag-target-hover': {
+              transform: 'scale(1.01)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15) !important'
+            }
+          }}
+        />
+        <BudgetAppContent />
+      </ThemeProvider>
     </AuthProvider>
   );
 } 

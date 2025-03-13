@@ -10,7 +10,7 @@ import {
   Title
 } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
-import { Box } from '@mui/material';
+import { Box, useTheme } from '@mui/material';
 
 // Register ChartJS components globally - only needs to happen once
 ChartJS.register(
@@ -42,6 +42,8 @@ export default function LazyCharts({
   // Generate unique IDs for each chart to avoid canvas reuse issues
   const pieChartId = useRef(`pie-chart-${Math.random().toString(36).substring(2, 9)}`);
   const barChartId = useRef(`bar-chart-${Math.random().toString(36).substring(2, 9)}`);
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
 
   // Clean up chart instances when component unmounts
   useEffect(() => {
@@ -51,6 +53,13 @@ export default function LazyCharts({
       chartInstances.forEach(chart => chart.destroy());
     };
   }, []);
+
+  // Apply dark mode styling to charts
+  useEffect(() => {
+    ChartJS.defaults.color = theme.palette.text.primary;
+    ChartJS.defaults.borderColor = theme.palette.divider;
+    ChartJS.defaults.backgroundColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+  }, [theme.palette.mode, isDarkMode, theme.palette.text.primary, theme.palette.divider]);
 
   return (
     <>
@@ -79,7 +88,8 @@ export default function LazyCharts({
                     padding: 15,
                     font: {
                       size: 12
-                    }
+                    },
+                    color: theme.palette.text.primary
                   }
                 },
                 tooltip: {
@@ -88,10 +98,15 @@ export default function LazyCharts({
                   },
                   titleFont: {
                     size: 13
-                  }
+                  },
+                  backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  titleColor: isDarkMode ? theme.palette.text.primary : theme.palette.text.primary,
+                  bodyColor: isDarkMode ? theme.palette.text.secondary : theme.palette.text.secondary,
+                  borderColor: theme.palette.divider,
+                  borderWidth: 1
                 }
               }
-            }}
+            }} 
           />
         </Box>
       )}
@@ -124,7 +139,8 @@ export default function LazyCharts({
                       size: 14
                     },
                     usePointStyle: true,
-                    pointStyle: 'circle'
+                    pointStyle: 'circle',
+                    color: theme.palette.text.primary
                   }
                 },
                 tooltip: {
@@ -134,7 +150,37 @@ export default function LazyCharts({
                   titleFont: {
                     size: 16
                   },
-                  padding: 12
+                  padding: 12,
+                  backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  titleColor: isDarkMode ? theme.palette.text.primary : theme.palette.text.primary,
+                  bodyColor: isDarkMode ? theme.palette.text.secondary : theme.palette.text.secondary,
+                  borderColor: theme.palette.divider,
+                  borderWidth: 1
+                }
+              },
+              scales: {
+                ...barOptions.scales,
+                y: {
+                  ...barOptions.scales.y,
+                  grid: {
+                    color: theme.palette.divider,
+                    drawBorder: false,
+                  },
+                  ticks: {
+                    ...barOptions.scales.y.ticks,
+                    color: theme.palette.text.secondary,
+                  }
+                },
+                x: {
+                  ...barOptions.scales.x,
+                  grid: {
+                    display: false,
+                    drawBorder: false
+                  },
+                  ticks: {
+                    ...barOptions.scales.x.ticks,
+                    color: theme.palette.text.primary,
+                  }
                 }
               }
             }} 

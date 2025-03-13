@@ -8,14 +8,17 @@ import {
   Typography,
   Divider,
   ListItemIcon,
+  Switch,
 } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Import specific icons from materialIcons utility
-import { PersonIcon, LogoutIcon, AccountCircleIcon } from '../../utils/materialIcons';
+import { PersonIcon, LogoutIcon, AccountCircleIcon, DarkModeIcon, LightModeIcon } from '../../utils/materialIcons';
 
 export function UserMenu() {
   const { user, logout } = useAuth();
+  const { mode, toggleColorMode } = useTheme();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
@@ -33,6 +36,13 @@ export function UserMenu() {
   const handleLogout = () => {
     handleClose();
     logout();
+  };
+
+  // Handle theme toggle
+  const handleThemeToggle = (event: React.MouseEvent) => {
+    // Stop propagation to prevent menu from closing
+    event.stopPropagation();
+    toggleColorMode();
   };
 
   // Get user initials for avatar
@@ -128,6 +138,23 @@ export function UserMenu() {
         </MenuItem>
         
         <Divider />
+        
+        <MenuItem onClick={(e) => e.stopPropagation()} sx={{ py: 1.5 }}>
+          <ListItemIcon>
+            {mode === 'light' ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />}
+          </ListItemIcon>
+          Dark Mode
+          <Box sx={{ ml: 'auto' }}>
+            <Switch
+              checked={mode === 'dark'}
+              onChange={(e) => {
+                e.stopPropagation();
+                toggleColorMode();
+              }}
+              size="small"
+            />
+          </Box>
+        </MenuItem>
         
         <MenuItem onClick={handleLogout} sx={{ py: 1.5, color: 'error.main' }}>
           <ListItemIcon>

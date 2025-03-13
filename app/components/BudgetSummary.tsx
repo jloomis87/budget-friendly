@@ -10,7 +10,7 @@ import {
   ListItemText,
   Alert,
   AlertTitle,
-  useTheme,
+  useTheme as useMuiTheme,
   LinearProgress,
   Chip,
   Stack,
@@ -21,6 +21,7 @@ import {
   Tooltip,
   Icon
 } from '@mui/material';
+import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import type { BudgetSummary as BudgetSummaryType, BudgetPlan } from '../services/budgetCalculator';
 
 // Lazy load Chart.js components to avoid SSR issues
@@ -33,8 +34,10 @@ interface BudgetSummaryProps {
 }
 
 export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps) {
-  const theme = useTheme();
+  const theme = useMuiTheme();
+  const { mode } = useCustomTheme();
   const [isBrowser, setIsBrowser] = useState(false);
+  const isDarkMode = mode === 'dark';
 
   // Only render charts on the client side
   useEffect(() => {
@@ -181,7 +184,8 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
             size: 14
           },
           usePointStyle: true,
-          pointStyle: 'circle'
+          pointStyle: 'circle',
+          color: theme.palette.text.primary
         }
       },
       tooltip: {
@@ -237,7 +241,7 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
         gutterBottom 
         sx={{ 
           fontWeight: 700, 
-          color: 'primary.dark',
+          color: isDarkMode ? 'primary.light' : 'primary.dark',
           mb: 3,
           position: 'relative',
           '&::after': {
@@ -274,7 +278,7 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
               >
                 <CardContent sx={{ p: 2.5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar sx={{ bgcolor: 'success.light', mr: 1.5 }}>💵</Avatar>
+                    <Avatar sx={{ bgcolor: isDarkMode ? 'success.dark' : 'success.light', mr: 1.5 }}>💵</Avatar>
                     <Typography variant="h6" sx={{ fontWeight: 600 }}>
                       Total Income
                     </Typography>
@@ -308,7 +312,7 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
               >
                 <CardContent sx={{ p: 2.5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar sx={{ bgcolor: 'error.light', mr: 1.5 }}>💸</Avatar>
+                    <Avatar sx={{ bgcolor: isDarkMode ? 'error.dark' : 'error.light', mr: 1.5 }}>💸</Avatar>
                     <Typography variant="h6" sx={{ fontWeight: 600 }}>
                       Total Expenses
                     </Typography>
@@ -338,7 +342,9 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                     transform: 'translateY(-4px)',
                     boxShadow: 4
                   },
-                  bgcolor: summary.netCashflow >= 0 ? 'success.light' : 'error.light',
+                  bgcolor: summary.netCashflow >= 0 
+                    ? (isDarkMode ? 'success.dark' : 'success.light') 
+                    : (isDarkMode ? 'error.dark' : 'error.light'),
                 }}
               >
                 <CardContent sx={{ p: 2.5 }}>
@@ -352,7 +358,12 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                     >
                       {summary.netCashflow >= 0 ? '✓' : '!'}
                     </Avatar>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: summary.netCashflow >= 0 ? 'success.dark' : 'error.dark' }}>
+                    <Typography variant="h6" sx={{ 
+                      fontWeight: 600, 
+                      color: summary.netCashflow >= 0 
+                        ? (isDarkMode ? 'success.light' : 'success.dark') 
+                        : (isDarkMode ? 'error.light' : 'error.dark')
+                    }}>
                       Net Cashflow
                     </Typography>
                   </Box>
@@ -360,7 +371,9 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                     variant="h4" 
                     sx={{ 
                       fontWeight: 700, 
-                      color: summary.netCashflow >= 0 ? 'success.dark' : 'error.dark',
+                      color: summary.netCashflow >= 0 
+                        ? (isDarkMode ? 'success.light' : 'success.dark') 
+                        : (isDarkMode ? 'error.light' : 'error.dark'),
                       mb: 1
                     }}
                   >
@@ -390,7 +403,7 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                 color: 'text.primary'
               }}
               sx={{ 
-                bgcolor: 'background.default',
+                bgcolor: isDarkMode ? 'background.default' : 'background.default',
                 borderBottom: '1px solid',
                 borderColor: 'divider',
                 pb: 1.5
@@ -444,7 +457,7 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                             label={formatPercentage(category.percentage)} 
                             size="small"
                             sx={{ 
-                              bgcolor: `${category.color}20`, 
+                              bgcolor: isDarkMode ? `${category.color}30` : `${category.color}20`, 
                               color: category.color,
                               fontWeight: 600
                             }} 
@@ -468,7 +481,7 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                           sx={{ 
                             height: 8, 
                             borderRadius: 4,
-                            bgcolor: `${category.color}20`,
+                            bgcolor: isDarkMode ? `${category.color}30` : `${category.color}20`,
                             '& .MuiLinearProgress-bar': {
                               bgcolor: category.color
                             }
@@ -628,7 +641,7 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                               sx={{ 
                                 height: 10, 
                                 borderRadius: 5,
-                                bgcolor: 'grey.200',
+                                bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'grey.200',
                                 '& .MuiLinearProgress-bar': {
                                   bgcolor: progressColor
                                 }
@@ -712,25 +725,27 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
             sx={{ 
               borderRadius: 2,
               overflow: 'hidden',
-              bgcolor: 'info.light',
+              bgcolor: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : 'info.light',
               border: '1px solid',
-              borderColor: 'info.main',
-              boxShadow: `0 0 20px ${theme.palette.info.light}`
+              borderColor: isDarkMode ? 'info.dark' : 'info.main',
+              boxShadow: isDarkMode 
+                ? `0 0 20px ${theme.palette.info.dark}30` 
+                : `0 0 20px ${theme.palette.info.light}`
             }}
           >
             <CardHeader
               avatar={
-                <Avatar sx={{ bgcolor: 'info.main' }}>💡</Avatar>
+                <Avatar sx={{ bgcolor: isDarkMode ? 'info.dark' : 'info.main' }}>💡</Avatar>
               }
               title="Budget Suggestions"
               titleTypographyProps={{ 
                 variant: 'h6', 
                 fontWeight: 600,
-                color: 'info.dark'
+                color: isDarkMode ? 'info.light' : 'info.dark'
               }}
               sx={{ 
                 borderBottom: '1px solid',
-                borderColor: 'info.main',
+                borderColor: isDarkMode ? 'info.dark' : 'info.main',
                 pb: 1.5
               }}
             />
@@ -741,16 +756,19 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
                     py: 1.5,
                     px: 3,
                     borderBottom: index < suggestions.length - 1 ? '1px solid' : 'none',
-                    borderColor: 'info.main',
+                    borderColor: isDarkMode ? 'info.dark' : 'info.main',
                     '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.2)'
+                      bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.2)'
                     }
                   }}>
                     <ListItemText 
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <Box component="span" sx={{ mr: 1, fontSize: '1.2rem' }}>•</Box>
-                          <Typography variant="body1" sx={{ color: 'info.dark', fontWeight: 500 }}>
+                          <Typography variant="body1" sx={{ 
+                            color: isDarkMode ? 'info.light' : 'info.dark', 
+                            fontWeight: 500 
+                          }}>
                             {suggestion}
                           </Typography>
                         </Box>
