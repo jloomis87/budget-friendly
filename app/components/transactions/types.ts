@@ -54,6 +54,7 @@ export interface TransactionRowProps {
   getOrdinalSuffix: (day: number) => string;
   formatDateForDisplay: (date: Date | string | number) => string;
   onClick?: () => void;
+  dragOver?: boolean;
 }
 
 export interface AddTransactionRowProps {

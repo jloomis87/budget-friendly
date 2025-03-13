@@ -315,15 +315,27 @@ function BudgetAppContent() {
     setDragOverCategory(null);
   }, []);
   
-  // Handle drag end (in case drop doesn't happen)
+  // Handle drag end
   const handleDragEnd = useCallback(() => {
     // Remove the dragging class
     document.body.classList.remove('dragging-active');
     
-    // Reset states
-    setDragOverCategory(null);
+    // Reset drag state
     setDraggedTransaction(null);
+    setDragOverCategory(null);
   }, []);
+
+  // Auto-dismiss alert messages after 3 seconds
+  useEffect(() => {
+    if (alertMessage) {
+      const timer = setTimeout(() => {
+        setAlertMessage(null);
+      }, 3000);
+      
+      // Clean up the timer if the component unmounts or alertMessage changes
+      return () => clearTimeout(timer);
+    }
+  }, [alertMessage, setAlertMessage]);
 
   // Handle opening the color picker
   const handleOpenColorPicker = useCallback((event: React.MouseEvent<HTMLElement>, category: string) => {

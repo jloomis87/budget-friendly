@@ -98,6 +98,17 @@ export function MobileTransactionList({
                 opacity: draggedIndex === index ? 0.5 : 1,
                 transition: 'transform 0.2s, opacity 0.2s',
                 mb: dragOverIndex === index ? '15px' : '5px',
+                '&::before': dragOverIndex === index ? {
+                  content: '""',
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  top: '-4px',
+                  height: '2px',
+                  backgroundColor: '#1976d2',
+                  boxShadow: '0 0 4px rgba(25, 118, 210, 0.5)',
+                  zIndex: 2
+                } : {}
               }}
             >
               <MobileTransactionCard

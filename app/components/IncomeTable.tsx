@@ -1124,6 +1124,18 @@ export function IncomeTable({
                     transform: dragOverIndex === index ? 'translateY(5px)' : 'none',
                     opacity: draggedIndex === index ? 0.5 : 1,
                     transition: 'transform 0.2s, opacity 0.2s, background-color 0.2s, box-shadow 0.2s',
+                    // Add blue line indicator when being dragged over
+                    '&::before': dragOverIndex === index ? {
+                      content: '""',
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      top: '-4px', // Position the line 4px above the container
+                      height: '2px',
+                      backgroundColor: '#1976d2', // Material UI primary blue
+                      boxShadow: '0 0 4px rgba(25, 118, 210, 0.5)',
+                      zIndex: 2
+                    } : {}
                   }}
                 >
                   {/* Description and Amount on top line */}

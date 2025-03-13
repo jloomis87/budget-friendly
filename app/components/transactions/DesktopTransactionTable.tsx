@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Table, TableBody } from '@mui/material';
 import { TransactionTableHead } from './TransactionTableHead';
 import { TransactionRow } from './TransactionRow';
@@ -36,6 +36,7 @@ interface DesktopTransactionTableProps {
   formatDateForDisplay: (date: Date | string | number) => string;
   totalAmount: number;
   onRowClick: (transaction: Transaction, transactionId: string, index: number) => void;
+  onReorder?: (category: string, sourceIndex: number, targetIndex: number) => void;
 }
 
 export function DesktopTransactionTable({
@@ -64,8 +65,51 @@ export function DesktopTransactionTable({
   getOrdinalSuffix,
   formatDateForDisplay,
   totalAmount,
-  onRowClick
+  onRowClick,
+  onReorder
 }: DesktopTransactionTableProps) {
+  // Add state to track which row is being dragged over
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  // Handle drag over for a specific row
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  // Handle drop on a specific row
+  const handleDrop = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+    
+    // Get the dragged transaction data
+    try {
+      const jsonData = e.dataTransfer.getData('application/json');
+      if (jsonData) {
+        const dragData = JSON.parse(jsonData);
+        
+        // If we're in the same category and have a valid source index
+        if (dragData.category === category && typeof dragData.index === 'number') {
+          // Call the parent reorder handler if provided
+          if (onReorder) {
+            onReorder(category, dragData.index, index);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error parsing drag data:', err);
+    }
+  };
+
+  // Handle drag end
+  const handleDragEnd = () => {
+    setDragOverIndex(null);
+  };
+
   return (
     <Box sx={{ overflowX: 'auto' }}>
       <Table size="small" sx={{ tableLayout: 'fixed' }}>
@@ -86,23 +130,29 @@ export function DesktopTransactionTable({
             const globalIndex = findGlobalIndex(transaction);
             
             return (
-              <TransactionRow
+              <Box
                 key={transactionId}
-                transaction={transaction}
-                isEditing={isEditing}
-                editingRow={editingRow}
-                isDark={isDark}
-                globalIndex={globalIndex}
-                onEditingChange={onEditingChange}
-                onSaveEdit={handleSaveEdit}
-                onCancelEdit={() => setEditingRow(null)}
-                onDeleteClick={handleDeleteClick}
-                onDragStart={onDragStart}
-                generateDayOptions={generateDayOptions}
-                getOrdinalSuffix={getOrdinalSuffix}
-                formatDateForDisplay={formatDateForDisplay}
-                onClick={() => !isEditing && onRowClick(transaction, transactionId, index)}
-              />
+                onDragOver={(e) => !isEditing && handleDragOver(e, index)}
+                onDrop={(e) => !isEditing && handleDrop(e, index)}
+              >
+                <TransactionRow
+                  transaction={transaction}
+                  isEditing={isEditing}
+                  editingRow={editingRow}
+                  isDark={isDark}
+                  globalIndex={globalIndex}
+                  onEditingChange={onEditingChange}
+                  onSaveEdit={handleSaveEdit}
+                  onCancelEdit={() => setEditingRow(null)}
+                  onDeleteClick={handleDeleteClick}
+                  onDragStart={onDragStart}
+                  generateDayOptions={generateDayOptions}
+                  getOrdinalSuffix={getOrdinalSuffix}
+                  formatDateForDisplay={formatDateForDisplay}
+                  onClick={() => !isEditing && onRowClick(transaction, transactionId, index)}
+                  dragOver={dragOverIndex === index}
+                />
+              </Box>
             );
           })}
 

@@ -22,7 +22,8 @@ export function TransactionRow({
   generateDayOptions,
   getOrdinalSuffix,
   formatDateForDisplay,
-  onClick
+  onClick,
+  dragOver = false
 }: TransactionRowProps) {
   // Create a custom drag image when dragging starts
   const handleDragStart = (e: React.DragEvent) => {
@@ -107,10 +108,29 @@ export function TransactionRow({
         color: isDark ? '#fff' : 'inherit',
         opacity: 1, // Ensure full opacity by default
         transition: 'opacity 0.2s, transform 0.2s',
+        position: 'relative',
+        // Add blue line indicator when being dragged over
+        '&::before': dragOver ? {
+          content: '""',
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: '-4px', // Position the line 4px above the container
+          height: '2px',
+          backgroundColor: '#1976d2', // Material UI primary blue
+          boxShadow: '0 0 4px rgba(25, 118, 210, 0.5)',
+          zIndex: 2
+        } : {}
       }}
       draggable={!isEditing}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragOver={(e) => {
+        if (!isEditing) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }
+      }}
       onClick={onClick}
     >
       <TableCell sx={{ 
