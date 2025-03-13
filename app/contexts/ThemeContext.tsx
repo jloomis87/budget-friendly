@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { ThemeProvider as MuiThemeProvider, createTheme } from '@mui/material';
 import type { Theme } from '@mui/material/styles';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useAuth } from './AuthContext';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/firebaseConfig';
 
 // Define the palette mode type
 type PaletteMode = 'light' | 'dark';
@@ -10,12 +13,14 @@ type PaletteMode = 'light' | 'dark';
 interface ThemeContextType {
   mode: PaletteMode;
   toggleColorMode: () => void;
+  isLoading: boolean;
 }
 
 // Create the context with default values
 const ThemeContext = createContext<ThemeContextType>({
   mode: 'light',
   toggleColorMode: () => {},
+  isLoading: false,
 });
 
 // Custom hook to use the theme context
@@ -23,7 +28,9 @@ export const useTheme = () => useContext(ThemeContext);
 
 // Theme provider component
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Use localStorage to persist theme preference
+  const { user, isAuthenticated } = useAuth();
+  
+  // Use localStorage to persist theme preference for non-authenticated users
   const [storedMode, setStoredMode] = useLocalStorage<PaletteMode>(
     'theme-mode',
     'theme-mode-legacy',
@@ -32,16 +39,101 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   
   // State to track current theme mode
   const [mode, setMode] = useState<PaletteMode>(storedMode);
+  // Flag to track if theme preferences are loading
+  const [isLoading, setIsLoading] = useState(false);
+  // Flag to track if there's an error with Firebase operations
+  const [firebaseError, setFirebaseError] = useState<string | null>(null);
+  // Ref to track if we've loaded from Firebase for the current user
+  const loadedUserIdRef = useRef<string | null>(null);
+
+  // Save theme to Firebase
+  const saveThemeToFirebase = useCallback(async (themeMode: PaletteMode) => {
+    if (isAuthenticated && user) {
+      console.log('Saving theme preference to Firebase:', themeMode, 'for user:', user.id);
+      try {
+        setFirebaseError(null);
+        // Store theme preference directly in the user document
+        const userDocRef = doc(db, 'users', user.id);
+        await updateDoc(userDocRef, { 
+          preferences: { 
+            theme: themeMode,
+            updatedAt: new Date().toISOString() 
+          }
+        });
+        console.log('Theme preference saved to Firebase successfully');
+      } catch (error) {
+        console.error('Error saving theme preference to Firebase:', error);
+        setFirebaseError('Failed to save theme preference to Firebase');
+      }
+    }
+  }, [isAuthenticated, user]);
 
   // Function to toggle between light and dark mode
-  const toggleColorMode = () => {
-    setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
-  };
+  const toggleColorMode = useCallback(() => {
+    console.log('Toggling theme mode from', mode, 'to', mode === 'light' ? 'dark' : 'light');
+    const newMode = mode === 'light' ? 'dark' : 'light';
+    setMode(newMode);
+    
+    // Save to Firebase immediately on toggle
+    if (isAuthenticated && user) {
+      saveThemeToFirebase(newMode);
+    }
+  }, [mode, isAuthenticated, user, saveThemeToFirebase]);
+
+  // Load theme preference from Firebase when user is authenticated
+  useEffect(() => {
+    const loadUserThemePreference = async () => {
+      // Only load if authenticated and we haven't loaded for this user yet
+      if (isAuthenticated && user && loadedUserIdRef.current !== user.id) {
+        setIsLoading(true);
+        console.log('Loading theme preference from Firebase for user:', user.id);
+        
+        try {
+          setFirebaseError(null);
+          // Get theme preference from the user document
+          const userDocRef = doc(db, 'users', user.id);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists() && userDoc.data().preferences?.theme) {
+            // User has a theme preference stored in Firebase
+            const userTheme = userDoc.data().preferences.theme as PaletteMode;
+            console.log('Found theme preference in Firebase:', userTheme);
+            setMode(userTheme);
+          } else {
+            // No theme preference in Firebase, use the local one and save it
+            console.log('No theme preference found in Firebase, saving current preference:', mode);
+            await saveThemeToFirebase(mode);
+          }
+          
+          // Mark this user as loaded
+          loadedUserIdRef.current = user.id;
+        } catch (error) {
+          console.error('Error loading theme preference from Firebase:', error);
+          setFirebaseError('Failed to load theme preference from Firebase');
+        } finally {
+          setIsLoading(false);
+        }
+      } else if (!isAuthenticated) {
+        // Reset the loaded user when logging out
+        loadedUserIdRef.current = null;
+      }
+    };
+
+    loadUserThemePreference();
+  }, [isAuthenticated, user, saveThemeToFirebase, mode]);
 
   // Update localStorage when mode changes
   useEffect(() => {
+    // Always update localStorage
     setStoredMode(mode);
   }, [mode, setStoredMode]);
+
+  // Log Firebase errors for debugging
+  useEffect(() => {
+    if (firebaseError) {
+      console.error('Firebase theme operation error:', firebaseError);
+    }
+  }, [firebaseError]);
 
   // Create the theme based on current mode
   const theme = React.useMemo(
@@ -114,7 +206,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 
   return (
-    <ThemeContext.Provider value={{ mode, toggleColorMode }}>
+    <ThemeContext.Provider value={{ mode, toggleColorMode, isLoading }}>
       <MuiThemeProvider theme={theme}>{children}</MuiThemeProvider>
     </ThemeContext.Provider>
   );

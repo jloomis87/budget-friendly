@@ -9,6 +9,7 @@ import {
   Divider,
   ListItemIcon,
   Switch,
+  CircularProgress,
 } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -18,7 +19,7 @@ import { PersonIcon, LogoutIcon, AccountCircleIcon, DarkModeIcon, LightModeIcon 
 
 export function UserMenu() {
   const { user, logout } = useAuth();
-  const { mode, toggleColorMode } = useTheme();
+  const { mode, toggleColorMode, isLoading } = useTheme();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
@@ -36,13 +37,6 @@ export function UserMenu() {
   const handleLogout = () => {
     handleClose();
     logout();
-  };
-
-  // Handle theme toggle
-  const handleThemeToggle = (event: React.MouseEvent) => {
-    // Stop propagation to prevent menu from closing
-    event.stopPropagation();
-    toggleColorMode();
   };
 
   // Get user initials for avatar
@@ -144,15 +138,20 @@ export function UserMenu() {
             {mode === 'light' ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />}
           </ListItemIcon>
           Dark Mode
-          <Box sx={{ ml: 'auto' }}>
-            <Switch
-              checked={mode === 'dark'}
-              onChange={(e) => {
-                e.stopPropagation();
-                toggleColorMode();
-              }}
-              size="small"
-            />
+          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center' }}>
+            {isLoading ? (
+              <CircularProgress size={20} thickness={4} sx={{ mr: 1 }} />
+            ) : (
+              <Switch
+                checked={mode === 'dark'}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  toggleColorMode();
+                }}
+                size="small"
+                disabled={isLoading}
+              />
+            )}
           </Box>
         </MenuItem>
         
