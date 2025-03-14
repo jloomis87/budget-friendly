@@ -1405,28 +1405,17 @@ export function IncomeTable({
                             <Card
                               key={transactionId}
                               sx={{
-                                bgcolor: isDark ? 'rgba(255, 255, 255, 0.03)' : '#fff',
+                                bgcolor: isDark ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.04)',
                                 borderRadius: 2,
-                                boxShadow: isDark 
-                                  ? '0 2px 4px rgba(0,0,0,0.2)' 
-                                  : '0 2px 4px rgba(0,0,0,0.05)',
+                                border: '1px dashed',
+                                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
                                 transition: 'all 0.2s ease',
                                 cursor: 'pointer',
                                 height: '63px',
-                                border: '1px solid',
-                                borderColor: isDark 
-                                  ? 'rgba(255, 255, 255, 0.1)' 
-                                  : 'rgba(0, 0, 0, 0.08)',
-                                mx: 1,
                                 '&:hover': {
                                   transform: 'translateY(-2px)',
-                                  boxShadow: isDark 
-                                    ? '0 4px 8px rgba(0,0,0,0.4)' 
-                                    : '0 4px 8px rgba(0,0,0,0.1)',
                                   borderColor: 'primary.main',
-                                  bgcolor: isDark 
-                                    ? 'rgba(255, 255, 255, 0.05)' 
-                                    : '#fff'
+                                  bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(25, 118, 210, 0.05)'
                                 }
                               }}
                               onClick={() => handleOpenMobileEdit(transaction, globalIndex)}
@@ -1481,28 +1470,17 @@ export function IncomeTable({
                       <Card
                         sx={{
                           position: 'relative',
-                          bgcolor: isDark ? 'rgba(255, 255, 255, 0.03)' : '#fff',
+                          bgcolor: isDark ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.04)',
                           borderRadius: 2,
-                          boxShadow: isDark 
-                            ? '0 2px 4px rgba(0,0,0,0.2)' 
-                            : '0 2px 4px rgba(0,0,0,0.05)',
+                          border: '1px dashed',
+                          borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
                           transition: 'all 0.2s ease',
                           cursor: 'pointer',
                           height: '63px',
-                          border: '1px solid',
-                          borderColor: isDark 
-                            ? 'rgba(255, 255, 255, 0.1)' 
-                            : 'rgba(0, 0, 0, 0.08)',
-                          mx: 1,
                           '&:hover': {
                             transform: 'translateY(-2px)',
-                            boxShadow: isDark 
-                              ? '0 4px 8px rgba(0,0,0,0.4)' 
-                              : '0 4px 8px rgba(0,0,0,0.1)',
                             borderColor: 'primary.main',
-                            bgcolor: isDark 
-                              ? 'rgba(255, 255, 255, 0.05)' 
-                              : '#fff'
+                            bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(25, 118, 210, 0.05)'
                           }
                         }}
                         onClick={() => handleOpenMobileAdd(month)}
