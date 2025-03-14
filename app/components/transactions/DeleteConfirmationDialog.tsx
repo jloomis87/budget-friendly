@@ -1,8 +1,21 @@
 import React from 'react';
-import { 
-  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button 
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
+  Box
 } from '@mui/material';
-import type { DeleteConfirmationDialogProps } from './types';
+import type { Transaction } from '../../services/fileParser';
+
+interface DeleteConfirmationDialogProps {
+  open: boolean;
+  transactionToDelete: { transaction: Transaction; index: number } | null;
+  onClose: () => void;
+  onConfirm: () => void;
+}
 
 export function DeleteConfirmationDialog({
   open,
@@ -10,31 +23,64 @@ export function DeleteConfirmationDialog({
   onClose,
   onConfirm
 }: DeleteConfirmationDialogProps) {
+  const isDark = true; // TODO: Get from theme context
+
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      aria-labelledby="delete-transaction-dialog-title"
-      aria-describedby="delete-transaction-dialog-description"
+      PaperProps={{
+        sx: {
+          borderRadius: 2,
+          bgcolor: isDark ? 'rgba(30, 30, 30, 0.9)' : 'background.paper',
+          color: isDark ? '#fff' : 'inherit',
+        }
+      }}
     >
-      <DialogTitle id="delete-transaction-dialog-title">
-        Confirm Deletion
+      <DialogTitle sx={{ pb: 1, fontWeight: 'bold' }}>
+        Confirm Delete
       </DialogTitle>
-      <DialogContent>
-        <DialogContentText id="delete-transaction-dialog-description">
-          Are you sure you want to delete the transaction "{transactionToDelete?.transaction.description}"
-          for {new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-          }).format(transactionToDelete?.transaction.amount || 0)}?
-          This action cannot be undone.
-        </DialogContentText>
+      <DialogContent sx={{ pt: 1 }}>
+        <Typography>
+          Are you sure you want to delete this {transactionToDelete?.transaction.category.toLowerCase()}?
+        </Typography>
+        {transactionToDelete && (
+          <Box sx={{ mt: 2, bgcolor: 'rgba(0,0,0,0.05)', p: 2, borderRadius: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {transactionToDelete.transaction.description}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+              ${Math.abs(transactionToDelete.transaction.amount).toFixed(2)}
+            </Typography>
+          </Box>
+        )}
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} color="primary">
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button 
+          onClick={onClose} 
+          color="primary" 
+          sx={{ 
+            bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+            color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
+            '&:hover': {
+              bgcolor: isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+            }
+          }}
+        >
           Cancel
         </Button>
-        <Button onClick={onConfirm} color="error" autoFocus>
+        <Button 
+          onClick={onConfirm} 
+          color="error" 
+          variant="contained"
+          sx={{ 
+            bgcolor: 'error.main', 
+            color: '#fff',
+            '&:hover': {
+              bgcolor: 'error.dark',
+            } 
+          }}
+        >
           Delete
         </Button>
       </DialogActions>
