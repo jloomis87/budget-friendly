@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Paper, useMediaQuery, useTheme, Typography } from '@mui/material';
+import { Box, Paper, useMediaQuery, useTheme, Typography, Grid, Stack, Card, CardContent, IconButton, Tooltip } from '@mui/material';
+import { Add as AddIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material';
 import { isColorDark } from '../../utils/colorUtils';
 import { useTableColors } from '../../hooks/useTableColors';
 import { useTransactionUtils } from './useTransactionUtils';
@@ -12,6 +13,92 @@ import { MobileAddDialog } from './MobileAddDialog';
 import type { Transaction } from '../../services/fileParser';
 import type { EnhancedTransactionTableProps, EditingRow } from './types';
 import { CategoryColorPicker } from '../CategoryColorPicker';
+import { v4 as uuidv4 } from 'uuid';
+import { CopyMonthConfirmationDialog } from './CopyMonthConfirmationDialog';
+
+// Helper function to format date for display
+const formatDate = (date: string | number | Date) => {
+  // If it's just a day number, use current month/year
+  if (typeof date === 'number') {
+    const now = new Date();
+    const fullDate = new Date(now.getFullYear(), now.getMonth(), date);
+    return fullDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+  
+  // If it's a Date object
+  if (date instanceof Date) {
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+  
+  // If it's a string in YYYY-MM-DD format
+  if (typeof date === 'string' && date.includes('-')) {
+    const [year, month, day] = date.split('-').map(Number);
+    const fullDate = new Date(year, month - 1, day);  // month is 0-based in Date constructor
+    return fullDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+  
+  // For any other string format
+  return new Date(date).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+// Helper function to group transactions by month
+const groupTransactionsByMonth = (transactions: Transaction[]) => {
+  const grouped: Record<string, Transaction[]> = {};
+  
+  transactions.forEach(transaction => {
+    let date: Date;
+    
+    // If transaction.date is a number (day of month), use current month
+    if (typeof transaction.date === 'number') {
+      date = new Date();
+      date.setDate(transaction.date);
+    } else if (typeof transaction.date === 'string' && transaction.date.includes('-')) {
+      // If it's a YYYY-MM-DD format string
+      const [year, month, day] = transaction.date.split('-').map(Number);
+      date = new Date(year, month - 1, day);
+    } else {
+      // If it's any other format
+      date = new Date(transaction.date);
+    }
+    
+    const month = date.toLocaleString('default', { month: 'long' });
+    
+    if (!grouped[month]) {
+      grouped[month] = [];
+    }
+    grouped[month].push(transaction);
+  });
+  
+  // Sort transactions within each month by date
+  Object.values(grouped).forEach(monthTransactions => {
+    monthTransactions.sort((a, b) => {
+      const getDate = (d: string | number) => {
+        if (typeof d === 'number') return d;
+        if (typeof d === 'string' && d.includes('-')) {
+          const [, , day] = d.split('-').map(Number);
+          return day;
+        }
+        return new Date(d).getDate();
+      };
+      
+      return getDate(a.date) - getDate(b.date);
+    });
+  });
+  
+  return grouped;
+};
 
 export function EnhancedTransactionTable({
   category,
@@ -25,7 +112,8 @@ export function EnhancedTransactionTable({
   onDrop,
   dragOverCategory,
   recentlyDropped,
-  onReorder
+  onReorder,
+  selectedMonths
 }: EnhancedTransactionTableProps) {
   const [editingRow, setEditingRow] = useState<EditingRow | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -48,8 +136,72 @@ export function EnhancedTransactionTable({
   // Mobile add dialog state
   const [mobileAddDialogOpen, setMobileAddDialogOpen] = useState(false);
 
+  // Add new state for copy month dialog
+  const [copyMonthDialogOpen, setCopyMonthDialogOpen] = useState(false);
+  const [copySourceMonth, setCopySourceMonth] = useState('');
+  const [copyTargetMonth, setCopyTargetMonth] = useState('');
+  const [copyTransactions, setCopyTransactions] = useState<Transaction[]>([]);
+
   const [tableColors] = useTableColors();
   const utils = useTransactionUtils();
+
+  // Get months that have no transactions
+  const monthsWithoutTransactions = React.useMemo(() => {
+    const allMonths = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    // If no months are selected, show all months
+    if (!selectedMonths?.length) {
+      return allMonths.filter(month => {
+        return !transactions.some(transaction => {
+          const transactionDate = new Date(transaction.date);
+          const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+          return transactionMonth === month;
+        });
+      });
+    }
+    
+    // Otherwise, show all selected months that don't have transactions
+    return allMonths.filter(month => {
+      const hasNoTransactions = !transactions.some(transaction => {
+        const transactionDate = new Date(transaction.date);
+        const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+        return transactionMonth === month;
+      });
+      return selectedMonths.includes(month) && hasNoTransactions;
+    });
+  }, [transactions, selectedMonths]);
+
+  // Filter transactions by selected months
+  const filteredTransactions = React.useMemo(() => {
+    const allMonths = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    if (!selectedMonths?.length) {
+      // If no months selected, show all transactions
+      return transactions;
+    }
+    
+    // Filter transactions for selected months
+    return transactions.filter(transaction => {
+      const transactionDate = new Date(transaction.date);
+      const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+      return selectedMonths.includes(transactionMonth);
+    });
+  }, [transactions, selectedMonths]);
+
+  // Helper function to get month order for sorting
+  const getMonthOrder = (month: string): number => {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months.indexOf(month);
+  };
 
   // Check if the table has a custom color and if it's dark
   const hasCustomColor = tableColors[category] !== '#f5f5f5';
@@ -82,15 +234,12 @@ export function EnhancedTransactionTable({
         updates.amount = signedAmount;
       }
       
-      // Update date if changed - now storing day of month as a number
+      // Update date if changed - now storing full date string
       if (editingRow.date) {
         try {
-          // Convert the day string to a number
-          const day = parseInt(editingRow.date, 10);
-          if (!isNaN(day) && day >= 1 && day <= 31) {
-            updates.date = day;
-            console.log('Updating date to day number:', day);
-          }
+          // Store the full date string
+          updates.date = editingRow.date;
+          console.log('Updating date to:', editingRow.date);
         } catch (e) {
           // Invalid date, ignore
           console.error('Error parsing date:', e);
@@ -125,31 +274,23 @@ export function EnhancedTransactionTable({
 
   // Handle adding a new transaction
   const handleAddTransaction = () => {
-    // Validate inputs
-    if (!newDescription.trim()) {
-      return; // Description is required
-    }
-    
-    const parsedAmount = parseFloat(newAmount.replace(/[^0-9.]/g, ''));
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      return; // Valid amount is required
-    }
-    
-    // Create transaction object
-    const newTransaction: Transaction = {
+    if (!newDescription.trim() || !newAmount.trim()) return;
+
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];  // Get YYYY-MM-DD format
+
+    const transaction: Transaction = {
       description: newDescription.trim(),
-      amount: -parsedAmount, // Expense is always negative
-      date: parseInt(newDate, 10), // Store as day number
-      category: category as "Essentials" | "Wants" | "Savings" | "Income"
+      amount: -parseFloat(newAmount.replace(/[^0-9.]/g, '')),
+      date: dateStr,
+      category: category as "Essentials" | "Wants" | "Savings" | "Income",
+      id: uuidv4(),
     };
-    
-    // Add transaction
-    onAddTransaction(newTransaction);
-    
-    // Reset form
+
+    onAddTransaction(transaction);
     setNewDescription('');
     setNewAmount('');
-    setNewDate('1'); // Default to day 1
+    setNewDate('1');
     setIsAdding(false);
   };
 
@@ -292,11 +433,9 @@ export function EnhancedTransactionTable({
   // Handle saving mobile edit
   const handleSaveMobileEdit = () => {
     if (mobileEditTransaction && editingRow) {
-      const day = parseInt(editingRow.date, 10);
-      
       const updatedTransaction: Partial<Transaction> = {
         description: editingRow.description,
-        date: day, // Store as day number
+        date: editingRow.date, // Store full date string
         amount: parseFloat(editingRow.amount) * (category === 'Income' ? 1 : -1)
       };
       
@@ -317,10 +456,16 @@ export function EnhancedTransactionTable({
   };
 
   // Handle opening mobile add dialog
-  const handleOpenMobileAdd = () => {
+  const handleOpenMobileAdd = (month: string) => {
+    // Get the current month from the clicked column
+    const currentYear = new Date().getFullYear();
+    const monthIndex = new Date(`${month} 1`).getMonth(); // Get month index (0-11)
+    const firstOfMonth = new Date(currentYear, monthIndex, 1);
+    const newDateValue = firstOfMonth.toISOString().split('T')[0];
+
     setNewDescription('');
     setNewAmount('');
-    setNewDate('1');
+    setNewDate(newDateValue);
     setMobileAddDialogOpen(true);
   };
   
@@ -334,102 +479,347 @@ export function EnhancedTransactionTable({
   
   // Handle adding transaction from mobile dialog
   const handleAddTransactionMobile = () => {
-    // Validate inputs
-    if (!newDescription.trim()) {
-      // Show error or alert
-      return;
-    }
-    
-    const amountValue = parseFloat(newAmount);
-    if (isNaN(amountValue) || amountValue <= 0) {
-      // Show error or alert
-      return;
-    }
-    
-    // Create new transaction
-    const newTransaction: Transaction = {
+    if (!newDescription.trim() || !newAmount.trim()) return;
+
+    const transaction: Transaction = {
       description: newDescription.trim(),
-      amount: -Math.abs(amountValue), // Negative for expenses
-      date: parseInt(newDate, 10), // Store as day number
-      category: category as "Essentials" | "Wants" | "Savings" | "Income"
+      amount: -parseFloat(newAmount.replace(/[^0-9.]/g, '')),
+      date: newDate, // Use the full date string from the date picker
+      category: category as "Essentials" | "Wants" | "Savings" | "Income",
+      id: uuidv4(),
     };
-    
-    // Add transaction
-    onAddTransaction(newTransaction);
-    
-    // Close dialog and reset form
-    handleCloseMobileAdd();
+
+    onAddTransaction(transaction);
+    setNewDescription('');
+    setNewAmount('');
+    setNewDate('');
+    setMobileAddDialogOpen(false);
+  };
+
+  // Helper function to get the next month
+  const getNextMonth = (currentMonth: string): string => {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const currentIndex = months.indexOf(currentMonth);
+    return months[(currentIndex + 1) % 12];
+  };
+
+  // Handle opening copy month dialog
+  const handleCopyMonthClick = (month: string, transactions: Transaction[]) => {
+    const nextMonth = getNextMonth(month);
+    setCopySourceMonth(month);
+    setCopyTargetMonth(nextMonth);
+    setCopyTransactions(transactions);
+    setCopyMonthDialogOpen(true);
+  };
+
+  // Handle confirming copy month
+  const handleCopyMonthConfirm = () => {
+    // Get the month numbers for source and target
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const targetMonthIndex = months.indexOf(copyTargetMonth);
+
+    // Copy each transaction with updated date
+    copyTransactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      // Create new date with same day but target month
+      const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
+      
+      const newTransaction: Transaction = {
+        ...transaction,
+        id: uuidv4(), // Generate new ID for the copy
+        date: newDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        // Preserve the sign based on category
+        amount: category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount)
+      };
+
+      onAddTransaction(newTransaction);
+    });
+
+    setCopyMonthDialogOpen(false);
   };
 
   return (
-    <>
-      <Box 
-        sx={{ mt: 3, mb: 3 }}
+    <Box sx={{ mt: 1, mb: 1 }}>
+      <Paper 
+        elevation={1} 
+        sx={{ 
+          mb: 1,
+          borderRadius: 2,
+          overflow: 'hidden',
+          ...getBackgroundStyles(),
+          transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.3s'
+        }}
+        className={`drag-target ${dragOverCategory === category ? 'drag-target-hover' : ''}`}
+        onDragOver={(e) => onDragOver && onDragOver(e, category)}
+        onDrop={(e) => onDrop && onDrop(e, category)}
+        onDragLeave={() => {}}
       >
-        <Paper 
-          elevation={1} 
-          sx={{ 
-            mb: 3, 
-            borderRadius: 2,
-            overflow: 'hidden',
-            ...getBackgroundStyles(),
-            transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.3s'
-          }}
-          className={`drag-target ${dragOverCategory === category ? 'drag-target-hover' : ''}`}
-          onDragOver={(e) => onDragOver(e, category)}
-          onDrop={(e) => onDrop(e, category)}
-          onDragLeave={() => {}}
-        >
+        <Box sx={{ 
+          p: 1,
+          borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+          pb: 1,
+          mb: 0.5
+        }}>
           <Box sx={{ 
             display: 'flex', 
             justifyContent: 'space-between',
-            alignItems: 'center',
-            p: 2,
-            borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
-            pb: 2,
-            mb: 1
+            alignItems: 'center'
           }}>
-            <Typography variant="h6" sx={{
+            <Typography variant="h6" sx={{ 
               fontWeight: 'bold',
-              color: isDark ? '#fff' : 'inherit',
+              color: tableColors[category] && isColorDark(tableColors[category]) 
+                ? 'rgba(255, 255, 255, 0.9)' 
+                : 'rgba(0, 0, 0, 0.9)',
               fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-              letterSpacing: '0.01em'
+              letterSpacing: '0.01em',
             }}>
               {category}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography 
                 component="span" 
-                variant="subtitle1"
+                variant="subtitle1" 
                 sx={{ 
                   fontWeight: 500, 
-                  color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
+                  color: tableColors[category] && isColorDark(tableColors[category])
+                    ? 'rgba(255, 255, 255, 0.7)'
+                    : 'rgba(0, 0, 0, 0.7)',
                   fontSize: '0.9rem'
                 }}
               >
-                (Total: ${totalAmount.toFixed(2)})
+                (Total: ${Math.abs(totalAmount).toFixed(2)})
               </Typography>
               <CategoryColorPicker category={category} />
             </Box>
           </Box>
-          
-          {/* Always use the mobile view regardless of screen size */}
-          <MobileTransactionList
-            category={category}
-            transactions={[...transactions].sort((a, b) => (a.order || 0) - (b.order || 0))}
-            isDark={isDark}
-            isAdding={isAdding}
-            handleOpenMobileEdit={handleOpenMobileEdit}
-            handleOpenMobileAdd={handleOpenMobileAdd}
-            setIsAdding={setIsAdding}
-            formatDateForDisplay={utils.formatDateForDisplay}
-            onDragStart={onDragStart}
-            allTransactions={allTransactions}
-            findGlobalIndex={(transaction, allTrans) => utils.findGlobalIndex(transaction, allTrans)}
-            onReorder={onReorder}
-          />
-        </Paper>
-      </Box>
+        </Box>
+
+        <Box sx={{ p: 1 }}>
+          <Grid 
+            container 
+            spacing={1} 
+            sx={{ 
+              flexWrap: 'nowrap', 
+              overflowX: 'auto',
+              '&::-webkit-scrollbar': { height: 6 },
+              '&::-webkit-scrollbar-track': { backgroundColor: 'rgba(0,0,0,0.1)' },
+              '&::-webkit-scrollbar-thumb': { 
+                backgroundColor: 'rgba(0,0,0,0.2)',
+                borderRadius: 3,
+                '&:hover': {
+                  backgroundColor: 'rgba(0,0,0,0.3)'
+                }
+              }
+            }}
+          >
+            {/* Group transactions by month */}
+            {(() => {
+              const groupedTransactions = groupTransactionsByMonth(filteredTransactions);
+              const allMonths = [
+                'January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'
+              ];
+              
+              // If no months are selected, show all months
+              const monthsToShow = !selectedMonths?.length ? allMonths : selectedMonths;
+              
+              // Create array of months with their transactions (empty array if no transactions)
+              return monthsToShow
+                .map(month => [month, groupedTransactions[month] || [] as Transaction[]])
+                .sort(([monthA], [monthB]) => getMonthOrder(monthA as string) - getMonthOrder(monthB as string))
+                .map(([month, monthTransactions]) => (
+                  <Grid 
+                    item 
+                    key={month} 
+                    sx={{ 
+                      width: `${100 / monthsToShow.length}%`,
+                      minWidth: '200px',
+                      p: 1
+                    }}
+                  >
+                    {/* Month Header with Copy Button */}
+                    <Box sx={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      mb: 0.5,
+                      borderBottom: 1,
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'divider',
+                      pb: 0.5,
+                      width: '100%',
+                      minHeight: '32px' // Ensure minimum height for the header
+                    }}>
+                      <Typography
+                        variant="subtitle1"
+                        sx={{
+                          fontWeight: 500,
+                          color: tableColors[category] && isColorDark(tableColors[category]) 
+                            ? 'rgba(255, 255, 255, 0.9)' 
+                            : 'rgba(0, 0, 0, 0.9)',
+                          flex: '1 1 auto' // Allow text to shrink if needed
+                        }}
+                      >
+                        {month}
+                      </Typography>
+                      <Tooltip title={`Copy ${month} ${category} to ${getNextMonth(month as string)}`}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleCopyMonthClick(month as string, monthTransactions as Transaction[])}
+                          sx={{
+                            color: tableColors[category] && isColorDark(tableColors[category])
+                              ? 'rgba(255, 255, 255, 0.7)'
+                              : 'rgba(0, 0, 0, 0.54)',
+                            '&:hover': {
+                              color: tableColors[category] && isColorDark(tableColors[category])
+                                ? 'rgba(255, 255, 255, 0.9)'
+                                : 'rgba(0, 0, 0, 0.87)',
+                              backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                            },
+                            ml: 1,
+                            display: 'flex !important',
+                            visibility: 'visible !important',
+                            position: 'relative',
+                            zIndex: 10,
+                            padding: '4px',
+                            minWidth: '32px',
+                            minHeight: '32px',
+                            borderRadius: '4px',
+                            '&:active': {
+                              backgroundColor: 'rgba(0, 0, 0, 0.08)'
+                            }
+                          }}
+                        >
+                          <ContentCopyIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                    <Typography
+                      sx={{
+                        fontSize: {
+                          xs: '0.65rem',
+                          sm: '0.75rem',
+                          md: '0.85rem'
+                        },
+                        color: tableColors[category] && isColorDark(tableColors[category])
+                          ? 'rgba(255, 255, 255, 0.6)'
+                          : 'rgba(0, 0, 0, 0.6)',
+                        mb: 1,
+                        textAlign: 'left'
+                      }}
+                    >
+                      ${Math.abs((monthTransactions as Transaction[]).reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}
+                    </Typography>
+                    <Stack spacing={1}>
+                      {(monthTransactions as Transaction[]).map((transaction) => {
+                        const transactionId = utils.getTransactionId(transaction);
+                        const globalIndex = utils.findGlobalIndex(transaction, allTransactions);
+                        const isEditing = editingRow?.identifier === transactionId;
+
+                        return (
+                          <Card
+                            key={transactionId}
+                            sx={{
+                              bgcolor: isDark ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.04)',
+                              borderRadius: 2,
+                              border: '1px dashed',
+                              borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                              transition: 'all 0.2s ease',
+                              cursor: 'pointer',
+                              height: '63px',
+                              '&:hover': {
+                                transform: 'translateY(-2px)',
+                                borderColor: 'primary.main',
+                                bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(25, 118, 210, 0.05)'
+                              }
+                            }}
+                            onClick={() => !isEditing && handleOpenMobileEdit(transaction, globalIndex)}
+                            draggable={!isEditing}
+                            onDragStart={(e) => onDragStart && onDragStart(e, transaction, globalIndex)}
+                          >
+                            <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Box>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                                      fontSize: '0.875rem'
+                                    }}
+                                  >
+                                    {transaction.description}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)',
+                                      fontSize: '0.75rem'
+                                    }}
+                                  >
+                                    {formatDate(transaction.date)}
+                                  </Typography>
+                                </Box>
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    fontWeight: 500,
+                                    color: isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)',
+                                    fontSize: '0.875rem'
+                                  }}
+                                >
+                                  ${Math.abs(transaction.amount).toFixed(2)}
+                                </Typography>
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                      {/* Add Transaction Card */}
+                      <Card
+                        sx={{
+                          position: 'relative',
+                          bgcolor: isDark ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.04)',
+                          borderRadius: 2,
+                          border: '1px dashed',
+                          borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                          transition: 'all 0.2s ease',
+                          cursor: 'pointer',
+                          height: '63px',
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            borderColor: 'primary.main',
+                            bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(25, 118, 210, 0.05)'
+                          }
+                        }}
+                        onClick={() => handleOpenMobileAdd(month as string)}
+                      >
+                        <CardContent sx={{ 
+                          p: 1, 
+                          '&:last-child': { pb: 1 },
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          height: '100%'
+                        }}>
+                          <AddIcon sx={{ 
+                            color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)',
+                            fontSize: '1.5rem'
+                          }} />
+                        </CardContent>
+                      </Card>
+                    </Stack>
+                  </Grid>
+                ))
+            })()}
+          </Grid>
+        </Box>
+      </Paper>
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
@@ -447,34 +837,16 @@ export function EnhancedTransactionTable({
         onClose={handleCloseMobileEdit}
         onSave={handleSaveMobileEdit}
         onDelete={() => {
-          if (mobileEditTransaction && allTransactions) {
-            console.log('Delete button clicked for transaction:', {
-              description: mobileEditTransaction.transaction.description,
-              amount: mobileEditTransaction.transaction.amount,
-              category: mobileEditTransaction.transaction.category,
-              localIndex: mobileEditTransaction.index
-            });
-            
-            // Use findGlobalIndex to get the correct global index
-            const globalIndex = utils.findGlobalIndex(mobileEditTransaction.transaction, allTransactions);
-            console.log(`Found global index: ${globalIndex}`);
-            
-            if (globalIndex === -1) {
-              console.error('Could not find transaction to delete in global array');
-              alert('Error: Could not find the transaction to delete. Please try again.');
-              handleCloseMobileEdit();
-              return;
-            }
-            
-            setTransactionToDelete({
-              transaction: mobileEditTransaction.transaction,
-              index: globalIndex
-            });
-            setDeleteConfirmOpen(true);
-            handleCloseMobileEdit();
+          if (mobileEditTransaction) {
+            handleDeleteClick(new MouseEvent('click'), mobileEditTransaction.transaction, mobileEditTransaction.index);
+          }
+          handleCloseMobileEdit();
+        }}
+        handleEditingChange={(field, value) => {
+          if (editingRow) {
+            handleEditingChange(field, value);
           }
         }}
-        handleEditingChange={handleEditingChange}
         generateDayOptions={utils.generateDayOptions}
         getOrdinalSuffix={utils.getOrdinalSuffix}
         tableColor={tableColors[category]}
@@ -484,20 +856,31 @@ export function EnhancedTransactionTable({
       {/* Mobile add dialog */}
       <MobileAddDialog
         open={mobileAddDialogOpen}
-        category={category}
+        onClose={handleCloseMobileAdd}
+        onAdd={handleAddTransactionMobile}
         newDescription={newDescription}
         newAmount={newAmount}
         newDate={newDate}
         setNewDescription={setNewDescription}
         setNewAmount={setNewAmount}
         setNewDate={setNewDate}
-        onClose={handleCloseMobileAdd}
-        onAdd={handleAddTransactionMobile}
         generateDayOptions={utils.generateDayOptions}
         getOrdinalSuffix={utils.getOrdinalSuffix}
-        tableColor={tableColors[category]}
         isDark={isDark}
+        category={category}
+        tableColor={tableColors[category]}
       />
-    </>
+
+      {/* Add CopyMonthConfirmationDialog */}
+      <CopyMonthConfirmationDialog
+        open={copyMonthDialogOpen}
+        onClose={() => setCopyMonthDialogOpen(false)}
+        onConfirm={handleCopyMonthConfirm}
+        sourceMonth={copySourceMonth}
+        targetMonth={copyTargetMonth}
+        category={category}
+        transactionCount={copyTransactions.length}
+      />
+    </Box>
   );
 } 

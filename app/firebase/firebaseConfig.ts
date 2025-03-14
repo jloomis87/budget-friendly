@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc, updateDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
@@ -19,4 +19,31 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Firestore and Auth
 export const db = getFirestore(app);
-export const auth = getAuth(app); 
+export const auth = getAuth(app);
+
+// Function to save user preferences
+export const saveUserPreferences = async (userId: string, preferences: { selectedMonths: string[] }) => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    await setDoc(userRef, { preferences }, { merge: true });
+    return true;
+  } catch (error) {
+    console.error('Error saving user preferences:', error);
+    return false;
+  }
+};
+
+// Function to get user preferences
+export const getUserPreferences = async (userId: string) => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    if (userDoc.exists()) {
+      return userDoc.data()?.preferences;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting user preferences:', error);
+    return null;
+  }
+}; 

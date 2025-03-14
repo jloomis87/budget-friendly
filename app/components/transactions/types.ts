@@ -21,6 +21,7 @@ export interface EnhancedTransactionTableProps {
   dragOverCategory: string | null;
   recentlyDropped: string | null;
   onReorder?: (category: string, sourceIndex: number, targetIndex: number) => void;
+  selectedMonths?: string[];
 }
 
 export interface TransactionUtilsHook {
@@ -132,7 +133,7 @@ export interface MobileEditDialogProps {
 
 export interface MobileAddDialogProps {
   open: boolean;
-  category: string;
+  category?: string;
   newDescription: string;
   newAmount: string;
   newDate: string;
@@ -141,8 +142,6 @@ export interface MobileAddDialogProps {
   setNewDate: (value: string) => void;
   onClose: () => void;
   onAdd: () => void;
-  generateDayOptions: () => number[];
-  getOrdinalSuffix: (day: number) => string;
-  tableColor: string;
-  isDark: boolean;
+  tableColor?: string;
+  isDark?: boolean;
 } 

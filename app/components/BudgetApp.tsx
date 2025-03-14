@@ -7,6 +7,7 @@ import { EditOutlinedIcon, SaveIcon, CloseIcon, DragIndicatorIcon, PaletteIcon, 
 import { HexColorPicker } from 'react-colorful';
 import { BudgetSummary } from './BudgetSummary';
 import type { Transaction } from '../services/fileParser';
+import type { User } from '../contexts/AuthContext';
 import {
   calculateBudgetSummary,
   create503020Plan,
@@ -22,6 +23,8 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { UserMenu } from './auth/UserMenu';
 import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
 import { ThemeProvider } from '../contexts/ThemeContext';
+import { MonthSelector } from './MonthSelector';
+import { saveUserPreferences, getUserPreferences } from '../firebase/firebaseConfig';
 
 // Add this interface for alert messages
 interface AlertMessage {
@@ -58,6 +61,34 @@ function BudgetAppContent() {
     index: number;
   } | null>(null);
   
+  // Get current month name for default selection
+  const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([currentMonth]);
+  
+  // Load user preferences from Firebase when component mounts or user changes
+  const { user } = useAuth();
+  useEffect(() => {
+    const loadUserPreferences = async () => {
+      if (user) {
+        const preferences = await getUserPreferences(user.id);
+        if (preferences?.selectedMonths) {
+          setSelectedMonths(preferences.selectedMonths);
+        }
+      }
+    };
+    loadUserPreferences();
+  }, [user]);
+
+  // Save selected months to Firebase whenever they change
+  useEffect(() => {
+    const saveMonths = async () => {
+      if (user) {
+        await saveUserPreferences(user.id, { selectedMonths });
+      }
+    };
+    saveMonths();
+  }, [selectedMonths, user]);
+  
   // Use the transactions hook to handle data and operations
   const {
     transactions,
@@ -93,7 +124,7 @@ function BudgetAppContent() {
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
   
   // Auth state
-  const { isAuthenticated, isLoading: authLoading, user, logout, login, signup, error } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user: authUser, logout, login, signup, error } = useAuth();
   const [activeAuthTab, setActiveAuthTab] = useState(0);
   
   // Login form state
@@ -391,6 +422,12 @@ function BudgetAppContent() {
         px: { xs: 1, sm: 2, md: 3 }, // Add responsive horizontal padding
         maxWidth: '100%', // Ensure content doesn't overflow
       }}>
+        {/* Month Selector Component */}
+        <MonthSelector 
+          selectedMonths={selectedMonths}
+          onChange={setSelectedMonths}
+        />
+        
         {/* Display Income Table */}
         <IncomeTable 
           transactions={transactions}
@@ -403,6 +440,7 @@ function BudgetAppContent() {
           dragOverCategory={dragOverCategory}
           recentlyDropped={recentlyDropped}
           onReorder={handleReorder}
+          selectedMonths={selectedMonths}
         />
         
         {/* Display transactions grouped by category */}
@@ -421,6 +459,7 @@ function BudgetAppContent() {
             dragOverCategory={dragOverCategory}
             recentlyDropped={recentlyDropped}
             onReorder={handleReorder}
+            selectedMonths={selectedMonths}
           />
         ))}
       </Box>
@@ -436,7 +475,8 @@ function BudgetAppContent() {
     handleDrop, 
     dragOverCategory, 
     recentlyDropped,
-    handleReorder
+    handleReorder,
+    selectedMonths
   ]);
 
   // Memoize the budget summary component to prevent unnecessary re-renders

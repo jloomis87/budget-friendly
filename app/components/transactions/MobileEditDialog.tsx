@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Stack, TextField, 
-  Box, IconButton, FormControl, InputLabel, Select, MenuItem, Paper
+  Box, IconButton, FormControl, InputLabel, Paper
 } from '@mui/material';
 import { DeleteIcon } from '../../utils/materialIcons';
 import type { MobileEditDialogProps } from './types';
@@ -20,6 +20,41 @@ export function MobileEditDialog({
   tableColor,
   isDark
 }: MobileEditDialogProps) {
+  // Function to handle date change from the native date input
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.value && handleEditingChange) {
+      // Create a date that preserves the local date exactly as selected
+      const [year, month, day] = e.target.value.split('-').map(Number);
+      const date = new Date(year, month - 1, day);  // month is 0-based in Date constructor
+      const dateString = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      handleEditingChange('date', dateString);
+    }
+  };
+
+  // Function to get the current date string for the date input
+  const getCurrentDate = () => {
+    if (!editingRow?.date) {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+    
+    // If the date is just a day number, convert it to a full date
+    if (!isNaN(Number(editingRow.date))) {
+      const now = new Date();
+      const date = new Date(now.getFullYear(), now.getMonth(), Number(editingRow.date));
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+    
+    // If it's already a full date string, parse and format it consistently
+    if (editingRow.date.includes('-')) {
+      return editingRow.date;  // Already in YYYY-MM-DD format
+    }
+    
+    // For any other format, parse and reformat
+    const date = new Date(editingRow.date);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+
   return (
     <Dialog 
       open={open} 
@@ -101,22 +136,26 @@ export function MobileEditDialog({
                 fontSize: '0.875rem'
               }}
             >
-              Day of Month
+              Date
             </InputLabel>
-            <Select
-              value={editingRow?.date || '1'}
-              onChange={(e) => handleEditingChange('date', e.target.value)}
+            <TextField
+              type="date"
+              value={getCurrentDate()}
+              onChange={handleDateChange}
+              variant="outlined"
               fullWidth
-              sx={{
-                bgcolor: 'background.paper'
+              InputProps={{
+                sx: {
+                  bgcolor: 'background.paper',
+                  '& input': {
+                    color: isDark ? 'rgba(255, 255, 255, 0.87)' : 'inherit',
+                    '&::-webkit-calendar-picker-indicator': {
+                      filter: isDark ? 'invert(1)' : 'none'
+                    }
+                  }
+                }
               }}
-            >
-              {generateDayOptions().map(day => (
-                <MenuItem key={day} value={day.toString()}>
-                  {getOrdinalSuffix(day)}
-                </MenuItem>
-              ))}
-            </Select>
+            />
           </Box>
         </Box>
       </DialogContent>

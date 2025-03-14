@@ -30,11 +30,15 @@ import {
   FormControl,
   InputLabel
 } from '@mui/material';
+import { ContentCopy as ContentCopyIcon } from '@mui/icons-material';
+import type { InputLabelProps } from '@mui/material';
 import { DeleteIcon, SaveIcon, CloseIcon, AddIcon, EditOutlinedIcon, CheckCircleOutlineIcon, CancelOutlinedIcon, DragIndicatorIcon } from '../utils/materialIcons';
 import type { Transaction } from '../services/fileParser';
 import { useTableColors } from '../hooks/useTableColors';
 import { isColorDark } from '../utils/colorUtils';
 import { CategoryColorPicker } from './CategoryColorPicker';
+import { CopyMonthConfirmationDialog } from '../components/transactions/CopyMonthConfirmationDialog';
+import { v4 as uuidv4 } from 'uuid';
 
 interface IncomeTableProps {
   transactions: Transaction[];
@@ -47,6 +51,7 @@ interface IncomeTableProps {
   dragOverCategory?: string | null;
   recentlyDropped?: string | null;
   onReorder?: (category: string, sourceIndex: number, targetIndex: number) => void;
+  selectedMonths?: string[];
 }
 
 interface EditingRow {
@@ -67,7 +72,8 @@ export function IncomeTable({
   onDrop,
   dragOverCategory,
   recentlyDropped,
-  onReorder
+  onReorder,
+  selectedMonths
 }: IncomeTableProps) {
   // State for tracking if we're showing delete buttons (hover effect)
   // const [showDeleteButtons, setShowDeleteButtons] = useState(false);
@@ -92,6 +98,18 @@ export function IncomeTable({
     description?: string;
     amount?: string;
   }>({});
+
+  // Add these state variables at the top of the component with other state declarations
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const monthHeaderRef = React.useRef<HTMLDivElement>(null);
+
+  // Add these new state variables and handlers after other state declarations
+  const [copyMonthDialogOpen, setCopyMonthDialogOpen] = useState(false);
+  const [copySourceMonth, setCopySourceMonth] = useState('');
+  const [copyTargetMonth, setCopyTargetMonth] = useState('');
+  const [copyTransactions, setCopyTransactions] = useState<Transaction[]>([]);
 
   // Filter only income transactions and sort by order
   const incomeTransactions = transactions
@@ -235,13 +253,7 @@ export function IncomeTable({
       
       // Update date if changed
       if (editingRow.date) {
-        try {
-          // Fix for date offset issue - create date object without timezone conversion
-          const [year, month, day] = editingRow.date.split('-').map(Number);
-          updates.date = new Date(year, month - 1, day);
-        } catch (e) {
-          // Invalid date, ignore
-        }
+        updates.date = new Date(editingRow.date);
       }
       
       // Update description if changed
@@ -409,7 +421,7 @@ export function IncomeTable({
       ? transaction.date.toISOString().split('T')[0]
       : (typeof transaction.date === 'string' 
         ? new Date(transaction.date).toISOString().split('T')[0]
-        : '');
+        : new Date().toISOString().split('T')[0]);
     
     setEditingRow({
       index: findGlobalIndex(transaction),
@@ -457,11 +469,16 @@ export function IncomeTable({
   };
 
   // Handle opening mobile add dialog
-  const handleOpenMobileAdd = () => {
+  const handleOpenMobileAdd = (month: string) => {
+    // Set the date to the first of the selected month in the current year
+    const currentYear = new Date().getFullYear();
+    const monthIndex = new Date(`${month} 1`).getMonth(); // Get month index (0-11)
+    const firstOfMonth = new Date(currentYear, monthIndex, 1);
+    const newDateValue = firstOfMonth.toISOString().split('T')[0];
+    
     setNewDescription('');
     setNewAmount('');
-    setNewDate(new Date().toISOString().split('T')[0]);
-    setFormErrors({});
+    setNewDate(newDateValue);
     setMobileAddDialogOpen(true);
   };
   
@@ -498,11 +515,12 @@ export function IncomeTable({
       return;
     }
     
-    // Create new transaction
+    // Create new transaction with proper date handling
+    const [year, month, day] = newDate.split('-').map(Number);
     const newTransaction: Transaction = {
       description: newDescription.trim(),
       amount: Math.abs(amountValue), // Positive for income
-      date: new Date(newDate),
+      date: new Date(year, month - 1, day), // Adjust month (0-based) and ensure local date
       category: 'Income'
     };
     
@@ -651,6 +669,114 @@ export function IncomeTable({
   const handleInternalDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
+  };
+
+  // Filter transactions by selected months
+  const filteredTransactions = React.useMemo(() => {
+    return incomeTransactions.filter(transaction => {
+      const transactionDate = new Date(transaction.date);
+      const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+      return selectedMonths?.includes(transactionMonth);
+    });
+  }, [incomeTransactions, selectedMonths]);
+
+  // Get months that have no income transactions
+  const monthsWithoutIncome = React.useMemo(() => {
+    if (!selectedMonths) return [];
+    
+    return selectedMonths.filter(month => {
+      return !incomeTransactions.some(transaction => {
+        const transactionDate = new Date(transaction.date);
+        const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+        return transactionMonth === month;
+      });
+    });
+  }, [incomeTransactions, selectedMonths]);
+
+  // Handle clicking "Add Month Income" card
+  const handleAddMonthIncome = (month: string) => {
+    // Set the date to the first of the selected month in the current year
+    const currentYear = new Date().getFullYear();
+    const monthIndex = new Date(`${month} 1`).getMonth(); // Get month index (0-11)
+    const firstOfMonth = new Date(currentYear, monthIndex, 1);
+    const newDateValue = firstOfMonth.toISOString().split('T')[0];
+    setNewDate(newDateValue);
+    setMobileAddDialogOpen(true);
+  };
+
+  // Add this helper function before the IncomeTable component
+  const getMonthOrder = (month: string): number => {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months.indexOf(month);
+  };
+
+  // Add these handlers before the return statement
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!monthHeaderRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - monthHeaderRef.current.offsetLeft);
+    setScrollLeft(monthHeaderRef.current.scrollLeft);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !monthHeaderRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - monthHeaderRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    monthHeaderRef.current.scrollLeft = scrollLeft - walk;
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  // Add these helper functions before the return statement
+  const getNextMonth = (currentMonth: string): string => {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const currentIndex = months.indexOf(currentMonth);
+    return months[(currentIndex + 1) % 12];
+  };
+
+  const handleCopyMonthClick = (month: string, transactions: Transaction[]) => {
+    const nextMonth = getNextMonth(month);
+    setCopySourceMonth(month);
+    setCopyTargetMonth(nextMonth);
+    setCopyTransactions(transactions);
+    setCopyMonthDialogOpen(true);
+  };
+
+  const handleCopyMonthConfirm = () => {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const targetMonthIndex = months.indexOf(copyTargetMonth);
+
+    copyTransactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
+      
+      const newTransaction: Transaction = {
+        ...transaction,
+        id: uuidv4(),
+        date: newDate,
+        amount: Math.abs(transaction.amount) // Income is always positive
+      };
+
+      onAddTransaction(newTransaction);
+    });
+
+    setCopyMonthDialogOpen(false);
   };
 
   if (incomeTransactions.length === 0 && !isAdding) {
@@ -864,8 +990,11 @@ export function IncomeTable({
                 <Typography 
                   sx={{ 
                     fontWeight: 500,
-                    fontSize: '0.9rem',
-                    letterSpacing: '0.01em',
+                    fontSize: {
+                      xs: '0.7rem',   // Smaller screens
+                      sm: '0.75rem',  // Small screens
+                      md: '0.85rem'   // Medium and up
+                    },
                   }}
                 >
                   Add Income
@@ -916,7 +1045,7 @@ export function IncomeTable({
                   sx: {
                     color: isDark ? '#fff' : undefined,
                     '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : undefined,
                     },
                     '&:hover .MuiOutlinedInput-notchedOutline': {
                       borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
@@ -939,7 +1068,7 @@ export function IncomeTable({
                   sx: {
                     color: isDark ? '#fff' : undefined,
                     '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : undefined,
                     },
                     '&:hover .MuiOutlinedInput-notchedOutline': {
                       borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
@@ -964,20 +1093,20 @@ export function IncomeTable({
                 InputLabelProps={{
                   shrink: true,
                   sx: {
-                    color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
+                    color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined
                   }
                 }}
                 InputProps={{
                   sx: {
                     color: isDark ? '#fff' : undefined,
                     '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : undefined,
                     },
                     '&:hover .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : undefined,
                     },
                     '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                      borderColor: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.5)' : undefined,
                     }
                   }
                 }}
@@ -1020,13 +1149,20 @@ export function IncomeTable({
   }
 
   return (
-    <Box sx={{ mt: 3, mb: 3 }}>
+    <Box sx={{ 
+      mt: 1,
+      mb: 1,
+      width: '100%',
+      maxWidth: '100%',
+      overflowX: 'hidden'
+    }}>
       <Paper 
         elevation={1} 
         sx={{ 
-          mb: 3, 
+          mb: 1,
           borderRadius: 2,
           overflow: 'hidden',
+          width: '100%',
           ...getBackgroundStyles(),
           transition: 'transform 0.2s, box-shadow 0.2s, background-color 0.3s'
         }}
@@ -1035,193 +1171,321 @@ export function IncomeTable({
         onDrop={(e) => onDrop && onDrop(e, 'Income')}
         onDragLeave={() => {}}
       >
+        {/* Add Header Section */}
         <Box sx={{ 
           p: 2, 
-          borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
-          pb: 2,
-          mb: 1 // Added 5px margin below the border
+          display: 'flex', 
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderBottom: '1px solid',
+          borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'divider'
         }}>
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <Typography variant="h6" sx={{ 
+          <Typography 
+            variant="h6" 
+            sx={{ 
               fontWeight: 'bold',
               color: isDark ? '#fff' : 'inherit',
               fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
               letterSpacing: '0.01em',
-            }}>
-              Income
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography 
-                component="span" 
-                variant="subtitle1" 
-                sx={{ 
-                  fontWeight: 500, 
-                  color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
-                  fontSize: '0.9rem'
-                }}
-              >
-                (Total: ${totalIncome.toFixed(2)})
-              </Typography>
-              <CategoryColorPicker category="Income" />
-            </Box>
-          </Box>
-        </Box>
-        
-        {/* Empty state - No income and not adding */}
-        {incomeTransactions.length === 0 && !isAdding && (
-          <Box sx={{ 
-            p: 3, 
-            textAlign: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-          }}>
-            <Typography variant="body1" color={isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'}>
-              No income sources yet. Add your first income source below.
-            </Typography>
-          </Box>
-        )}
-        
-        {/* Income Transaction Items */}
-        {incomeTransactions.length > 0 && !isAdding && (
-          <>
-            {incomeTransactions.map((transaction, index) => {
-              const transactionId = getTransactionId(transaction);
-              const dateString = formatDateForDisplay(transaction.date);
-              const globalIndex = findGlobalIndex(transaction);
-              
-              // Create a custom drag handler for the income item
-              const handleDragStart = (e: React.DragEvent) => {
-                handleInternalDragStart(e, transaction, index, globalIndex);
-              };
-              
-              return (
-                <Box 
-                  key={transactionId}
-                  onClick={() => handleOpenMobileEdit(transaction, index)}
-                  draggable={true}
-                  onDragStart={handleDragStart}
-                  onDragOver={(e) => handleInternalDragOver(e, index)}
-                  onDrop={(e) => handleInternalDrop(e, index)}
-                  onDragEnd={handleInternalDragEnd}
-                  sx={{
-                    mx: '5px',
-                    mb: dragOverIndex === index ? '15px' : '5px',
-                    p: 2,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    position: 'relative',
-                    cursor: 'pointer',
-                    borderRadius: 2,
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.5)',
-                    '&:hover': {
-                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.7)',
-                      boxShadow: '0 3px 6px rgba(0,0,0,0.15)',
-                    },
-                    transform: dragOverIndex === index ? 'translateY(5px)' : 'none',
-                    opacity: draggedIndex === index ? 0.5 : 1,
-                    transition: 'transform 0.2s, opacity 0.2s, background-color 0.2s, box-shadow 0.2s',
-                    // Add blue line indicator when being dragged over
-                    '&::before': dragOverIndex === index ? {
-                      content: '""',
-                      position: 'absolute',
-                      left: 0,
-                      right: 0,
-                      top: '-4px', // Position the line 4px above the container
-                      height: '2px',
-                      backgroundColor: '#1976d2', // Material UI primary blue
-                      boxShadow: '0 0 4px rgba(25, 118, 210, 0.5)',
-                      zIndex: 2
-                    } : {}
-                  }}
-                >
-                  {/* Description and Amount on top line */}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography
-                      component="div"
-                      sx={{
-                        fontWeight: 500,
-                        fontSize: '1rem',
-                        color: isDark ? '#fff' : 'text.primary',
-                        textOverflow: 'ellipsis',
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap',
-                        maxWidth: '70%'
-                      }}
-                    >
-                      {transaction.description}
-                    </Typography>
-                    <Typography
-                      component="div"
-                      sx={{
-                        fontSize: '1.1rem',
-                        color: isDark ? '#fff' : 'text.primary',
-                        ml: 1
-                      }}
-                    >
-                      ${Math.abs(transaction.amount).toFixed(2)}
-                    </Typography>
-                  </Box>
-                  
-                  {/* Date on bottom line */}
-                  <Typography
-                    component="div"
-                    sx={{
-                      fontSize: '0.85rem',
-                      color: isDark ? 'rgba(255, 255, 255, 0.6)' : 'text.secondary',
-                    }}
-                  >
-                    {dateString}
-                  </Typography>
-
-                  {/* Centered "click to edit" text */}
-                  <Typography
-                    sx={{
-                      position: 'absolute',
-                      bottom: '4px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      color: isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
-                      fontSize: '0.7rem',
-                      pointerEvents: 'none'
-                    }}
-                  >
-                    (click to edit or drag to reorder)
-                  </Typography>
-                </Box>
-              );
-            })}
-          </>
-        )}
-
-        {/* Add Button */}
-        {!isAdding && (
-          <Box sx={{ 
-            p: 2, 
-            textAlign: 'center',
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-          }}>
-            <Button
-              variant="contained"
-              onClick={handleOpenMobileAdd}
-              sx={{
-                bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)',
-                borderRadius: 8,
-                py: 1,
-                px: 3,
-                '&:hover': {
-                  bgcolor: isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
-                }
+            }}
+          >
+            Income
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Typography 
+              variant="body1" 
+              sx={{ 
+                color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
+                fontWeight: 500
               }}
             >
-              <AddIcon sx={{ mr: 1 }} /> ADD INCOME SOURCE
-            </Button>
+              (Total: ${totalIncome.toFixed(2)})
+            </Typography>
+            <CategoryColorPicker category="Income" />
           </Box>
-        )}
+        </Box>
+        <Box sx={{ 
+          p: 1,
+          width: '100%',
+          maxWidth: '100%',
+          overflowX: 'hidden'
+        }}>
+          <Box 
+            ref={monthHeaderRef}
+            sx={{ 
+              width: '100%',
+              maxWidth: '100%',
+              overflowX: {
+                xs: 'auto',
+                '@media (min-width:1500px)': 'hidden'
+              },
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              '&::-webkit-scrollbar': {
+                display: 'none'
+              },
+              '& .month-header': {
+                cursor: isDragging ? 'grabbing' : 'grab',
+                userSelect: 'none'
+              }
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+          >
+            <Grid 
+              container 
+              spacing={1} 
+              sx={{ 
+                flexWrap: 'nowrap', 
+                overflowX: 'auto',
+                width: '100%',
+                maxWidth: '100%',
+                mx: 'auto'
+              }}
+            >
+              {selectedMonths?.sort((a, b) => getMonthOrder(a) - getMonthOrder(b)).map((month) => {
+                // Calculate total income for this month
+                const monthlyTotal = filteredTransactions
+                  .filter(transaction => {
+                    const transactionDate = new Date(transaction.date);
+                    const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+                    return transactionMonth === month;
+                  })
+                  .reduce((sum, transaction) => sum + transaction.amount, 0);
+
+                return (
+                  <Grid item key={month} sx={{ 
+                    flex: '0 0 auto',
+                    width: `${100 / (selectedMonths?.length || 1)}%`,
+                    minWidth: '200px',
+                    p: {
+                      xs: 1,
+                      '@media (min-width:1500px)': 0.5
+                    },
+                    '@media (min-width:1500px)': {
+                      '&:first-of-type': { pl: 1 },
+                      '&:last-of-type': { pr: 1 }
+                    }
+                  }}>
+                    <Typography
+                      className="month-header"
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: 600,
+                        mb: 1,
+                        color: tableColors['Income'] && isColorDark(tableColors['Income']) 
+                          ? 'rgba(255, 255, 255, 0.9)' 
+                          : 'rgba(0, 0, 0, 0.9)',
+                        borderBottom: 1,
+                        borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'divider',
+                        pb: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        px: 1
+                      }}
+                    >
+                      <span>{month}</span>
+                      <Tooltip title={`Copy ${month} Income to ${getNextMonth(month as string)}`}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleCopyMonthClick(
+                            month as string,
+                            filteredTransactions.filter(transaction => {
+                              const transactionDate = new Date(transaction.date);
+                              const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+                              return transactionMonth === month;
+                            })
+                          )}
+                          sx={{
+                            color: tableColors['Income'] && isColorDark(tableColors['Income'])
+                              ? 'rgba(255, 255, 255, 0.7)'
+                              : 'rgba(0, 0, 0, 0.54)',
+                            '&:hover': {
+                              color: tableColors['Income'] && isColorDark(tableColors['Income'])
+                                ? 'rgba(255, 255, 255, 0.9)'
+                                : 'rgba(0, 0, 0, 0.87)',
+                              backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                            },
+                            ml: 1,
+                            display: 'flex !important',
+                            visibility: 'visible !important',
+                            position: 'relative',
+                            zIndex: 10,
+                            padding: '4px',
+                            minWidth: '32px',
+                            minHeight: '32px',
+                            borderRadius: '4px',
+                            '&:active': {
+                              backgroundColor: 'rgba(0, 0, 0, 0.08)'
+                            }
+                          }}
+                        >
+                          <ContentCopyIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: {
+                          xs: '0.65rem',
+                          sm: '0.75rem',
+                          md: '0.85rem'
+                        },
+                        color: tableColors['Income'] && isColorDark(tableColors['Income'])
+                          ? 'rgba(255, 255, 255, 0.6)'
+                          : 'rgba(0, 0, 0, 0.6)',
+                        mb: 1,
+                        textAlign: 'left'
+                      }}
+                    >
+                      ${monthlyTotal.toFixed(2)}
+                    </Typography>
+                    <Stack spacing={1} sx={{ pb: 1 }}>
+                      {/* Render transactions for this month */}
+                      {filteredTransactions
+                        .filter(transaction => {
+                          const transactionDate = new Date(transaction.date);
+                          const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+                          return transactionMonth === month;
+                        })
+                        .sort((a, b) => new Date(a.date).getDate() - new Date(b.date).getDate())
+                        .map((transaction) => {
+                          const transactionId = getTransactionId(transaction);
+                          const dateString = formatDateForDisplay(transaction.date);
+                          const globalIndex = findGlobalIndex(transaction);
+                          
+                          return (
+                            <Card
+                              key={transactionId}
+                              sx={{
+                                bgcolor: isDark ? 'rgba(255, 255, 255, 0.03)' : '#fff',
+                                borderRadius: 2,
+                                boxShadow: isDark 
+                                  ? '0 2px 4px rgba(0,0,0,0.2)' 
+                                  : '0 2px 4px rgba(0,0,0,0.05)',
+                                transition: 'all 0.2s ease',
+                                cursor: 'pointer',
+                                height: '63px',
+                                border: '1px solid',
+                                borderColor: isDark 
+                                  ? 'rgba(255, 255, 255, 0.1)' 
+                                  : 'rgba(0, 0, 0, 0.08)',
+                                mx: 1,
+                                '&:hover': {
+                                  transform: 'translateY(-2px)',
+                                  boxShadow: isDark 
+                                    ? '0 4px 8px rgba(0,0,0,0.4)' 
+                                    : '0 4px 8px rgba(0,0,0,0.1)',
+                                  borderColor: 'primary.main',
+                                  bgcolor: isDark 
+                                    ? 'rgba(255, 255, 255, 0.05)' 
+                                    : '#fff'
+                                }
+                              }}
+                              onClick={() => handleOpenMobileEdit(transaction, globalIndex)}
+                            >
+                              <CardContent sx={{ 
+                                p: '8px 16px',
+                                '&:last-child': { pb: '8px' },
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                              }}>
+                                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 500,
+                                      color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                                      fontSize: '0.875rem',
+                                      lineHeight: '1.2'
+                                    }}
+                                  >
+                                    {transaction.description}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+                                      fontSize: '0.75rem',
+                                      mt: 0.5
+                                    }}
+                                  >
+                                    {dateString}
+                                  </Typography>
+                                </Box>
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    fontWeight: 600,
+                                    color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                                    fontSize: '0.875rem'
+                                  }}
+                                >
+                                  ${Math.abs(transaction.amount).toFixed(2)}
+                                </Typography>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      
+                      {/* Add "Add Month Income" card for all months */}
+                      <Card
+                        sx={{
+                          position: 'relative',
+                          bgcolor: isDark ? 'rgba(255, 255, 255, 0.03)' : '#fff',
+                          borderRadius: 2,
+                          boxShadow: isDark 
+                            ? '0 2px 4px rgba(0,0,0,0.2)' 
+                            : '0 2px 4px rgba(0,0,0,0.05)',
+                          transition: 'all 0.2s ease',
+                          cursor: 'pointer',
+                          height: '63px',
+                          border: '1px solid',
+                          borderColor: isDark 
+                            ? 'rgba(255, 255, 255, 0.1)' 
+                            : 'rgba(0, 0, 0, 0.08)',
+                          mx: 1,
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: isDark 
+                              ? '0 4px 8px rgba(0,0,0,0.4)' 
+                              : '0 4px 8px rgba(0,0,0,0.1)',
+                            borderColor: 'primary.main',
+                            bgcolor: isDark 
+                              ? 'rgba(255, 255, 255, 0.05)' 
+                              : '#fff'
+                          }
+                        }}
+                        onClick={() => handleOpenMobileAdd(month)}
+                      >
+                        <CardContent sx={{ 
+                          p: '8px 16px',
+                          '&:last-child': { pb: '8px' },
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          <AddIcon sx={{ 
+                            color: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+                            fontSize: '1.5rem'
+                          }} />
+                        </CardContent>
+                      </Card>
+                    </Stack>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          </Box>
+        </Box>
       </Paper>
 
       {/* Delete Confirmation Dialog */}
@@ -1358,34 +1622,22 @@ export function IncomeTable({
                 }}
               />
               
-              <FormControl fullWidth variant="outlined">
-                <InputLabel id="date-label" sx={{ 
-                  color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
-                }}>Day of Month</InputLabel>
-                <Select
-                  labelId="date-label"
-                  value={editingRow.date}
-                  onChange={(e) => handleEditingChange('date', e.target.value)}
-                  label="Day of Month"
-                  MenuProps={{
-                    PaperProps: {
-                      sx: {
-                        bgcolor: isDark ? 'rgba(30, 30, 30, 0.95)' : 'background.paper',
-                        color: isDark ? '#fff' : 'inherit',
-                        '& .MuiMenuItem-root': {
-                          color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.87)',
-                        },
-                        '& .MuiMenuItem-root:hover': {
-                          bgcolor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.04)',
-                        }
-                      }
-                    }
-                  }}
-                  sx={{
-                    '& .MuiSelect-select': {
-                      color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.87)',
-                      bgcolor: isDark ? 'rgba(255, 255, 255, 0.15)' : '#fff',
-                    },
+              <TextField
+                label="Date"
+                type="date"
+                value={editingRow.date}
+                onChange={(e) => handleEditingChange('date', e.target.value)}
+                fullWidth
+                variant="outlined"
+                InputLabelProps={{
+                  shrink: true,
+                  sx: {
+                    color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined
+                  }
+                }}
+                InputProps={{
+                  sx: {
+                    color: isDark ? '#fff' : undefined,
                     '& .MuiOutlinedInput-notchedOutline': {
                       borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : undefined,
                     },
@@ -1395,15 +1647,9 @@ export function IncomeTable({
                     '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
                       borderColor: isDark ? 'rgba(255, 255, 255, 0.5)' : undefined,
                     }
-                  }}
-                >
-                  {generateDayOptions().map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                  }
+                }}
+              />
             </Box>
           )}
         </DialogContent>
@@ -1519,7 +1765,7 @@ export function IncomeTable({
                 sx: {
                   color: isDark ? '#fff' : undefined,
                   '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : undefined,
                   },
                   '&:hover .MuiOutlinedInput-notchedOutline': {
                     borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
@@ -1542,7 +1788,7 @@ export function IncomeTable({
                 sx: {
                   color: isDark ? '#fff' : undefined,
                   '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : undefined,
                   },
                   '&:hover .MuiOutlinedInput-notchedOutline': {
                     borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
@@ -1567,20 +1813,20 @@ export function IncomeTable({
               InputLabelProps={{
                 shrink: true,
                 sx: {
-                  color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
+                  color: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined
                 }
               }}
               InputProps={{
                 sx: {
                   color: isDark ? '#fff' : undefined,
                   '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.23)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.2)' : undefined,
                   },
                   '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.4)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.3)' : undefined,
                   },
                   '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.7)' : undefined,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.5)' : undefined,
                   }
                 }
               }}
@@ -1618,6 +1864,17 @@ export function IncomeTable({
           </Box>
         </DialogActions>
       </Dialog>
+
+      {/* Copy Month Confirmation Dialog */}
+      <CopyMonthConfirmationDialog
+        open={copyMonthDialogOpen}
+        onClose={() => setCopyMonthDialogOpen(false)}
+        onConfirm={handleCopyMonthConfirm}
+        sourceMonth={copySourceMonth}
+        targetMonth={copyTargetMonth}
+        category="Income"
+        transactionCount={copyTransactions.length}
+      />
     </Box>
   );
 } 
