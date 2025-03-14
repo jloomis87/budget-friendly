@@ -1243,7 +1243,16 @@ export function IncomeTable({
                 overflowX: 'auto',
                 width: '100%',
                 maxWidth: '100%',
-                mx: 'auto'
+                mx: 'auto',
+                '&::-webkit-scrollbar': { height: 6 },
+                '&::-webkit-scrollbar-track': { backgroundColor: 'rgba(0,0,0,0.1)' },
+                '&::-webkit-scrollbar-thumb': { 
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                  borderRadius: 3,
+                  '&:hover': {
+                    backgroundColor: 'rgba(0,0,0,0.3)'
+                  }
+                }
               }}
             >
               {selectedMonths?.sort((a, b) => getMonthOrder(a) - getMonthOrder(b)).map((month) => {
