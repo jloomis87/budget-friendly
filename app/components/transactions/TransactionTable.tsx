@@ -203,6 +203,8 @@ export function TransactionTable({
   const [copySourceMonth, setCopySourceMonth] = useState('');
   const [copyTargetMonth, setCopyTargetMonth] = useState('');
   const [copyTransactions, setCopyTransactions] = useState<Transaction[]>([]);
+  // Add a force refresh counter
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   const [tableColors] = useTableColors();
   const utils = useTransactionUtils();
@@ -248,13 +250,14 @@ export function TransactionTable({
     }
   };
 
-  // Filter transactions by selected months
+  // Filter transactions by selected months - add refreshCounter as a dependency
   const filteredTransactions = React.useMemo(() => {
     // For debugging
     console.log(`Filtering transactions for ${category}:`, {
       totalTransactions: transactions.length,
       selectedMonths,
-      hasSelectedMonths: Boolean(selectedMonths?.length)
+      hasSelectedMonths: Boolean(selectedMonths?.length),
+      refreshCounter // Log the refresh counter for debugging
     });
     
     if (!selectedMonths?.length) {
@@ -287,7 +290,7 @@ export function TransactionTable({
     });
     
     return filtered;
-  }, [transactions, selectedMonths, category]);
+  }, [transactions, selectedMonths, category, refreshCounter]); // Add refreshCounter as a dependency
 
   // Calculate total amount
   const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
@@ -512,6 +515,18 @@ export function TransactionTable({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [isIntraMonthDrag, setIsIntraMonthDrag] = useState(false);
   
+  // Helper function to reset all drag state
+  const resetDragState = () => {
+    setIsIntraMonthDrag(false);
+    setDragOverIndex(null);
+    setIsDragging(false);
+    setDraggedTransaction(null);
+    setDraggedIndex(null);
+    setDragSourceMonth(null);
+    setDragOverMonth(null);
+    setIsCopyMode(false);
+  };
+  
   // Custom drag and drop handlers
   const handleTransactionDragStart = (e: React.DragEvent, transaction: Transaction, index: number, sourceMonth: string) => {
     // For debugging
@@ -572,19 +587,33 @@ export function TransactionTable({
     e.preventDefault();
     e.stopPropagation();
     
-    // Only handle if we're dragging within the same month
-    if (dragSourceMonth === targetMonth && draggedIndex !== null) {
-      setIsIntraMonthDrag(true);
-      setDragOverIndex(targetIndex);
-      e.dataTransfer.dropEffect = 'move';
+    // Set the drop effect based on whether Ctrl/Cmd is pressed
+    e.dataTransfer.dropEffect = isCopyMode ? 'copy' : 'move';
+    
+    // Update the drag over month
+    setDragOverMonth(targetMonth);
+    
+    // Check if we're dragging within the same month or to a different month
+    if (draggedIndex !== null) {
+      if (dragSourceMonth === targetMonth) {
+        // Intra-month drag (sorting within the same month)
+        setIsIntraMonthDrag(true);
+        setDragOverIndex(targetIndex);
+      } else {
+        // Inter-month drag (moving to a different month)
+        setIsIntraMonthDrag(false);
+        setDragOverIndex(targetIndex);
+      }
       
       // For debugging
-      if (dragOverIndex !== targetIndex) {
+      if (dragOverIndex !== targetIndex || dragOverMonth !== targetMonth) {
         console.log(`Dragging over ${category} transaction:`, {
           targetMonth,
           targetIndex,
           draggedIndex,
+          dragSourceMonth,
           category,
+          isIntraMonthDrag: dragSourceMonth === targetMonth,
           draggedTransaction: draggedTransaction ? {
             description: draggedTransaction.description,
             category: draggedTransaction.category || category,
@@ -607,103 +636,212 @@ export function TransactionTable({
       draggedIndex,
       dragSourceMonth,
       category,
-      isIntraMonthDrag
+      isIntraMonthDrag: dragSourceMonth === targetMonth
     });
     
-    // Only handle if we're dragging within the same month
-    if (dragSourceMonth === targetMonth && draggedIndex !== null && draggedIndex !== targetIndex) {
-      // Get the transactions for this month
-      const groupedTransactions = groupTransactionsByMonth(filteredTransactions);
-      const monthTransactions = [...(groupedTransactions[targetMonth] || [])];
+    // Ensure we have a dragged transaction
+    if (draggedIndex === null || !draggedTransaction || !dragSourceMonth) {
+      resetDragState();
+      return;
+    }
+    
+    // Get the transactions for the target month
+    const groupedTransactions = groupTransactionsByMonth(filteredTransactions);
+    const targetMonthTransactions = [...(groupedTransactions[targetMonth] || [])];
+    
+    // Handle intra-month drag (sorting within the same month)
+    if (dragSourceMonth === targetMonth && draggedIndex !== targetIndex) {
+      try {
+        const sourceTransaction = targetMonthTransactions[draggedIndex];
+        if (!sourceTransaction) {
+          throw new Error(`Source transaction not found at index ${draggedIndex}`);
+        }
+        
+        const sourceGlobalIndex = utils.findGlobalIndex(sourceTransaction, allTransactions);
+        const targetTransaction = targetMonthTransactions[targetIndex];
+        const targetGlobalIndex = targetTransaction 
+          ? utils.findGlobalIndex(targetTransaction, allTransactions)
+          : utils.findGlobalIndex(targetMonthTransactions[targetMonthTransactions.length - 1], allTransactions) + 1;
+        
+        if (sourceGlobalIndex !== -1 && targetGlobalIndex !== -1) {
+          if (onReorder) {
+            onReorder(category, sourceGlobalIndex, targetGlobalIndex);
+            // Force refresh after reordering
+            forceRefresh();
+          }
+          showNotification(`Reordered "${sourceTransaction.description}" within ${targetMonth}`, 'success');
+        }
+      } catch (error) {
+        console.error('Error during transaction reordering:', error);
+        showNotification(`Error reordering transaction: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      }
+    } 
+    // Handle inter-month drag (moving to a different month)
+    else if (dragSourceMonth !== targetMonth) {
+      const months = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
       
-      console.log(`Month transactions for ${targetMonth}:`, {
-        count: monthTransactions.length,
-        transactions: monthTransactions.map(t => ({ 
-          id: t.id, 
-          description: t.description,
-          category: t.category || category
-        }))
-      });
+      const targetMonthIndex = months.indexOf(targetMonth);
+      const currentDate = new Date(draggedTransaction.date);
+      const newDate = new Date(currentDate.getFullYear(), targetMonthIndex, currentDate.getDate());
       
-      if (onReorder && monthTransactions.length > 1) {
-        try {
-          // Ensure we have valid indices
-          if (draggedIndex < 0 || draggedIndex >= monthTransactions.length) {
-            throw new Error(`Invalid source index: ${draggedIndex} (max: ${monthTransactions.length - 1})`);
-          }
+      // Check for duplicates
+      const isDuplicate = targetMonthTransactions.some(transaction => 
+        transaction.description === draggedTransaction.description && 
+        Math.abs(transaction.amount) === Math.abs(draggedTransaction.amount)
+      );
+      
+      if (isDuplicate) {
+        showNotification(`Duplicate transaction "${draggedTransaction.description}" already exists in ${targetMonth}`, 'warning');
+      } else {
+        if (isCopyMode) {
+          // COPY MODE: Create a new transaction with the same details but a new ID
+          const newTransaction: Transaction = {
+            ...draggedTransaction,
+            id: uuidv4(), // Generate a new UUID
+            date: newDate,
+            order: targetIndex // Set the order explicitly to match the drop position
+          };
           
-          if (targetIndex < 0 || targetIndex >= monthTransactions.length) {
-            throw new Error(`Invalid target index: ${targetIndex} (max: ${monthTransactions.length - 1})`);
-          }
+          // Add the new transaction
+          onAddTransaction(newTransaction);
           
-          // Find the global indices of the transactions
-          const sourceTransaction = monthTransactions[draggedIndex];
-          if (!sourceTransaction) {
-            throw new Error(`Source transaction not found at index ${draggedIndex}`);
-          }
-          
-          // Ensure the source transaction has the correct category
-          const sourceCategory = sourceTransaction.category || category;
-          
-          const sourceGlobalIndex = utils.findGlobalIndex(sourceTransaction, allTransactions);
-          
-          // Get the target transaction's global index
-          const targetTransaction = monthTransactions[targetIndex];
-          if (!targetTransaction) {
-            throw new Error(`Target transaction not found at index ${targetIndex}`);
-          }
-          
-          const targetGlobalIndex = utils.findGlobalIndex(targetTransaction, allTransactions);
-          
-          console.log('Reordering transactions:', {
-            sourceTransaction: sourceTransaction.description,
-            targetTransaction: targetTransaction.description,
-            sourceGlobalIndex,
-            targetGlobalIndex,
-            sourceCategory,
-            targetCategory: targetTransaction.category || category
-          });
-          
-          if (sourceGlobalIndex !== -1 && targetGlobalIndex !== -1) {
-            // Call the parent reorder handler with the global indices
-            // Use the transaction's category if available, otherwise use the table category
-            const effectiveCategory = sourceCategory || category;
-            onReorder(effectiveCategory, sourceGlobalIndex, targetGlobalIndex);
-            
-            // Show success notification
-            showNotification(`Reordered "${sourceTransaction.description}" within ${targetMonth}`, 'success');
-          } else {
-            console.error('Could not find global indices for transactions', { 
-              sourceIndex: draggedIndex, 
-              targetIndex, 
-              sourceGlobalIndex, 
-              targetGlobalIndex,
-              sourceCategory,
-              tableCategory: category
+          // After adding, update the order of all transactions in the target month
+          setTimeout(() => {
+            // Get all transactions in the target month, including the newly added one
+            const updatedAllTransactions = [...allTransactions, newTransaction];
+            const updatedMonthTransactions = updatedAllTransactions.filter(t => {
+              let transactionDate: Date;
+              
+              if (typeof t.date === 'number') {
+                const now = new Date();
+                transactionDate = new Date(now.getFullYear(), now.getMonth(), t.date);
+              } else if (t.date instanceof Date) {
+                transactionDate = t.date;
+              } else {
+                transactionDate = new Date(t.date);
+              }
+              
+              const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+              return transactionMonth === targetMonth && t.category === category;
             });
             
-            // Log the transactions to help debug
-            console.log('Source transaction:', sourceTransaction);
-            console.log('Target transaction:', targetTransaction);
-            console.log('All transactions count:', allTransactions?.length);
+            // Create a sorted array of transactions based on the desired order
+            const sortedTransactions = [...updatedMonthTransactions];
             
-            showNotification(`Could not reorder transaction - indices not found`, 'error');
+            // Remove the new transaction from its current position
+            const newTransactionIndex = sortedTransactions.findIndex(t => t.id === newTransaction.id);
+            if (newTransactionIndex !== -1) {
+              const [removed] = sortedTransactions.splice(newTransactionIndex, 1);
+              
+              // Insert it at the target position
+              if (targetIndex >= sortedTransactions.length) {
+                sortedTransactions.push(removed);
+              } else {
+                sortedTransactions.splice(targetIndex, 0, removed);
+              }
+            }
+            
+            // Update the order property of each transaction
+            sortedTransactions.forEach((t, idx) => {
+              const globalIdx = utils.findGlobalIndex(t, updatedAllTransactions);
+              if (globalIdx !== -1) {
+                onUpdateTransaction(globalIdx, { order: idx });
+              }
+            });
+            
+            // Show success notification with specific position information
+            let positionText = "at the beginning of";
+            if (targetIndex >= updatedMonthTransactions.length - 1) {
+              positionText = "at the end of";
+            } else if (targetIndex > 0) {
+              positionText = `at position ${targetIndex + 1} in`;
+            }
+            
+            showNotification(`Transaction "${draggedTransaction.description}" copied ${positionText} ${targetMonth}`, 'success');
+          }, 100);
+        } else {
+          // MOVE MODE: Delete the old transaction and create a new one
+          const globalIndex = utils.findGlobalIndex(draggedTransaction, allTransactions);
+          
+          if (globalIndex !== -1) {
+            // Create a new transaction with the updated date and order
+            const newTransaction: Transaction = {
+              ...draggedTransaction,
+              id: uuidv4(), // Generate a new UUID to avoid conflicts
+              date: newDate,
+              order: targetIndex // Set the order explicitly to match the drop position
+            };
+            
+            // Delete the old transaction
+            onDeleteTransaction(globalIndex);
+            
+            // Add the new transaction
+            onAddTransaction(newTransaction);
+            
+            // After adding, update the order of all transactions in the target month
+            setTimeout(() => {
+              // Get all transactions in the target month, including the newly added one
+              const updatedAllTransactions = [...allTransactions.filter(t => t.id !== draggedTransaction.id), newTransaction];
+              const updatedMonthTransactions = updatedAllTransactions.filter(t => {
+                let transactionDate: Date;
+                
+                if (typeof t.date === 'number') {
+                  const now = new Date();
+                  transactionDate = new Date(now.getFullYear(), now.getMonth(), t.date);
+                } else if (t.date instanceof Date) {
+                  transactionDate = t.date;
+                } else {
+                  transactionDate = new Date(t.date);
+                }
+                
+                const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+                return transactionMonth === targetMonth && t.category === category;
+              });
+              
+              // Create a sorted array of transactions based on the desired order
+              const sortedTransactions = [...updatedMonthTransactions];
+              
+              // Remove the new transaction from its current position
+              const newTransactionIndex = sortedTransactions.findIndex(t => t.id === newTransaction.id);
+              if (newTransactionIndex !== -1) {
+                const [removed] = sortedTransactions.splice(newTransactionIndex, 1);
+                
+                // Insert it at the target position
+                if (targetIndex >= sortedTransactions.length) {
+                  sortedTransactions.push(removed);
+                } else {
+                  sortedTransactions.splice(targetIndex, 0, removed);
+                }
+              }
+              
+              // Update the order property of each transaction
+              sortedTransactions.forEach((t, idx) => {
+                const globalIdx = utils.findGlobalIndex(t, updatedAllTransactions);
+                if (globalIdx !== -1) {
+                  onUpdateTransaction(globalIdx, { order: idx });
+                }
+              });
+              
+              // Show success notification with specific position information
+              let positionText = "to the beginning of";
+              if (targetIndex >= updatedMonthTransactions.length - 1) {
+                positionText = "to the end of";
+              } else if (targetIndex > 0) {
+                positionText = `to position ${targetIndex + 1} in`;
+              }
+              
+              showNotification(`Transaction "${draggedTransaction.description}" moved ${positionText} ${targetMonth}`, 'success');
+            }, 100);
           }
-        } catch (error) {
-          console.error('Error during transaction reordering:', error);
-          showNotification(`Error reordering transaction: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
         }
       }
     }
     
     // Reset drag state
-    setIsIntraMonthDrag(false);
-    setDragOverIndex(null);
-    setIsDragging(false);
-    setDraggedTransaction(null);
-    setDraggedIndex(null);
-    setDragSourceMonth(null);
-    setDragOverMonth(null);
+    resetDragState();
   };
   
   const handleMonthDragOver = (e: React.DragEvent, targetMonth: string) => {
@@ -953,6 +1091,11 @@ export function TransactionTable({
       }
     };
   }, [dragLeaveTimeout]);
+
+  // Force a refresh of the component
+  const forceRefresh = useCallback(() => {
+    setRefreshCounter(prev => prev + 1);
+  }, []);
 
   return (
     <Box sx={{ mt: 1, mb: 1 }}>
@@ -1230,6 +1373,24 @@ export function TransactionTable({
                           }
                         }
                       }}
+                      onDragOver={(e) => {
+                        // Handle drag over the stack itself (for dropping at the end of the list)
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Only update if we're not already over a specific card
+                        if (dragOverIndex === null || dragOverIndex >= (monthTransactions as Transaction[]).length) {
+                          handleTransactionDragOver(e, month as string, (monthTransactions as Transaction[]).length);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        // Handle drop on the stack itself (for dropping at the end of the list)
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Drop at the end of the list
+                        handleTransactionDrop(e, month as string, (monthTransactions as Transaction[]).length);
+                      }}
                     >
                       {(monthTransactions as Transaction[]).map((transaction, index) => (
                         <Card
@@ -1288,6 +1449,29 @@ export function TransactionTable({
                                 borderRadius: '0 0 4px 4px',
                                 zIndex: 1
                               } : {}
+                            } : {}),
+                            // Add styles for when this card is the drop target for inter-month drag
+                            ...(!isIntraMonthDrag && dragOverIndex === index && dragOverMonth === month && dragSourceMonth !== month ? {
+                              boxShadow: `0 0 0 3px ${isCopyMode ? '#4caf50' : '#2196f3'}, 0 4px 10px rgba(0,0,0,0.2)`,
+                              transform: 'scale(1.02)',
+                              zIndex: 10,
+                              position: 'relative',
+                              '&::before': {
+                                content: '""',
+                                position: 'absolute',
+                                top: -4,
+                                left: 0,
+                                right: 0,
+                                height: 4,
+                                backgroundColor: isCopyMode 
+                                  ? 'rgba(76, 175, 80, 0.8)'  // More visible green
+                                  : 'rgba(33, 150, 243, 0.8)', // More visible blue
+                                borderRadius: 1,
+                                zIndex: 2,
+                                boxShadow: isCopyMode 
+                                  ? '0 0 8px rgba(76, 175, 80, 0.5)' 
+                                  : '0 0 8px rgba(33, 150, 243, 0.5)',
+                              }
                             } : {}),
                             '&:hover': {
                               boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
@@ -1371,6 +1555,40 @@ export function TransactionTable({
                           </Box>
                         </Card>
                       ))}
+                      
+                      {/* Empty drop zone at the end of the list - enhance the visual indicator */}
+                      {dragOverMonth === month && dragOverIndex === (monthTransactions as Transaction[]).length && (
+                        <Box
+                          sx={{
+                            height: '30px', // Increased height for better visibility
+                            borderRadius: 1,
+                            border: `3px dashed ${isCopyMode ? '#4caf50' : '#2196f3'}`, // Thicker border
+                            backgroundColor: isCopyMode 
+                              ? 'rgba(76, 175, 80, 0.15)' 
+                              : 'rgba(33, 150, 243, 0.15)',
+                            mb: 1,
+                            transition: 'all 0.3s ease',
+                            boxShadow: isCopyMode 
+                              ? '0 0 12px rgba(76, 175, 80, 0.4)' 
+                              : '0 0 12px rgba(33, 150, 243, 0.4)', // More pronounced shadow
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          }}
+                        >
+                          {/* Add a text indicator */}
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              color: isCopyMode ? '#4caf50' : '#2196f3',
+                              fontWeight: 'bold',
+                              fontSize: '0.7rem',
+                            }}
+                          >
+                            {isCopyMode ? 'Copy Here' : 'Move Here'}
+                          </Typography>
+                        </Box>
+                      )}
                       
                       {/* Add button as the last card in the list */}
                       <Card
