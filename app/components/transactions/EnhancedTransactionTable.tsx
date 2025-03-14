@@ -534,16 +534,44 @@ export function EnhancedTransactionTable({
     ];
     const targetMonthIndex = months.indexOf(copyTargetMonth);
 
+    // Get existing transactions in the target month
+    const targetMonthTransactions = transactions.filter(t => {
+      const date = new Date(t.date);
+      const month = date.toLocaleString('default', { month: 'long' });
+      return month === copyTargetMonth && t.category === category;
+    });
+
     // Copy each transaction with updated date
     copyTransactions.forEach(transaction => {
       const date = new Date(transaction.date);
       // Create new date with same day but target month
       const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
       
+      // Check if a similar transaction already exists in the target month
+      const existingTransaction = targetMonthTransactions.find(t => 
+        t.description === transaction.description && 
+        t.category === transaction.category
+      );
+
+      if (existingTransaction) {
+        // If description matches but amount is different, update the existing transaction
+        if (Math.abs(existingTransaction.amount) !== Math.abs(transaction.amount)) {
+          const globalIndex = utils.findGlobalIndex(existingTransaction, allTransactions);
+          if (globalIndex !== -1) {
+            onUpdateTransaction(globalIndex, {
+              amount: category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount)
+            });
+          }
+        }
+        // If both description and amount match, skip this transaction
+        return;
+      }
+
+      // If no matching transaction exists, create a new one
       const newTransaction: Transaction = {
         ...transaction,
         id: uuidv4(), // Generate new ID for the copy
-        date: newDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        date: newDate,
         // Preserve the sign based on category
         amount: category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount)
       };

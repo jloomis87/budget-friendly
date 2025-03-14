@@ -765,13 +765,43 @@ export function IncomeTable({
     ];
     const targetMonthIndex = months.indexOf(copyTargetMonth);
 
+    // Get existing transactions in the target month
+    const targetMonthTransactions = transactions.filter(t => {
+      const date = new Date(t.date);
+      const month = date.toLocaleString('default', { month: 'long' });
+      return month === copyTargetMonth && t.category === 'Income';
+    });
+
+    // Copy each transaction with updated date
     copyTransactions.forEach(transaction => {
       const date = new Date(transaction.date);
+      // Create new date with same day but target month
       const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
       
+      // Check if a similar transaction already exists in the target month
+      const existingTransaction = targetMonthTransactions.find(t => 
+        t.description === transaction.description && 
+        t.category === 'Income'
+      );
+
+      if (existingTransaction) {
+        // If description matches but amount is different, update the existing transaction
+        if (Math.abs(existingTransaction.amount) !== Math.abs(transaction.amount)) {
+          const globalIndex = findGlobalIndex(existingTransaction);
+          if (globalIndex !== -1) {
+            onUpdateTransaction(globalIndex, {
+              amount: Math.abs(transaction.amount) // Income is always positive
+            });
+          }
+        }
+        // If both description and amount match, skip this transaction
+        return;
+      }
+
+      // If no matching transaction exists, create a new one
       const newTransaction: Transaction = {
         ...transaction,
-        id: uuidv4(),
+        id: uuidv4(), // Generate new ID for the copy
         date: newDate,
         amount: Math.abs(transaction.amount) // Income is always positive
       };
