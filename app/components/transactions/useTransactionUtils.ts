@@ -6,26 +6,85 @@ export function useTransactionUtils(): TransactionUtilsHook {
   return useMemo(() => ({
     // Find the global index of a transaction in the full transactions array
     findGlobalIndex: (transaction: Transaction, allTransactions: Transaction[]): number => {
+      // Validate inputs
+      if (!transaction || !allTransactions || !Array.isArray(allTransactions)) {
+        console.error('Invalid arguments to findGlobalIndex', { 
+          hasTransaction: !!transaction, 
+          hasAllTransactions: !!allTransactions,
+          isArray: Array.isArray(allTransactions)
+        });
+        return -1;
+      }
+      
       // First try to find by ID if available
       if (transaction.id) {
         const idIndex = allTransactions.findIndex(t => t.id === transaction.id);
-        if (idIndex !== -1) return idIndex;
+        if (idIndex !== -1) {
+          console.log(`Found transaction by ID at index ${idIndex}`, {
+            id: transaction.id,
+            description: transaction.description
+          });
+          return idIndex;
+        }
       }
       
+      // Log the transaction we're trying to find
+      console.log('Finding transaction by properties:', {
+        description: transaction.description,
+        category: transaction.category,
+        amount: transaction.amount,
+        date: transaction.date
+      });
+      
       // Otherwise, try to match by properties
-      return allTransactions.findIndex(t => {
-        if (t.category !== transaction.category) return false;
+      const index = allTransactions.findIndex(t => {
+        // For Income transactions, we need to be more careful with category matching
+        const categoryMatch = t.category === transaction.category;
+        if (!categoryMatch) return false;
         
         const dateMatch = getDateString(t.date) === getDateString(transaction.date);
         const descriptionMatch = t.description === transaction.description;
         const amountMatch = t.amount === transaction.amount;
         
-        return dateMatch && descriptionMatch && amountMatch;
+        const isMatch = dateMatch && descriptionMatch && amountMatch;
+        
+        // Log potential matches for debugging
+        if (descriptionMatch && t.category === 'Income' && transaction.category === 'Income') {
+          console.log('Potential Income match:', {
+            description: t.description,
+            dateMatch,
+            amountMatch,
+            isMatch
+          });
+        }
+        
+        return isMatch;
       });
+      
+      if (index === -1) {
+        console.warn('Could not find transaction in allTransactions', {
+          description: transaction.description,
+          category: transaction.category,
+          totalTransactions: allTransactions.length
+        });
+      } else {
+        console.log(`Found transaction by properties at index ${index}`, {
+          description: transaction.description,
+          category: transaction.category
+        });
+      }
+      
+      return index;
     },
 
     // Create a unique identifier for a transaction
     getTransactionId: (transaction: Transaction): string => {
+      // If the transaction already has an ID, use it
+      if (transaction.id) {
+        return transaction.id;
+      }
+      
+      // Otherwise, create a composite ID from transaction properties
       return `${transaction.date instanceof Date ? transaction.date.toISOString() : String(transaction.date)}-${transaction.description}-${transaction.amount}-${transaction.category}`;
     },
 

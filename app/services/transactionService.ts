@@ -113,6 +113,9 @@ export const getUserTransactions = async (userId: string): Promise<Transaction[]
         } else if (data.date && typeof data.date.toDate === 'function') {
           // If it's a Firestore timestamp, convert to Date
           processedDate = data.date.toDate();
+        } else if (typeof data.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
+          // Handle YYYY-MM-DD string format
+          processedDate = new Date(data.date);
         } else {
           // Fallback for other date formats
           console.warn(`[Firebase] Document ${doc.id} has unknown date format:`, data.date);

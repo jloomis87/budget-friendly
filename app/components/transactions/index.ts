@@ -1,4 +1,4 @@
-export { EnhancedTransactionTable } from './EnhancedTransactionTable';
+
 export { AddTransactionButton } from './AddTransactionButton';
 export { AddTransactionRow } from './AddTransactionRow';
 export { DeleteConfirmationDialog } from './DeleteConfirmationDialog';

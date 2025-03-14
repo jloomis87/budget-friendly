@@ -15,8 +15,7 @@ import {
   type BudgetSummary as BudgetSummaryType,
   type BudgetPlan
 } from '../services/budgetCalculator';
-import { IncomeTable } from './IncomeTable';
-import { EnhancedTransactionTable } from './EnhancedTransactionTable';
+import { TransactionTable } from './transactions/TransactionTable';
 import { BudgetActions } from './BudgetActions';
 import { useTransactions } from '../hooks/useTransactions';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
@@ -334,25 +333,115 @@ function BudgetAppContent() {
 
   // Handle reordering within a category
   const handleReorder = useCallback((category: string, sourceIndex: number, targetIndex: number) => {
+    console.log(`Handling reorder for category: ${category}`, {
+      sourceIndex,
+      targetIndex,
+      totalTransactions: transactions.length
+    });
+    
     // Get transactions for this category
     const categoryTransactions = transactions.filter(t => t.category === category);
     
+    console.log(`Found ${categoryTransactions.length} transactions for category ${category}`);
+    
     // Ensure indices are valid
-    if (sourceIndex < 0 || sourceIndex >= categoryTransactions.length || 
-        targetIndex < 0 || targetIndex >= categoryTransactions.length) {
+    if (sourceIndex < 0 || sourceIndex >= transactions.length || 
+        targetIndex < 0 || targetIndex >= transactions.length) {
+      console.error('Invalid indices for reordering', { 
+        sourceIndex, 
+        targetIndex, 
+        transactionsLength: transactions.length 
+      });
       return;
     }
     
-    // Create a new array with the reordered transactions
-    const reordered = [...categoryTransactions];
-    const [movedItem] = reordered.splice(sourceIndex, 1);
-    reordered.splice(targetIndex, 0, movedItem);
-    
-    // Get the IDs in the new order
-    const orderedIds = reordered.map(t => t.id).filter(id => id !== undefined) as string[];
-    
-    // Update the order in the database
-    reorderTransactions(category, orderedIds);
+    try {
+      // Get the actual transactions from the global indices
+      const sourceTransaction = transactions[sourceIndex];
+      const targetTransaction = transactions[targetIndex];
+      
+      if (!sourceTransaction || !targetTransaction) {
+        console.error('Source or target transaction not found', {
+          sourceFound: !!sourceTransaction,
+          targetFound: !!targetTransaction,
+          sourceIndex,
+          targetIndex
+        });
+        return;
+      }
+      
+      console.log('Reordering transactions:', {
+        source: {
+          description: sourceTransaction.description,
+          category: sourceTransaction.category,
+          index: sourceIndex,
+          id: sourceTransaction.id,
+          order: sourceTransaction.order
+        },
+        target: {
+          description: targetTransaction.description,
+          category: targetTransaction.category,
+          index: targetIndex,
+          id: targetTransaction.id,
+          order: targetTransaction.order
+        }
+      });
+      
+      // Verify both transactions are in the same category
+      if (sourceTransaction.category !== category || targetTransaction.category !== category) {
+        console.error('Category mismatch during reordering', {
+          expectedCategory: category,
+          sourceCategory: sourceTransaction.category,
+          targetCategory: targetTransaction.category
+        });
+        return;
+      }
+      
+      // Create a new array with the reordered transactions
+      const reordered = [...categoryTransactions];
+      
+      // Find the local indices within the category-filtered array
+      const localSourceIndex = reordered.findIndex(t => t === sourceTransaction);
+      const localTargetIndex = reordered.findIndex(t => t === targetTransaction);
+      
+      if (localSourceIndex === -1 || localTargetIndex === -1) {
+        console.error('Could not find local indices for reordering', {
+          localSourceIndex,
+          localTargetIndex,
+          category
+        });
+        return;
+      }
+      
+      // Perform the reordering
+      const [movedItem] = reordered.splice(localSourceIndex, 1);
+      reordered.splice(localTargetIndex, 0, movedItem);
+      
+      // Get the IDs in the new order
+      const orderedIds = reordered.map(t => t.id).filter(id => id !== undefined) as string[];
+      
+      if (orderedIds.length !== reordered.length) {
+        console.warn(`Some transactions don't have IDs`, {
+          totalTransactions: reordered.length,
+          idsFound: orderedIds.length
+        });
+      }
+      
+      // Log the new order for debugging
+      console.log(`New order for ${category}:`, {
+        orderedIds,
+        transactions: reordered.map(t => ({
+          id: t.id,
+          description: t.description,
+          order: t.order
+        }))
+      });
+      
+      // Update the order in the database
+      reorderTransactions(category, orderedIds);
+    } catch (error) {
+      console.error('Error during reordering:', error);
+    }
   }, [transactions, reorderTransactions]);
   
   // Clear any drag/drop/animation states when mouse leaves a draggable area
@@ -428,7 +517,10 @@ function BudgetAppContent() {
   // Memoize the transaction tables to prevent unnecessary re-renders
   const transactionTables = useMemo(() => {
     if (transactions.length === 0) return null;
-    
+
+    // Get income transactions separately since they're not included in getTransactionsByCategory
+    const incomeTransactions = transactions.filter(t => t.category === 'Income');
+
     return (
       <Box sx={{ 
         mt: 3,
@@ -442,23 +534,42 @@ function BudgetAppContent() {
         />
         
         {/* Display Income Table */}
-        <IncomeTable 
-          transactions={transactions}
-          onUpdateTransaction={updateTransaction}
-          onDeleteTransaction={deleteTransaction}
-          onAddTransaction={addTransaction}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          dragOverCategory={dragOverCategory}
-          recentlyDropped={recentlyDropped}
-          onReorder={handleReorder}
-          selectedMonths={selectedMonths}
-        />
-        
+        {incomeTransactions.length > 0 && (
+          <TransactionTable
+            key="Income" 
+            category="Income"
+            transactions={incomeTransactions}
+            allTransactions={transactions}
+            onUpdateTransaction={updateTransaction}
+            onDeleteTransaction={deleteTransaction}
+            onAddTransaction={addTransaction}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            dragOverCategory={dragOverCategory}
+            recentlyDropped={recentlyDropped}
+            onReorder={handleReorder}
+            selectedMonths={selectedMonths}
+            month={currentMonth}
+            isDark={isColorDark(tableColors['Income'])}
+            onTransactionsChange={(newTransactions) => {
+              // Use existing transaction update functions
+              newTransactions.forEach((transaction, index) => {
+                const existingTransaction = transactions.find(t => t.id === transaction.id);
+                if (existingTransaction) {
+                  const globalIndex = transactions.findIndex(t => t.id === transaction.id);
+                  if (globalIndex !== -1) {
+                    updateTransaction(globalIndex, transaction);
+                  }
+                }
+              });
+            }}
+          />
+        )}
+
         {/* Display transactions grouped by category */}
         {Object.entries(getTransactionsByCategory()).map(([category, categoryTransactions]) => (
-          <EnhancedTransactionTable
+          <TransactionTable
             key={category} 
             category={category}
             transactions={categoryTransactions}
@@ -473,6 +584,20 @@ function BudgetAppContent() {
             recentlyDropped={recentlyDropped}
             onReorder={handleReorder}
             selectedMonths={selectedMonths}
+            month={currentMonth}
+            isDark={isColorDark(tableColors[category])}
+            onTransactionsChange={(newTransactions) => {
+              // Use existing transaction update functions
+              newTransactions.forEach((transaction, index) => {
+                const existingTransaction = transactions.find(t => t.id === transaction.id);
+                if (existingTransaction) {
+                  const globalIndex = transactions.findIndex(t => t.id === transaction.id);
+                  if (globalIndex !== -1) {
+                    updateTransaction(globalIndex, transaction);
+                  }
+                }
+              });
+            }}
           />
         ))}
       </Box>
@@ -489,7 +614,10 @@ function BudgetAppContent() {
     dragOverCategory, 
     recentlyDropped,
     handleReorder,
-    selectedMonths
+    selectedMonths,
+    currentMonth,
+    isColorDark,
+    tableColors
   ]);
 
   // Memoize the budget summary component to prevent unnecessary re-renders
@@ -1161,11 +1289,28 @@ function BudgetAppContent() {
             
             {/* Include a simplified Income form */}
             <Box sx={{ mb: 3 }}>
-              <IncomeTable 
-                transactions={transactions}
+              <TransactionTable 
+                category="Income"
+                transactions={transactions.filter(t => t.category === 'Income')}
+                allTransactions={transactions}
                 onUpdateTransaction={updateTransaction}
                 onDeleteTransaction={deleteTransaction}
                 onAddTransaction={addTransaction}
+                month={currentMonth}
+                isDark={isColorDark(tableColors['Income'])}
+                selectedMonths={selectedMonths}
+                onTransactionsChange={(newTransactions) => {
+                  // Handle transaction changes
+                  newTransactions.forEach((transaction, index) => {
+                    const existingTransaction = transactions.find(t => t.id === transaction.id);
+                    if (existingTransaction) {
+                      const globalIndex = transactions.findIndex(t => t.id === transaction.id);
+                      if (globalIndex !== -1) {
+                        updateTransaction(globalIndex, transaction);
+                      }
+                    }
+                  });
+                }}
               />
             </Box>
             

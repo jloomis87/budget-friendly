@@ -25,7 +25,7 @@ export interface EnhancedTransactionTableProps {
 }
 
 export interface TransactionUtilsHook {
-  generateDayOptions: () => number[];
+  generateDayOptions: () => { value: string; label: string }[];
   getOrdinalSuffix: (day: number) => string;
   getDateString: (date: Date | string | number) => string;
   formatDateForDisplay: (date: Date | string | number) => string;
@@ -51,7 +51,7 @@ export interface TransactionRowProps {
   onCancelEdit: () => void;
   onDeleteClick: (e: React.MouseEvent, transaction: Transaction, index: number) => void;
   onDragStart: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
-  generateDayOptions: () => number[];
+  generateDayOptions: () => { value: string; label: string }[];
   getOrdinalSuffix: (day: number) => string;
   formatDateForDisplay: (date: Date | string | number) => string;
   onClick?: () => void;
@@ -69,7 +69,7 @@ export interface AddTransactionRowProps {
   setNewDate: (value: string) => void;
   handleAddTransaction: () => void;
   setIsAdding: (value: boolean) => void;
-  generateDayOptions: () => number[];
+  generateDayOptions: () => { value: string; label: string }[];
   getOrdinalSuffix: (day: number) => string;
 }
 
@@ -142,6 +142,8 @@ export interface MobileAddDialogProps {
   setNewDate: (value: string) => void;
   onClose: () => void;
   onAdd: () => void;
+  generateDayOptions: () => { value: string; label: string }[];
+  getOrdinalSuffix: (day: number) => string;
   tableColor?: string;
   isDark?: boolean;
 } 
