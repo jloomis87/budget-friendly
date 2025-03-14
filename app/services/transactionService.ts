@@ -11,7 +11,8 @@ import {
   Timestamp,
   getDoc,
   limit,
-  writeBatch
+  writeBatch,
+  type QueryDocumentSnapshot
 } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import type { Transaction } from '../services/fileParser';

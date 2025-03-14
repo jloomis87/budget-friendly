@@ -10,7 +10,7 @@ import {
 import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from './useLocalStorage';
 import { useAuth } from '../contexts/AuthContext';
 import * as transactionService from '../services/transactionService';
-import { collection, getDocs, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, writeBatch, type QueryDocumentSnapshot } from '@firebase/firestore/lite';
 import { db } from '../firebase/firebaseConfig';
 
 export function useTransactions() {
@@ -538,7 +538,7 @@ export function useTransactions() {
         const batch = writeBatch(db);
         let deleteCount = 0;
 
-        querySnapshot.forEach((doc) => {
+        querySnapshot.forEach((doc: QueryDocumentSnapshot) => {
           batch.delete(doc.ref);
           deleteCount++;
         });

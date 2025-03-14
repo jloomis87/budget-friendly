@@ -25,6 +25,8 @@ import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/use
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { MonthSelector } from './MonthSelector';
 import { saveUserPreferences, getUserPreferences } from '../firebase/firebaseConfig';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase/firebaseConfig';
 
 // Add this interface for alert messages
 interface AlertMessage {
@@ -70,9 +72,10 @@ function BudgetAppContent() {
   useEffect(() => {
     const loadUserPreferences = async () => {
       if (user) {
-        const preferences = await getUserPreferences(user.id);
-        if (preferences?.selectedMonths) {
-          setSelectedMonths(preferences.selectedMonths);
+        const userDocRef = doc(db, 'users', user.id);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists() && userDoc.data()?.preferences?.selectedMonths) {
+          setSelectedMonths(userDoc.data().preferences.selectedMonths);
         }
       }
     };
@@ -83,7 +86,17 @@ function BudgetAppContent() {
   useEffect(() => {
     const saveMonths = async () => {
       if (user) {
-        await saveUserPreferences(user.id, { selectedMonths });
+        const userDocRef = doc(db, 'users', user.id);
+        const userDoc = await getDoc(userDocRef);
+        const existingPreferences = userDoc.exists() ? userDoc.data()?.preferences || {} : {};
+        
+        await updateDoc(userDocRef, {
+          preferences: {
+            ...existingPreferences,
+            selectedMonths,
+            updatedAt: new Date().toISOString()
+          }
+        });
       }
     };
     saveMonths();

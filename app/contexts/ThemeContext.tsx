@@ -54,8 +54,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setFirebaseError(null);
         // Store theme preference directly in the user document
         const userDocRef = doc(db, 'users', user.id);
+        const userDoc = await getDoc(userDocRef);
+        const existingPreferences = userDoc.exists() ? userDoc.data()?.preferences || {} : {};
+        
         await updateDoc(userDocRef, { 
           preferences: { 
+            ...existingPreferences,
             theme: themeMode,
             updatedAt: new Date().toISOString() 
           }
