@@ -1226,10 +1226,12 @@ export function IncomeTable({
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography 
-              variant="body1" 
+              component="span" 
+              variant="subtitle1" 
               sx={{ 
-                color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
-                fontWeight: 500
+                fontWeight: 500, 
+                color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+                fontSize: '0.9rem'
               }}
             >
               (Total: ${totalIncome.toFixed(2)})
@@ -1316,7 +1318,7 @@ export function IncomeTable({
                       className="month-header"
                       variant="subtitle1"
                       sx={{
-                        fontWeight: 600,
+                        fontWeight: 500,
                         mb: 1,
                         color: tableColors['Income'] && isColorDark(tableColors['Income']) 
                           ? 'rgba(255, 255, 255, 0.9)' 
@@ -1379,8 +1381,7 @@ export function IncomeTable({
                           md: '0.85rem'
                         },
                         color: tableColors['Income'] && isColorDark(tableColors['Income'])
-                          ? 'rgba(255, 255, 255, 0.6)'
-                          : 'rgba(0, 0, 0, 0.6)',
+                          ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)',
                         mb: 1,
                         textAlign: 'left'
                       }}
@@ -1433,7 +1434,7 @@ export function IncomeTable({
                                     variant="body2"
                                     sx={{
                                       fontWeight: 500,
-                                      color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                                      color: isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)',
                                       fontSize: '0.875rem',
                                       lineHeight: '1.2'
                                     }}
@@ -1454,8 +1455,8 @@ export function IncomeTable({
                                 <Typography
                                   variant="body2"
                                   sx={{
-                                    fontWeight: 600,
-                                    color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.87)',
+                                    fontWeight: 500,
+                                    color: isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)',
                                     fontSize: '0.875rem'
                                   }}
                                 >
