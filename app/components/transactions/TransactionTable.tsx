@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Paper, Typography, Grid, Stack, Card, CardContent, IconButton, Tooltip, useTheme, useMediaQuery } from '@mui/material';
+import { Box, Paper, Typography, Grid, Stack, Card, CardContent, IconButton, Tooltip, useTheme, useMediaQuery, Button } from '@mui/material';
 import { Add as AddIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material';
 import { isColorDark } from '../../utils/colorUtils';
 import { useTableColors } from '../../hooks/useTableColors';
@@ -77,12 +77,12 @@ const groupTransactionsByMonth = (transactions: Transaction[]) => {
     let date: Date;
     
     try {
-      if (typeof transaction.date === 'number') {
+    if (typeof transaction.date === 'number') {
         // If it's just a day number, use current month/year
         const now = new Date();
         date = new Date(now.getFullYear(), now.getMonth(), transaction.date);
       } else if (transaction.date instanceof Date) {
-        date = transaction.date;
+      date = transaction.date;
       } else {
         // If it's a string or something else, convert to Date
         date = new Date(transaction.date);
@@ -144,7 +144,7 @@ const groupTransactionsByMonth = (transactions: Transaction[]) => {
       };
       
       try {
-        return getDate(a.date) - getDate(b.date);
+      return getDate(a.date) - getDate(b.date);
       } catch (error) {
         console.error('Error sorting by date:', error, { a, b });
         return 0; // Keep original order if there's an error
@@ -344,7 +344,7 @@ export function TransactionTable({
   const handleDeleteClick = (e: React.MouseEvent | undefined, transaction: Transaction) => {
     // Only call stopPropagation if e is a valid event object
     if (e && typeof e.stopPropagation === 'function') {
-      e.stopPropagation();
+    e.stopPropagation();
     }
     
     const globalIndex = utils.findGlobalIndex(transaction, allTransactions);
@@ -587,6 +587,12 @@ export function TransactionTable({
     e.preventDefault();
     e.stopPropagation();
     
+    // Clear any existing timeout
+    if (dragLeaveTimeout) {
+      window.clearTimeout(dragLeaveTimeout);
+      setDragLeaveTimeout(null);
+    }
+    
     // Set the drop effect based on whether Ctrl/Cmd is pressed
     e.dataTransfer.dropEffect = isCopyMode ? 'copy' : 'move';
     
@@ -622,6 +628,9 @@ export function TransactionTable({
         });
       }
     }
+    
+    // Check if Ctrl key is pressed for copy mode
+    setIsCopyMode(e.ctrlKey);
   };
   
   // Add handler for transaction drop
@@ -636,7 +645,8 @@ export function TransactionTable({
       draggedIndex,
       dragSourceMonth,
       category,
-      isIntraMonthDrag: dragSourceMonth === targetMonth
+      isIntraMonthDrag: dragSourceMonth === targetMonth,
+      isCopyMode
     });
     
     // Ensure we have a dragged transaction
@@ -645,12 +655,27 @@ export function TransactionTable({
       return;
     }
     
+    // Handle special indices
+    if (targetIndex === -888) {
+      // Force copy mode for the copy zone
+      setIsCopyMode(true);
+      // Use the length of the month's transactions as the target index
+      const groupedTransactions = groupTransactionsByMonth(filteredTransactions);
+      targetIndex = (groupedTransactions[targetMonth] || []).length;
+    } else if (targetIndex === -999) {
+      // Force move mode for the move zone
+      setIsCopyMode(false);
+      // Use the length of the month's transactions as the target index
+      const groupedTransactions = groupTransactionsByMonth(filteredTransactions);
+      targetIndex = (groupedTransactions[targetMonth] || []).length;
+    }
+    
     // Get the transactions for the target month
     const groupedTransactions = groupTransactionsByMonth(filteredTransactions);
     const targetMonthTransactions = [...(groupedTransactions[targetMonth] || [])];
     
     // Handle intra-month drag (sorting within the same month)
-    if (dragSourceMonth === targetMonth && draggedIndex !== targetIndex) {
+    if (dragSourceMonth === targetMonth && draggedIndex !== targetIndex && !isCopyMode) {
       try {
         const sourceTransaction = targetMonthTransactions[draggedIndex];
         if (!sourceTransaction) {
@@ -950,36 +975,134 @@ export function TransactionTable({
         const newTransaction: Transaction = {
           ...draggedTransaction,
           id: uuidv4(), // Generate a new UUID
-          date: newDate
+          date: newDate,
+          order: 0 // Add at the beginning of the month by default when dropping on the month
         };
         
         // Add the new transaction
         onAddTransaction(newTransaction);
         
-        // Show success notification
-        showNotification(`Transaction "${draggedTransaction.description}" copied to ${targetMonth}`, 'success');
+        // Force refresh the component
+        forceRefresh();
+        
+        // After adding, update the order of all transactions in the target month
+        setTimeout(() => {
+          // Get all transactions in the target month, including the newly added one
+          const updatedAllTransactions = [...allTransactions, newTransaction];
+          const updatedMonthTransactions = updatedAllTransactions.filter(t => {
+            let transactionDate: Date;
+            
+            if (typeof t.date === 'number') {
+              const now = new Date();
+              transactionDate = new Date(now.getFullYear(), now.getMonth(), t.date);
+            } else if (t.date instanceof Date) {
+              transactionDate = t.date;
+            } else {
+              transactionDate = new Date(t.date);
+            }
+            
+            const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+            return transactionMonth === targetMonth && t.category === category;
+          });
+          
+          // Create a sorted array of transactions based on the desired order
+          const sortedTransactions = [...updatedMonthTransactions];
+          
+          // Remove the new transaction from its current position
+          const newTransactionIndex = sortedTransactions.findIndex(t => t.id === newTransaction.id);
+          if (newTransactionIndex !== -1) {
+            const [removed] = sortedTransactions.splice(newTransactionIndex, 1);
+            
+            // Insert it at the beginning
+            sortedTransactions.unshift(removed);
+          }
+          
+          // Update the order property of each transaction
+          sortedTransactions.forEach((t, idx) => {
+            const globalIdx = utils.findGlobalIndex(t, updatedAllTransactions);
+            if (globalIdx !== -1) {
+              onUpdateTransaction(globalIdx, { order: idx });
+            }
+          });
+          
+          // Force refresh again after updating orders
+          forceRefresh();
+          
+          showNotification(`Transaction "${draggedTransaction.description}" copied to the beginning of ${targetMonth}`, 'success');
+        }, 100);
       } else {
-        // MOVE MODE: Update the existing transaction with the new date
+        // MOVE MODE: Delete the old transaction and create a new one
         const globalIndex = utils.findGlobalIndex(draggedTransaction, allTransactions);
         
         if (globalIndex !== -1) {
-          // Update the transaction with the new date
-          onUpdateTransaction(globalIndex, {
-            date: newDate
-          });
+          // Create a new transaction with the updated date and order
+          const newTransaction: Transaction = {
+            ...draggedTransaction,
+            id: uuidv4(), // Generate a new UUID to avoid conflicts
+            date: newDate,
+            order: 0 // Add at the beginning of the month by default when dropping on the month
+          };
           
-          // Show success notification
-          showNotification(`Transaction "${draggedTransaction.description}" moved to ${targetMonth}`, 'success');
+          // Delete the old transaction
+          onDeleteTransaction(globalIndex);
+          
+          // Add the new transaction
+          onAddTransaction(newTransaction);
+          
+          // Force refresh the component
+          forceRefresh();
+          
+          // After adding, update the order of all transactions in the target month
+          setTimeout(() => {
+            // Get all transactions in the target month, including the newly added one
+            const updatedAllTransactions = [...allTransactions.filter(t => t.id !== draggedTransaction.id), newTransaction];
+            const updatedMonthTransactions = updatedAllTransactions.filter(t => {
+              let transactionDate: Date;
+              
+              if (typeof t.date === 'number') {
+                const now = new Date();
+                transactionDate = new Date(now.getFullYear(), now.getMonth(), t.date);
+              } else if (t.date instanceof Date) {
+                transactionDate = t.date;
+              } else {
+                transactionDate = new Date(t.date);
+              }
+              
+              const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+              return transactionMonth === targetMonth && t.category === category;
+            });
+            
+            // Create a sorted array of transactions based on the desired order
+            const sortedTransactions = [...updatedMonthTransactions];
+            
+            // Remove the new transaction from its current position
+            const newTransactionIndex = sortedTransactions.findIndex(t => t.id === newTransaction.id);
+            if (newTransactionIndex !== -1) {
+              const [removed] = sortedTransactions.splice(newTransactionIndex, 1);
+              
+              // Insert it at the beginning
+              sortedTransactions.unshift(removed);
+            }
+            
+            // Update the order property of each transaction
+            sortedTransactions.forEach((t, idx) => {
+              const globalIdx = utils.findGlobalIndex(t, updatedAllTransactions);
+              if (globalIdx !== -1) {
+                onUpdateTransaction(globalIdx, { order: idx });
+              }
+            });
+            
+            // Force refresh again after updating orders
+            forceRefresh();
+            
+            showNotification(`Transaction "${draggedTransaction.description}" moved to the beginning of ${targetMonth}`, 'success');
+          }, 100);
         }
       }
     }
     
     // Reset drag state
-    setIsDragging(false);
-    setDraggedTransaction(null);
-    setDraggedIndex(null);
-    setDragSourceMonth(null);
-    setIsCopyMode(false);
+    resetDragState();
     
     // Call the parent drop handler if provided
     if (onDrop) {
@@ -995,14 +1118,7 @@ export function TransactionTable({
     }
     
     // Reset all drag state
-    setIsDragging(false);
-    setDraggedTransaction(null);
-    setDraggedIndex(null);
-    setDragSourceMonth(null);
-    setDragOverMonth(null);
-    setIsCopyMode(false);
-    setIsIntraMonthDrag(false);
-    setDragOverIndex(null);
+    resetDragState();
   };
 
   // Function to get text color based on category and custom color
@@ -1096,6 +1212,45 @@ export function TransactionTable({
   const forceRefresh = useCallback(() => {
     setRefreshCounter(prev => prev + 1);
   }, []);
+
+  // Add a pulsing animation for drop zones when dragging
+  useEffect(() => {
+    if (isDragging) {
+      // Add a CSS keyframe animation for pulsing effect
+      const style = document.createElement('style');
+      style.id = 'drop-zone-animation';
+      style.innerHTML = `
+        @keyframes pulseDropZone {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+          100% { transform: scale(1); }
+        }
+        .drop-zone-pulse {
+          animation: pulseDropZone 2s infinite ease-in-out;
+        }
+      `;
+      document.head.appendChild(style);
+      
+      // Add the animation class to all drop zones
+      const dropZones = document.querySelectorAll('.drop-zone');
+      dropZones.forEach(zone => {
+        zone.classList.add('drop-zone-pulse');
+      });
+      
+      return () => {
+        // Clean up the animation when dragging stops
+        const styleElement = document.getElementById('drop-zone-animation');
+        if (styleElement) {
+          document.head.removeChild(styleElement);
+        }
+        
+        // Remove the animation class
+        dropZones.forEach(zone => {
+          zone.classList.remove('drop-zone-pulse');
+        });
+      };
+    }
+  }, [isDragging]);
 
   return (
     <Box sx={{ mt: 1, mb: 1 }}>
@@ -1213,58 +1368,58 @@ export function TransactionTable({
         </Box>
 
         <Box sx={{ p: 1 }}>
-          <Box 
-            sx={{ 
-              display: 'flex',
-              flexDirection: 'row',
+            <Box 
+              sx={{ 
+                display: 'flex',
+                flexDirection: 'row',
               flexWrap: 'nowrap',
               justifyContent: 'space-between',
               alignItems: 'stretch',
               width: '100%',
               gap: '0px',
-              overflowX: 'auto',
+                overflowX: 'auto',
               pb: 1.5,
-              '&::-webkit-scrollbar': {
-                height: '8px',
-              },
-              '&::-webkit-scrollbar-track': {
-                backgroundColor: 'rgba(0,0,0,0.05)',
-                borderRadius: '4px',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : (category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
-                borderRadius: '4px',
-                '&:hover': {
-                  backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : (category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
+                '&::-webkit-scrollbar': {
+                  height: '8px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  backgroundColor: 'rgba(0,0,0,0.05)',
+                  borderRadius: '4px',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : (category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
+                  borderRadius: '4px',
+                  '&:hover': {
+                    backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : (category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
+                  }
                 }
-              }
-            }}
-          >
-            {(() => {
-              const groupedTransactions = groupTransactionsByMonth(filteredTransactions);
-              const allMonths = [
-                'January', 'February', 'March', 'April', 'May', 'June',
-                'July', 'August', 'September', 'October', 'November', 'December'
-              ];
-              
+              }}
+            >
+              {(() => {
+                const groupedTransactions = groupTransactionsByMonth(filteredTransactions);
+                const allMonths = [
+                  'January', 'February', 'March', 'April', 'May', 'June',
+                  'July', 'August', 'September', 'October', 'November', 'December'
+                ];
+                
               // Always use selectedMonths if available, regardless of category
-              const monthsToShow = !selectedMonths?.length ? allMonths : selectedMonths;
-              const monthCount = monthsToShow.length;
-              
-              // Calculate width based on number of months to show
-              const getColumnWidth = () => {
+                const monthsToShow = !selectedMonths?.length ? allMonths : selectedMonths;
+                const monthCount = monthsToShow.length;
+                
+                // Calculate width based on number of months to show
+                const getColumnWidth = () => {
                 if (monthCount === 1) return '100%'; // Full width for single month
                 return `${100 / monthCount}%`; // Equal width for all columns without gap
-              };
-              
-              return monthsToShow
-                .map(month => [month, groupedTransactions[month] || [] as Transaction[]])
-                .sort(([monthA], [monthB]) => getMonthOrder(monthA as string) - getMonthOrder(monthB as string))
-                .map(([month, monthTransactions]) => (
-                  <Box 
-                    key={month as string} 
-                    sx={{ 
-                      width: getColumnWidth(),
+                };
+                
+                return monthsToShow
+                  .map(month => [month, groupedTransactions[month] || [] as Transaction[]])
+                  .sort(([monthA], [monthB]) => getMonthOrder(monthA as string) - getMonthOrder(monthB as string))
+                  .map(([month, monthTransactions]) => (
+                    <Box 
+                      key={month as string} 
+                      sx={{ 
+                        width: getColumnWidth(),
                       minWidth: {
                         xs: '113px', // Minimum width for screens below 1500px
                         sm: '113px',
@@ -1283,7 +1438,7 @@ export function TransactionTable({
                       },
                       flexBasis: getColumnWidth(),
                       px: 0.5,
-                      display: 'flex',
+                        display: 'flex',
                       flexDirection: 'column',
                       // Add styles for when this month is the drop target
                       ...(dragOverMonth === month ? {
@@ -1301,78 +1456,81 @@ export function TransactionTable({
                     onDragOver={(e) => handleMonthDragOver(e, month as string)}
                     onDragLeave={handleMonthDragLeave}
                     onDrop={(e) => handleMonthDrop(e, month as string)}
-                  >
-                    <Box sx={{ 
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      mb: 0.5,
-                      borderBottom: 1,
-                      borderColor: category === 'Income' ? 'rgba(0, 0, 0, 0.1)' : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'divider'),
-                      pb: 0.5
-                    }}>
-                      <Typography
-                        variant="subtitle1"
-                        sx={{
-                          fontWeight: 500,
-                          color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.9)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.9)' : (isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)')),
-                        }}
-                      >
-                        {month as string}
-                      </Typography>
-                      <Tooltip title={`Copy ${month} ${category} to ${getNextMonth(month as string)}`}>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleCopyMonthClick(month as string, monthTransactions as Transaction[])}
+                    >
+                      <Box sx={{ 
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        mb: 0.5,
+                        borderBottom: 1,
+                        borderColor: category === 'Income' ? 'rgba(0, 0, 0, 0.1)' : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'divider'),
+                        pb: 0.5
+                      }}>
+                        <Typography
+                          variant="subtitle1"
                           sx={{
-                            color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.7)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.54)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.54)')),
-                            '&:hover': {
-                              color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.9)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.87)')),
-                              backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                            }
+                            fontWeight: 500,
+                            color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.9)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.9)' : (isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)')),
                           }}
                         >
-                          <ContentCopyIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                    <Typography
-                      sx={{
-                        fontSize: {
-                          xs: '0.65rem',
-                          sm: '0.75rem',
-                          md: '0.85rem'
-                        },
-                        color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.85)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)')),
-                        mb: 1
-                      }}
-                    >
-                      ${Math.abs((monthTransactions as Transaction[]).reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}
-                    </Typography>
-                    <Stack 
-                      spacing={1}
-                      sx={{ 
-                        flexGrow: 1,
-                        minHeight: '100px',
-                        maxHeight: '500px',
-                        overflowY: 'auto',
-                        pr: 0.5,
-                        pt: 0.5,
-                        pb: 0.5,
-                        '&::-webkit-scrollbar': {
-                          width: '6px',
-                        },
-                        '&::-webkit-scrollbar-track': {
-                          backgroundColor: 'rgba(0,0,0,0.05)',
-                        },
-                        '&::-webkit-scrollbar-thumb': {
-                          backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : (category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
-                          borderRadius: '3px',
-                          '&:hover': {
-                            backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : (category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
-                          }
-                        }
-                      }}
+                          {month as string}
+                        </Typography>
+                        <Tooltip title={`Copy ${month} ${category} to ${getNextMonth(month as string)}`}>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleCopyMonthClick(month as string, monthTransactions as Transaction[])}
+                            sx={{
+                              color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.7)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.54)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.54)')),
+                              '&:hover': {
+                                color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.9)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.87)')),
+                                backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                              }
+                            }}
+                          >
+                            <ContentCopyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                      <Typography
+                        sx={{
+                          fontSize: {
+                            xs: '0.65rem',
+                            sm: '0.75rem',
+                            md: '0.85rem'
+                          },
+                          color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.85)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)')),
+                          mb: 1
+                        }}
+                      >
+                        ${Math.abs((monthTransactions as Transaction[]).reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}
+                      </Typography>
+                    
+                    {/* Remove the top permanent drop zone */}
+                    
+                          <Stack 
+                            spacing={1}
+                            sx={{ 
+                              flexGrow: 1,
+                              minHeight: '100px',
+                              maxHeight: '500px',
+                              overflowY: 'auto',
+                              pr: 0.5,
+                              pt: 0.5,
+                              pb: 0.5,
+                              '&::-webkit-scrollbar': {
+                                width: '6px',
+                              },
+                              '&::-webkit-scrollbar-track': {
+                                backgroundColor: 'rgba(0,0,0,0.05)',
+                              },
+                              '&::-webkit-scrollbar-thumb': {
+                                backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : (category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
+                                borderRadius: '3px',
+                                '&:hover': {
+                                  backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : (category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
+                                }
+                              }
+                            }}
                       onDragOver={(e) => {
                         // Handle drag over the stack itself (for dropping at the end of the list)
                         e.preventDefault();
@@ -1392,29 +1550,31 @@ export function TransactionTable({
                         handleTransactionDrop(e, month as string, (monthTransactions as Transaction[]).length);
                       }}
                     >
-                      {(monthTransactions as Transaction[]).map((transaction, index) => (
-                        <Card
+                      {/* Remove the top permanent drop zone */}
+                      
+                            {(monthTransactions as Transaction[]).map((transaction, index) => (
+                                  <Card
                           key={transaction.id || utils.getTransactionId(transaction)}
                           draggable={true}
                           onDragStart={(e) => handleTransactionDragStart(e, transaction, index, month as string)}
                           onDragOver={(e) => handleTransactionDragOver(e, month as string, index)}
                           onDrop={(e) => handleTransactionDrop(e, month as string, index)}
                           onDragEnd={handleDragEnd}
-                          onClick={() => handleOpenMobileEdit(transaction, index)}
-                          sx={{
-                            mb: 1,
-                            p: 0.75,
-                            height: '60px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            bgcolor: getCardBackgroundColor(),
-                            border: 'none',
-                            borderRadius: 1,
-                            transition: 'all 0.2s ease-in-out',
+                                    onClick={() => handleOpenMobileEdit(transaction, index)}
+                                    sx={{
+                                      mb: 1,
+                                      p: 0.75,
+                                      height: '60px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      justifyContent: 'space-between',
+                                      bgcolor: getCardBackgroundColor(),
+                                      border: 'none',
+                                      borderRadius: 1,
+                                      transition: 'all 0.2s ease-in-out',
                             transform: draggedTransaction?.id === transaction.id ? 'scale(1.02)' : 'none',
-                            cursor: 'pointer',
-                            boxShadow: '0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)',
+                                      cursor: 'pointer',
+                                      boxShadow: '0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)',
                             opacity: draggedTransaction?.id === transaction.id ? 0.5 : 1,
                             // Add styles for when this card is the drop target for intra-month sorting
                             ...(isIntraMonthDrag && dragOverIndex === index && dragSourceMonth === month ? {
@@ -1473,25 +1633,25 @@ export function TransactionTable({
                                   : '0 0 8px rgba(33, 150, 243, 0.5)',
                               }
                             } : {}),
-                            '&:hover': {
-                              boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
-                              transform: 'translateY(-2px)',
-                              bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getCardBackgroundColor(true)
-                            }
-                          }}
-                        >
-                          <Typography 
-                            variant="subtitle1"
-                            sx={{ 
-                              color: hasCustomDarkColor || (!hasCustomColor && category === 'Income')
-                                ? 'rgba(255, 255, 255, 0.85)' 
-                                : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)')),
-                              fontWeight: 500,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 1,
-                              WebkitBoxOrient: 'vertical',
+                                      '&:hover': {
+                                        boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
+                                        transform: 'translateY(-2px)',
+                                        bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getCardBackgroundColor(true)
+                                      }
+                                    }}
+                                  >
+                                    <Typography 
+                                      variant="subtitle1"
+                                      sx={{ 
+                                        color: hasCustomDarkColor || (!hasCustomColor && category === 'Income')
+                                          ? 'rgba(255, 255, 255, 0.85)' 
+                                          : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)')),
+                                        fontWeight: 500,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        display: '-webkit-box',
+                                        WebkitLineClamp: 1,
+                                        WebkitBoxOrient: 'vertical',
                               fontSize: {
                                 xs: '0.64rem', // 75% of 0.85rem
                                 sm: '0.64rem',
@@ -1499,26 +1659,26 @@ export function TransactionTable({
                                 lg: '0.64rem',
                                 xl: '0.85rem', // Original size at 1500px and above
                               },
-                              lineHeight: 1.2
-                            }}
-                          >
-                            {transaction.description}
-                          </Typography>
-                          
-                          {/* Bottom row with date and amount */}
-                          <Box sx={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center',
-                            width: '100%',
-                            mt: 0.5
-                          }}>
-                            <Typography 
-                              variant="body2"
-                              sx={{ 
-                                color: hasCustomDarkColor || (!hasCustomColor && category === 'Income') 
-                                  ? 'rgba(255, 255, 255, 0.7)' 
-                                  : (category === 'Income' ? 'rgba(0, 0, 0, 0.7)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)')),
+                                        lineHeight: 1.2
+                                      }}
+                                    >
+                                      {transaction.description}
+                                    </Typography>
+                                    
+                                    {/* Bottom row with date and amount */}
+                                    <Box sx={{ 
+                                      display: 'flex', 
+                                      justifyContent: 'space-between', 
+                                      alignItems: 'center',
+                                      width: '100%',
+                                      mt: 0.5
+                                    }}>
+                                      <Typography 
+                                        variant="body2"
+                                        sx={{ 
+                                          color: hasCustomDarkColor || (!hasCustomColor && category === 'Income') 
+                                            ? 'rgba(255, 255, 255, 0.7)' 
+                                            : (category === 'Income' ? 'rgba(0, 0, 0, 0.7)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)')),
                                 fontSize: {
                                   xs: '0.56rem', // 75% of 0.75rem
                                   sm: '0.56rem',
@@ -1526,21 +1686,21 @@ export function TransactionTable({
                                   lg: '0.56rem',
                                   xl: '0.75rem', // Original size at 1500px and above
                                 }
-                              }}
-                            >
-                              {new Date(transaction.date).toLocaleDateString('en-US', { 
-                                month: 'short',
+                                        }}
+                                      >
+                                        {new Date(transaction.date).toLocaleDateString('en-US', { 
+                                          month: 'short',
                                 day: 'numeric'
-                              })}
-                            </Typography>
-                            
-                            {/* Amount to the right of date */}
-                            <Typography 
-                              variant="body2"
-                              sx={{ 
-                                color: hasCustomDarkColor || (!hasCustomColor && category === 'Income')
-                                  ? 'rgba(255, 255, 255, 0.85)' 
-                                  : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)')),
+                                        })}
+                                      </Typography>
+                                      
+                                      {/* Amount to the right of date */}
+                                      <Typography 
+                                        variant="body2"
+                                        sx={{ 
+                                          color: hasCustomDarkColor || (!hasCustomColor && category === 'Income')
+                                            ? 'rgba(255, 255, 255, 0.85)' 
+                                            : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)')),
                                 fontSize: {
                                   xs: '0.56rem', // 75% of 0.75rem
                                   sm: '0.56rem',
@@ -1548,12 +1708,12 @@ export function TransactionTable({
                                   lg: '0.56rem',
                                   xl: '0.75rem', // Original size at 1500px and above
                                 }
-                              }}
-                            >
-                              ${Math.abs(transaction.amount).toFixed(2)}
-                            </Typography>
-                          </Box>
-                        </Card>
+                                        }}
+                                      >
+                                        ${Math.abs(transaction.amount).toFixed(2)}
+                                      </Typography>
+                                    </Box>
+                                  </Card>
                       ))}
                       
                       {/* Empty drop zone at the end of the list - enhance the visual indicator */}
@@ -1590,32 +1750,160 @@ export function TransactionTable({
                         </Box>
                       )}
                       
-                      {/* Add button as the last card in the list */}
-                      <Card
-                        onClick={() => handleOpenMobileAdd(month as string)}
-                        sx={{
-                          p: 0.75,
-                          height: '60px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          bgcolor: getCardBackgroundColor(),
-                          border: 'none',
-                          borderRadius: 1,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease-in-out',
-                          boxShadow: '0 3px 6px rgba(0,0,0,0.1), 0 3px 6px rgba(0,0,0,0.15)',
-                          mb: 3,
-                          '&:hover': {
-                            boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
-                            transform: 'translateY(-2px)',
-                            bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getCardBackgroundColor(true)
-                          }
-                        }}
-                      >
-                        <AddIcon 
-                          sx={{ 
+                      {/* "Move Here" drop zone - only visible when dragging */}
+                      {isDragging && (
+                        <Box
+                          className="drop-zone"
+                          sx={{
+                            height: '50px',
+                            borderRadius: 1,
+                            border: `3px dashed #2196f3`,
+                            backgroundColor: (dragOverMonth === month && dragOverIndex === -999) 
+                              ? 'rgba(33, 150, 243, 0.2)'
+                              : 'rgba(33, 150, 243, 0.05)',
+                            mb: 1,
+                            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                            boxShadow: (dragOverMonth === month && dragOverIndex === -999)
+                              ? '0 0 15px rgba(33, 150, 243, 0.5)'
+                              : 'none',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            transform: (dragOverMonth === month && dragOverIndex === -999) ? 'scale(1.03)' : 'scale(1)',
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isDragging && draggedTransaction) {
+                              // Use a special index (-999) to indicate bottom of the list
+                              setDragOverMonth(month as string);
+                              setDragOverIndex(-999);
+                              
+                              // Force move mode (not copy)
+                              setIsCopyMode(false);
+                              
+                              // Set drop effect
+                              e.dataTransfer.dropEffect = 'move';
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isDragging && draggedTransaction) {
+                              // Force move mode
+                              setIsCopyMode(false);
+                              
+                              // Handle drop at the bottom of the month
+                              const monthTransactions = groupTransactionsByMonth(filteredTransactions)[month as string] || [];
+                              const bottomIndex = monthTransactions.length;
+                              handleTransactionDrop(e, month as string, bottomIndex);
+                            }
+                          }}
+                        >
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              color: '#2196f3',
+                              fontWeight: (dragOverMonth === month && dragOverIndex === -999 && !isCopyMode) ? 'bold' : 'normal',
+                              fontSize: '0.85rem',
+                            }}
+                          >
+                            Move Here
+                          </Typography>
+                        </Box>
+                      )}
+                      
+                      {/* "Copy Here" drop zone - only visible when dragging */}
+                      {isDragging && (
+                        <Box
+                          className="drop-zone"
+                          sx={{
+                            height: '50px',
+                            borderRadius: 1,
+                            border: `3px dashed #4caf50`,
+                            backgroundColor: (dragOverMonth === month && dragOverIndex === -888) 
+                              ? 'rgba(76, 175, 80, 0.2)'
+                              : 'rgba(76, 175, 80, 0.05)',
+                            mb: 2,
+                            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                            boxShadow: (dragOverMonth === month && dragOverIndex === -888)
+                              ? '0 0 15px rgba(76, 175, 80, 0.5)'
+                              : 'none',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            transform: (dragOverMonth === month && dragOverIndex === -888) ? 'scale(1.03)' : 'scale(1)',
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isDragging && draggedTransaction) {
+                              // Use a special index (-888) to indicate copy zone
+                              setDragOverMonth(month as string);
+                              setDragOverIndex(-888);
+                              
+                              // Force copy mode
+                              setIsCopyMode(true);
+                              
+                              // Set drop effect
+                              e.dataTransfer.dropEffect = 'copy';
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (isDragging && draggedTransaction) {
+                              // Force copy mode
+                              setIsCopyMode(true);
+                              
+                              // Handle drop at the bottom of the month
+                              const monthTransactions = groupTransactionsByMonth(filteredTransactions)[month as string] || [];
+                              const bottomIndex = monthTransactions.length;
+                              handleTransactionDrop(e, month as string, bottomIndex);
+                            }
+                          }}
+                        >
+                          <Typography 
+                            variant="caption" 
+                            sx={{ 
+                              color: '#4caf50',
+                              fontWeight: (dragOverMonth === month && dragOverIndex === -888) ? 'bold' : 'normal',
+                              fontSize: '0.85rem',
+                            }}
+                          >
+                            Copy Here
+                          </Typography>
+                        </Box>
+                      )}
+                            
+                            {/* Add button as the last card in the list */}
+                            <Card
+                              onClick={() => handleOpenMobileAdd(month as string)}
+                              sx={{
+                                p: 0.75,
+                                height: '60px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                bgcolor: getCardBackgroundColor(),
+                                border: 'none',
+                                borderRadius: 1,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease-in-out',
+                                boxShadow: '0 3px 6px rgba(0,0,0,0.1), 0 3px 6px rgba(0,0,0,0.15)',
+                                mb: 3,
+                                '&:hover': {
+                                  boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
+                                  transform: 'translateY(-2px)',
+                                  bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getCardBackgroundColor(true)
+                                }
+                              }}
+                            >
+                              <AddIcon 
+                                sx={{ 
                             fontSize: {
                               xs: '1.125rem', // 75% of 1.5rem (which was 75% of 2rem)
                               sm: '1.125rem',
@@ -1623,18 +1911,18 @@ export function TransactionTable({
                               lg: '1.125rem',
                               xl: '1.5rem', // 75% of original 2rem size
                             },
-                            color: getTextColor(),
-                            '&:hover': {
-                              color: getTextColor(true)
-                            }
-                          }} 
-                        />
-                      </Card>
-                    </Stack>
-                  </Box>
-                ));
-            })()}
-          </Box>
+                                  color: getTextColor(),
+                                  '&:hover': {
+                                    color: getTextColor(true)
+                                  }
+                                }} 
+                              />
+                            </Card>
+                          </Stack>
+                    </Box>
+                  ));
+              })()}
+            </Box>
         </Box>
       </Paper>
 
