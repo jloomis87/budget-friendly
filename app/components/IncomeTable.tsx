@@ -253,7 +253,9 @@ export function IncomeTable({
       
       // Update date if changed
       if (editingRow.date) {
-        updates.date = new Date(editingRow.date);
+        // Create date with local timezone to prevent date shift
+        const [year, month, day] = editingRow.date.split('-').map(Number);
+        updates.date = new Date(year, month - 1, day);
       }
       
       // Update description if changed
@@ -444,11 +446,12 @@ export function IncomeTable({
   // Handle saving mobile edit
   const handleSaveMobileEdit = () => {
     if (mobileEditTransaction && editingRow) {
-      const day = parseInt(editingRow.date, 10);
+      // Create date with local timezone to prevent date shift
+      const [year, month, day] = editingRow.date.split('-').map(Number);
       
       const updatedTransaction: Partial<Transaction> = {
         description: editingRow.description,
-        date: day, // Store as day number
+        date: new Date(year, month - 1, day),
         amount: parseFloat(editingRow.amount) // Income is always positive
       };
       

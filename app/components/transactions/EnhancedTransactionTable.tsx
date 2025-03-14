@@ -234,12 +234,12 @@ export function EnhancedTransactionTable({
         updates.amount = signedAmount;
       }
       
-      // Update date if changed - now storing full date string
+      // Update date if changed - create date with local timezone
       if (editingRow.date) {
         try {
-          // Store the full date string
-          updates.date = editingRow.date;
-          console.log('Updating date to:', editingRow.date);
+          const [year, month, day] = editingRow.date.split('-').map(Number);
+          updates.date = new Date(year, month - 1, day);
+          console.log('Updating date to:', updates.date);
         } catch (e) {
           // Invalid date, ignore
           console.error('Error parsing date:', e);
@@ -272,25 +272,28 @@ export function EnhancedTransactionTable({
     }
   };
 
-  // Handle adding a new transaction
+  // Handle adding new income transaction
   const handleAddTransaction = () => {
+    // Validate inputs
     if (!newDescription.trim() || !newAmount.trim()) return;
 
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];  // Get YYYY-MM-DD format
+    // Create date with local timezone
+    const [year, month, day] = newDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
 
-    const transaction: Transaction = {
+    // Create transaction object
+    const newTransaction: Transaction = {
       description: newDescription.trim(),
       amount: -parseFloat(newAmount.replace(/[^0-9.]/g, '')),
-      date: dateStr,
+      date: date,
       category: category as "Essentials" | "Wants" | "Savings" | "Income",
       id: uuidv4(),
     };
 
-    onAddTransaction(transaction);
+    onAddTransaction(newTransaction);
     setNewDescription('');
     setNewAmount('');
-    setNewDate('1');
+    setNewDate(new Date().toISOString().split('T')[0]);
     setIsAdding(false);
   };
 
@@ -433,9 +436,12 @@ export function EnhancedTransactionTable({
   // Handle saving mobile edit
   const handleSaveMobileEdit = () => {
     if (mobileEditTransaction && editingRow) {
+      // Create date with local timezone
+      const [year, month, day] = editingRow.date.split('-').map(Number);
+      
       const updatedTransaction: Partial<Transaction> = {
         description: editingRow.description,
-        date: editingRow.date, // Store full date string
+        date: new Date(year, month - 1, day),
         amount: parseFloat(editingRow.amount) * (category === 'Income' ? 1 : -1)
       };
       
@@ -481,10 +487,14 @@ export function EnhancedTransactionTable({
   const handleAddTransactionMobile = () => {
     if (!newDescription.trim() || !newAmount.trim()) return;
 
+    // Create date with local timezone
+    const [year, month, day] = newDate.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+
     const transaction: Transaction = {
       description: newDescription.trim(),
       amount: -parseFloat(newAmount.replace(/[^0-9.]/g, '')),
-      date: newDate, // Use the full date string from the date picker
+      date: date,
       category: category as "Essentials" | "Wants" | "Savings" | "Income",
       id: uuidv4(),
     };
