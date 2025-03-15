@@ -105,28 +105,18 @@ const groupTransactionsByMonth = (transactions: Transaction[]) => {
       grouped[month] = [];
     }
     
-    // Log for debugging Income transactions
-    if (transaction.category === 'Income') {
-      console.log(`Adding Income transaction to ${month}:`, {
-        description: transaction.description,
-        amount: transaction.amount,
-        date: date.toISOString(),
-        id: transaction.id,
-        order: transaction.order
-      });
-    }
     
     grouped[month].push(transaction);
   });
   
   // Sort transactions within each month
   Object.entries(grouped).forEach(([month, monthTransactions]) => {
-    console.log(`Sorting ${monthTransactions.length} transactions for ${month}`);
+ 
     
     monthTransactions.sort((a, b) => {
       // First sort by order property if available
       if (a.order !== undefined && b.order !== undefined) {
-        console.log(`Sorting by order: ${a.description} (${a.order}) vs ${b.description} (${b.order})`);
+       
         return a.order - b.order;
       }
       
@@ -152,17 +142,7 @@ const groupTransactionsByMonth = (transactions: Transaction[]) => {
     });
     
     // Log the sorted order for debugging
-    if (monthTransactions.some(t => t.category === 'Income')) {
-      console.log(`Sorted Income transactions for ${month}:`, 
-        monthTransactions
-          .filter(t => t.category === 'Income')
-          .map(t => ({ 
-            description: t.description, 
-            order: t.order, 
-            id: t.id 
-          }))
-      );
-    }
+
   });
   
   return grouped;
@@ -252,14 +232,7 @@ export function TransactionTable({
 
   // Filter transactions by selected months - add refreshCounter as a dependency
   const filteredTransactions = React.useMemo(() => {
-    // For debugging
-    console.log(`Filtering transactions for ${category}:`, {
-      totalTransactions: transactions.length,
-      selectedMonths,
-      hasSelectedMonths: Boolean(selectedMonths?.length),
-      refreshCounter // Log the refresh counter for debugging
-    });
-    
+  
     if (!selectedMonths?.length) {
       return transactions;
     }
@@ -283,11 +256,7 @@ export function TransactionTable({
       return selectedMonths.includes(transactionMonth);
     });
     
-    // For debugging
-    console.log(`Filtered ${category} transactions:`, {
-      before: transactions.length,
-      after: filtered.length
-    });
+   
     
     return filtered;
   }, [transactions, selectedMonths, category, refreshCounter]); // Add refreshCounter as a dependency
@@ -465,7 +434,13 @@ export function TransactionTable({
         amount: category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount)
       };
 
+      // Add the new transaction
       onAddTransaction(newTransaction);
+
+      
+      // Force refresh the component
+      forceRefresh();
+      console.log('After calling forceRefresh');
       addedCount++;
     });
 
@@ -478,21 +453,29 @@ export function TransactionTable({
   };
 
   const getBackgroundStyles = () => {
+    // Always start with the base styles that include the custom background color
+    const baseStyles = hasCustomColor ? { backgroundColor: tableColors[category] } : {};
+    
     if (dragOverCategory === category) {
       return {
-        backgroundColor: 'rgba(25, 118, 210, 0.08)',
-        transition: 'background-color 0.3s ease',
+        ...baseStyles, // Preserve the custom background color
+        transition: 'background-color 0.3s ease, transform 0.3s ease',
         transform: 'scale(1.01)',
         boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)'
       };
     }
     if (recentlyDropped === category) {
       return {
-        backgroundColor: 'rgba(76, 175, 80, 0.08)',
-        transition: 'background-color 0.8s ease'
+        ...baseStyles, // Preserve the custom background color
+        transition: 'background-color 0.8s ease, transform 0.3s ease',
+        transform: 'scale(1.0)' // Explicitly reset to original size
       };
     }
-    return hasCustomColor ? { backgroundColor: tableColors[category] } : {};
+    return {
+      ...baseStyles,
+      transform: 'scale(1.0)', // Ensure transform is explicitly set to normal
+      transition: 'transform 0.3s ease'
+    };
   };
 
   const getMonthOrder = (month: string): number => {
@@ -516,7 +499,7 @@ export function TransactionTable({
   const [isIntraMonthDrag, setIsIntraMonthDrag] = useState(false);
   
   // Helper function to reset all drag state
-  const resetDragState = () => {
+  const resetDragState = (preserveCopyMode = false) => {
     setIsIntraMonthDrag(false);
     setDragOverIndex(null);
     setIsDragging(false);
@@ -524,7 +507,9 @@ export function TransactionTable({
     setDraggedIndex(null);
     setDragSourceMonth(null);
     setDragOverMonth(null);
-    setIsCopyMode(false);
+    if (!preserveCopyMode) {
+      setIsCopyMode(false);
+    }
   };
   
   // Custom drag and drop handlers
@@ -638,16 +623,6 @@ export function TransactionTable({
     e.preventDefault();
     e.stopPropagation();
     
-    // For debugging
-    console.log(`Drop on ${category} transaction:`, {
-      targetMonth,
-      targetIndex,
-      draggedIndex,
-      dragSourceMonth,
-      category,
-      isIntraMonthDrag: dragSourceMonth === targetMonth,
-      isCopyMode
-    });
     
     // Ensure we have a dragged transaction
     if (draggedIndex === null || !draggedTransaction || !dragSourceMonth) {
@@ -656,9 +631,11 @@ export function TransactionTable({
     }
     
     // Handle special indices
+    let forceCopyMode = false;
     if (targetIndex === -888) {
       // Force copy mode for the copy zone
       setIsCopyMode(true);
+      forceCopyMode = true;
       // Use the length of the month's transactions as the target index
       const groupedTransactions = groupTransactionsByMonth(filteredTransactions);
       targetIndex = (groupedTransactions[targetMonth] || []).length;
@@ -675,7 +652,7 @@ export function TransactionTable({
     const targetMonthTransactions = [...(groupedTransactions[targetMonth] || [])];
     
     // Handle intra-month drag (sorting within the same month)
-    if (dragSourceMonth === targetMonth && draggedIndex !== targetIndex && !isCopyMode) {
+    if (dragSourceMonth === targetMonth && draggedIndex !== targetIndex && !isCopyMode && !forceCopyMode) {
       try {
         const sourceTransaction = targetMonthTransactions[draggedIndex];
         if (!sourceTransaction) {
@@ -701,8 +678,8 @@ export function TransactionTable({
         showNotification(`Error reordering transaction: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       }
     } 
-    // Handle inter-month drag (moving to a different month)
-    else if (dragSourceMonth !== targetMonth) {
+    // Handle inter-month drag (moving to a different month) or forced copy mode
+    else if (dragSourceMonth !== targetMonth || forceCopyMode) {
       const months = [
         'January', 'February', 'March', 'April', 'May', 'June',
         'July', 'August', 'September', 'October', 'November', 'December'
@@ -721,8 +698,10 @@ export function TransactionTable({
       if (isDuplicate) {
         showNotification(`Duplicate transaction "${draggedTransaction.description}" already exists in ${targetMonth}`, 'warning');
       } else {
-        if (isCopyMode) {
+        if (isCopyMode || forceCopyMode) {
           // COPY MODE: Create a new transaction with the same details but a new ID
+         
+          
           const newTransaction: Transaction = {
             ...draggedTransaction,
             id: uuidv4(), // Generate a new UUID
@@ -730,8 +709,12 @@ export function TransactionTable({
             order: targetIndex // Set the order explicitly to match the drop position
           };
           
+      
           // Add the new transaction
           onAddTransaction(newTransaction);
+          
+          // Force refresh the component
+          forceRefresh();
           
           // After adding, update the order of all transactions in the target month
           setTimeout(() => {
@@ -806,6 +789,9 @@ export function TransactionTable({
             // Add the new transaction
             onAddTransaction(newTransaction);
             
+            // Force refresh the component
+            forceRefresh();
+            
             // After adding, update the order of all transactions in the target month
             setTimeout(() => {
               // Get all transactions in the target month, including the newly added one
@@ -865,8 +851,8 @@ export function TransactionTable({
       }
     }
     
-    // Reset drag state
-    resetDragState();
+    // Reset drag state - preserve copy mode if we're in a copy operation
+    resetDragState(forceCopyMode || isCopyMode);
   };
   
   const handleMonthDragOver = (e: React.DragEvent, targetMonth: string) => {
@@ -940,11 +926,14 @@ export function TransactionTable({
     
     // If dropping in the same month, do nothing
     if (dragSourceMonth === targetMonth) {
-      setIsDragging(false);
-      setDraggedTransaction(null);
-      setDraggedIndex(null);
-      setDragSourceMonth(null);
+      resetDragState();
       return;
+    }
+    
+    // Check if we're in the special copy zone
+    const forceCopyMode = dragOverIndex === -888;
+    if (forceCopyMode) {
+      setIsCopyMode(true);
     }
     
     // Get the target month index
@@ -970,7 +959,7 @@ export function TransactionTable({
     if (isDuplicate) {
       showNotification(`Duplicate transaction "${draggedTransaction.description}" already exists in ${targetMonth}`, 'warning');
     } else {
-      if (isCopyMode) {
+      if (isCopyMode || forceCopyMode) {
         // COPY MODE: Create a new transaction with the same details but a new ID
         const newTransaction: Transaction = {
           ...draggedTransaction,
@@ -1101,8 +1090,8 @@ export function TransactionTable({
       }
     }
     
-    // Reset drag state
-    resetDragState();
+    // Reset drag state - preserve copy mode if we're in a copy operation
+    resetDragState(forceCopyMode || isCopyMode);
     
     // Call the parent drop handler if provided
     if (onDrop) {
@@ -1119,6 +1108,18 @@ export function TransactionTable({
     
     // Reset all drag state
     resetDragState();
+    
+    // Force cursor back to normal after a short delay
+    setTimeout(() => {
+      const style = document.createElement('style');
+      style.innerHTML = `* { cursor: default !important; }`;
+      document.head.appendChild(style);
+      
+      // Remove the style after a very short time
+      setTimeout(() => {
+        document.head.removeChild(style);
+      }, 50);
+    }, 10);
   };
 
   // Function to get text color based on category and custom color
@@ -1573,7 +1574,7 @@ export function TransactionTable({
                                       borderRadius: 1,
                                       transition: 'all 0.2s ease-in-out',
                             transform: draggedTransaction?.id === transaction.id ? 'scale(1.02)' : 'none',
-                                      cursor: 'pointer',
+                                      cursor: isDragging ? 'grabbing' : 'grab', // Change cursor based on drag state
                                       boxShadow: '0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)',
                             opacity: draggedTransaction?.id === transaction.id ? 0.5 : 1,
                             // Add styles for when this card is the drop target for intra-month sorting
@@ -1750,8 +1751,10 @@ export function TransactionTable({
                         </Box>
                       )}
                       
-                      {/* "Move Here" drop zone - only visible when dragging */}
-                      {isDragging && (
+                  
+
+                       {/* "Move Here" drop zone - only visible when dragging */}
+                       {isDragging && (
                         <Box
                           className="drop-zone"
                           sx={{
@@ -1793,18 +1796,19 @@ export function TransactionTable({
                             if (isDragging && draggedTransaction) {
                               // Force move mode
                               setIsCopyMode(false);
+               
                               
                               // Handle drop at the bottom of the month
                               const monthTransactions = groupTransactionsByMonth(filteredTransactions)[month as string] || [];
                               const bottomIndex = monthTransactions.length;
-                              handleTransactionDrop(e, month as string, bottomIndex);
+                              handleTransactionDrop(e, month as string, -999); // Use -999 to indicate move zone
                             }
                           }}
                         >
                           <Typography 
                             variant="caption" 
                             sx={{ 
-                              color: '#2196f3',
+                              color: 'rgba(33, 150, 243, 1)',
                               fontWeight: (dragOverMonth === month && dragOverIndex === -999 && !isCopyMode) ? 'bold' : 'normal',
                               fontSize: '0.85rem',
                             }}
@@ -1813,63 +1817,70 @@ export function TransactionTable({
                           </Typography>
                         </Box>
                       )}
-                      
-                      {/* "Copy Here" drop zone - only visible when dragging */}
-                      {isDragging && (
+
+                        {/* "Copy Here" drop zone - only visible when dragging */}
+                        {isDragging && (
                         <Box
                           className="drop-zone"
                           sx={{
                             height: '50px',
                             borderRadius: 1,
-                            border: `3px dashed #4caf50`,
-                            backgroundColor: (dragOverMonth === month && dragOverIndex === -888) 
-                              ? 'rgba(76, 175, 80, 0.2)'
-                              : 'rgba(76, 175, 80, 0.05)',
-                            mb: 2,
+                            border: `3px dashed rgb(61, 222, 109)`,
+                            backgroundColor: (dragOverMonth === month && dragOverIndex === -999) 
+                              ? 'rgba(68, 248, 89, 0.2)'
+                              : 'rgba(33, 243, 107, 0.05)',
+                            mb: 1,
                             transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                            boxShadow: (dragOverMonth === month && dragOverIndex === -888)
-                              ? '0 0 15px rgba(76, 175, 80, 0.5)'
+                            boxShadow: (dragOverMonth === month && dragOverIndex === -999)
+                              ? '0 0 15px rgba(90, 212, 133, 0.5)'
                               : 'none',
                             display: 'flex',
                             justifyContent: 'center',
                             alignItems: 'center',
                             cursor: 'pointer',
-                            transform: (dragOverMonth === month && dragOverIndex === -888) ? 'scale(1.03)' : 'scale(1)',
+                            transform: (dragOverMonth === month && dragOverIndex === -999) ? 'scale(1.03)' : 'scale(1)',
                           }}
                           onDragOver={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (isDragging && draggedTransaction) {
-                              // Use a special index (-888) to indicate copy zone
+                              // Use a special index (-999) to indicate bottom of the list
                               setDragOverMonth(month as string);
-                              setDragOverIndex(-888);
+                              setDragOverIndex(-999);
                               
-                              // Force copy mode
+                              // Force move mode (not copy)
                               setIsCopyMode(true);
                               
                               // Set drop effect
-                              e.dataTransfer.dropEffect = 'copy';
+                              e.dataTransfer.dropEffect = 'move';
                             }
                           }}
                           onDrop={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             if (isDragging && draggedTransaction) {
-                              // Force copy mode
-                              setIsCopyMode(true);
+                           
+                              
+                              // Debug logging
+                              console.log('Dropping on Copy Here zone 2:', {
+                                month,
+                                dragOverIndex: -999,
+                                isCopyMode: false,
+                                draggedTransaction: draggedTransaction.description
+                              });
                               
                               // Handle drop at the bottom of the month
                               const monthTransactions = groupTransactionsByMonth(filteredTransactions)[month as string] || [];
                               const bottomIndex = monthTransactions.length;
-                              handleTransactionDrop(e, month as string, bottomIndex);
+                              handleTransactionDrop(e, month as string, -888); // Use -999 to indicate move zone
                             }
                           }}
                         >
                           <Typography 
                             variant="caption" 
                             sx={{ 
-                              color: '#4caf50',
-                              fontWeight: (dragOverMonth === month && dragOverIndex === -888) ? 'bold' : 'normal',
+                              color: 'rgb(61, 222, 109)',
+                              fontWeight: (dragOverMonth === month && dragOverIndex === -999 && isCopyMode) ? 'bold' : 'normal',
                               fontSize: '0.85rem',
                             }}
                           >
@@ -1877,6 +1888,7 @@ export function TransactionTable({
                           </Typography>
                         </Box>
                       )}
+                      
                             
                             {/* Add button as the last card in the list */}
                             <Card

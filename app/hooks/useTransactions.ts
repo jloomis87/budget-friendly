@@ -110,17 +110,33 @@ export function useTransactions() {
 
   // Add a transaction
   const addTransaction = useCallback(async (transaction: Transaction) => {
+    console.log('addTransaction called with:', {
+      description: transaction.description,
+      amount: transaction.amount,
+      date: transaction.date,
+      category: transaction.category,
+      id: transaction.id
+    });
+    
     try {
-      
       const newTransaction = {
         ...transaction,
         date: transaction.date instanceof Date ? transaction.date : new Date(transaction.date)
       };
       
+      console.log('Processed transaction:', {
+        description: newTransaction.description,
+        amount: newTransaction.amount,
+        date: newTransaction.date,
+        category: newTransaction.category,
+        id: newTransaction.id
+      });
+      
       let transactionId: string | undefined;
       
       // If authenticated, save to Firestore
       if (isAuthenticated && user?.id) {
+        console.log('Saving to Firestore for user:', user.id);
         setIsLoading(true);
         
         try {
@@ -128,21 +144,25 @@ export function useTransactions() {
           
           // Add the id to the transaction
           newTransaction.id = transactionId;
+          console.log('Transaction saved to Firestore with ID:', transactionId);
         } catch (firebaseError) {
           console.error('[useTransactions] Firebase error:', firebaseError);
           throw firebaseError;
         }
       } else {
+        console.log('User not authenticated, skipping Firestore save');
       }
       
       // Update local state
       const updatedTransactions = [...transactions, newTransaction];
+      console.log('Updating local state with new transaction');
 
       setTransactions(updatedTransactions);
+      console.log('Local state updated, transactions count:', updatedTransactions.length);
       
       // If not authenticated, save to localStorage
       if (!isAuthenticated || !user?.id) {
-
+        console.log('Saving to localStorage');
         setLocalTransactions(updatedTransactions);
       }
       
