@@ -10,7 +10,7 @@ import {
 import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from './useLocalStorage';
 import { useAuth } from '../contexts/AuthContext';
 import * as transactionService from '../services/transactionService';
-import { getFirestore, collection, getDocs, writeBatch, type QueryDocumentSnapshot } from '@firebase/firestore/lite';
+import { collection, getDocs, writeBatch, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 
 export function useTransactions() {

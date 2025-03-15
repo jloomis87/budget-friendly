@@ -1,4 +1,3 @@
-
 export { AddTransactionButton } from './AddTransactionButton';
 export { AddTransactionRow } from './AddTransactionRow';
 export { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
@@ -28,4 +27,10 @@ export type {
   DeleteConfirmationDialogProps,
   MobileEditDialogProps,
   MobileAddDialogProps
-} from './types'; 
+} from './types';
+
+export * from './TransactionCard';
+export * from './MonthColumn';
+export * from './DragIndicator';
+export * from './TransactionTableHeader';
+export * from './TransactionTableContext'; 

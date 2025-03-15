@@ -146,4 +146,107 @@ export interface MobileAddDialogProps {
   getOrdinalSuffix: (day: number) => string;
   tableColor?: string;
   isDark?: boolean;
+}
+
+export interface TransactionCardProps {
+  transaction: Transaction;
+  index: number;
+  month: string;
+  isDark: boolean;
+  hasCustomColor: boolean;
+  hasCustomDarkColor: boolean;
+  category: string;
+  isDragging: boolean;
+  draggedTransaction: Transaction | null;
+  draggedIndex: number | null;
+  dragSourceMonth: string | null;
+  dragOverMonth: string | null;
+  dragOverIndex: number | null;
+  isIntraMonthDrag: boolean;
+  isCopyMode: boolean;
+  getCardBackgroundColor: (isHover?: boolean) => string;
+  getTextColor: (isHover?: boolean) => string;
+  handleTransactionDragStart: (e: React.DragEvent, transaction: Transaction, index: number, sourceMonth: string) => void;
+  handleTransactionDragOver: (e: React.DragEvent, targetMonth: string, targetIndex: number) => void;
+  handleTransactionDrop: (e: React.DragEvent, targetMonth: string, targetIndex: number) => void;
+  handleDragEnd: (e: React.DragEvent) => void;
+  handleOpenMobileEdit: (transaction: Transaction, index: number) => void;
+}
+
+export interface MonthColumnProps {
+  month: string;
+  monthTransactions: Transaction[];
+  category: string;
+  isDark: boolean;
+  hasCustomColor: boolean;
+  hasCustomDarkColor: boolean;
+  isDragging: boolean;
+  draggedTransaction: Transaction | null;
+  draggedIndex: number | null;
+  dragSourceMonth: string | null;
+  dragOverMonth: string | null;
+  dragOverIndex: number | null;
+  isIntraMonthDrag: boolean;
+  isCopyMode: boolean;
+  getCardBackgroundColor: (isHover?: boolean) => string;
+  getTextColor: (isHover?: boolean) => string;
+  handleMonthDragOver: (e: React.DragEvent, targetMonth: string) => void;
+  handleMonthDragLeave: (e: React.DragEvent) => void;
+  handleMonthDrop: (e: React.DragEvent, targetMonth: string) => void;
+  handleTransactionDragStart: (e: React.DragEvent, transaction: Transaction, index: number, sourceMonth: string) => void;
+  handleTransactionDragOver: (e: React.DragEvent, targetMonth: string, targetIndex: number) => void;
+  handleTransactionDrop: (e: React.DragEvent, targetMonth: string, targetIndex: number) => void;
+  handleDragEnd: (e: React.DragEvent) => void;
+  handleOpenMobileEdit: (transaction: Transaction, index: number) => void;
+  handleOpenMobileAdd: (month: string) => void;
+  handleCopyMonthClick: (month: string, transactions: Transaction[]) => void;
+  getNextMonth: (currentMonth: string) => string;
+  getMonthOrder: (month: string) => number;
+}
+
+export interface DragIndicatorProps {
+  isDragging: boolean;
+  isCopyMode: boolean;
+  isIntraMonthDrag: boolean;
+  dragSourceMonth: string | null;
+}
+
+export interface TransactionTableHeaderProps {
+  category: string;
+  totalAmount: number;
+  hasCustomColor: boolean;
+  hasCustomDarkColor: boolean;
+  isDark: boolean;
+  tableColors: Record<string, string>;
+}
+
+export interface TransactionTableContextProps {
+  category: string;
+  transactions: Transaction[];
+  allTransactions: Transaction[];
+  isDark: boolean;
+  onUpdateTransaction: (index: number, updatedTransaction: Partial<Transaction>) => void;
+  onDeleteTransaction: (index: number) => void;
+  onAddTransaction: (transaction: Transaction) => void;
+  onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
+  onDragOver?: (e: React.DragEvent, category: string) => void;
+  onDrop?: (e: React.DragEvent, targetCategory: string) => void;
+  dragOverCategory?: string | null;
+  recentlyDropped?: string | null;
+  onReorder?: (category: string, sourceIndex: number, targetIndex: number) => void;
+  selectedMonths?: string[];
+  month: string;
+  onTransactionsChange: (newTransactions: Transaction[]) => void;
+}
+
+export interface DragDropState {
+  draggedTransaction: Transaction | null;
+  draggedIndex: number | null;
+  dragSourceMonth: string | null;
+  dragOverMonth: string | null;
+  isDragging: boolean;
+  isCopyMode: boolean;
+  dragLeaveTimeout: number | null;
+  dragOverIndex: number | null;
+  isIntraMonthDrag: boolean;
 } 

@@ -90,7 +90,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Only load if authenticated and we haven't loaded for this user yet
       if (isAuthenticated && user && loadedUserIdRef.current !== user.id) {
         setIsLoading(true);
-        console.log('Loading theme preference from Firebase for user:', user.id);
+       
         
         try {
           setFirebaseError(null);
