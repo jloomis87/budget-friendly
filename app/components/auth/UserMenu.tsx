@@ -122,28 +122,30 @@ const UserMenu: React.FC<UserMenuProps> = () => {
         
         <Divider />
         
-        <MenuItem onClick={handleClose} sx={{ py: 1.5 }}>
+        <MenuItem onClick={() => {
+          handleClose();
+          navigate('/settings');
+        }} sx={{ py: 1.5 }}>
           <ListItemIcon>
             <AccountCircleIcon fontSize="small" />
           </ListItemIcon>
           Account Settings
         </MenuItem>
 
-        <MenuItem onClick={handleClose} sx={{ py: 1.5 }}>
-          <ListItemIcon>
-            <NotificationsIcon fontSize="small" />
-          </ListItemIcon>
-          Notifications
-        </MenuItem>
-
-        <MenuItem onClick={handleClose} sx={{ py: 1.5 }}>
+        <MenuItem onClick={() => {
+          handleClose();
+          navigate('/privacy-security');
+        }} sx={{ py: 1.5 }}>
           <ListItemIcon>
             <SecurityIcon fontSize="small" />
           </ListItemIcon>
           Privacy & Security
         </MenuItem>
 
-        <MenuItem onClick={handleClose} sx={{ py: 1.5 }}>
+        <MenuItem onClick={() => {
+          handleClose();
+          navigate('/help-support');
+        }} sx={{ py: 1.5 }}>
           <ListItemIcon>
             <HelpIcon fontSize="small" />
           </ListItemIcon>

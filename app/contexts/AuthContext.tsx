@@ -1,198 +1,201 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { auth, db } from '../firebase/firebaseConfig';
 import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged, 
-  updateProfile 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updatePassword as firebaseUpdatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  type User as FirebaseAuthUser
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase/firebaseConfig';
 
-// Define user interface
-export interface User {
+interface User {
   id: string;
   email: string | null;
-  name: string;
-  createdAt: string;
+  displayName: string | null;
+  preferences?: {
+    theme?: 'light' | 'dark';
+    notifications?: boolean;
+    currency?: string;
+  };
 }
 
-// Define auth context interface
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, name: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateUserPreferences: (preferences: Partial<User['preferences']>) => Promise<void>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
-// Create the auth context with default values
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
   isLoading: true,
   error: null,
-  login: async () => {},
-  signup: async () => {},
+  signIn: async () => {},
+  signUp: async () => {},
   logout: async () => {},
+  updateUserPreferences: async () => {},
+  updatePassword: async () => {},
 });
 
-// Custom hook to use the auth context
 export const useAuth = () => useContext(AuthContext);
 
-// Auth provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Listen for auth state changes
   useEffect(() => {
-    
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setIsLoading(true);
-      
-      if (firebaseUser) {
-
-        try {
-          // Get user data from Firestore
-          const userDocRef = doc(db, 'users', firebaseUser.uid);
-          const userDoc = await getDoc(userDocRef);
+      try {
+        if (firebaseUser) {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          const userData = userDoc.data();
           
-          if (userDoc.exists()) {
-            // User exists in Firestore
-            const userData = userDoc.data() as Omit<User, 'id'>;
-            
-            const userObj = {
-              id: firebaseUser.uid,
-              ...userData
-            };
-            
-            setUser(userObj);
-          } else {
-            // User exists in Auth but not in Firestore
-            // This is a fallback that should rarely happen
-            
-            const userObj = {
-              id: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-              createdAt: new Date().toISOString()
-            };
-            
-            setUser(userObj);
-          }
-        } catch (err) {
-          console.error('[AuthContext] Error fetching user data:', err);
-          setError('Failed to load user data');
+          setUser({
+            id: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            preferences: userData?.preferences || {},
+          });
+        } else {
+          setUser(null);
         }
-      } else {
-        setUser(null);
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setError('Failed to load user data');
+      } finally {
+        setIsLoading(false);
       }
-      
-      setIsLoading(false);
     });
 
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
-  // Login function with Firebase
-  const login = async (email: string, password: string) => {
-    
-    setIsLoading(true);
-    setError(null);
-    
+  const signIn = async (email: string, password: string) => {
     try {
-      // Sign in with Firebase Authentication
-      
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      
-      // Auth state change listener will update the user state
-    } catch (err: any) {
-      console.error('[AuthContext] Login error:', err);
-      
-      // Handle specific Firebase error codes
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-        setError('Invalid email or password');
-      } else if (err.code === 'auth/too-many-requests') {
-        setError('Too many failed login attempts. Please try again later');
-      } else {
-        setError('Failed to login. Please try again.');
-      }
+      setError(null);
+      setIsLoading(true);
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      console.error('Sign in error:', err);
+      setError('Failed to sign in');
+      throw err;
+    } finally {
       setIsLoading(false);
     }
   };
 
-  // Signup function with Firebase
-  const signup = async (email: string, password: string, name: string) => {
-    
-    setIsLoading(true);
-    setError(null);
-    
+  const signUp = async (email: string, password: string) => {
     try {
-      // Create user with Firebase Authentication
-
+      setError(null);
+      setIsLoading(true);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
-      
-      // Update user profile with name
-
-      await updateProfile(firebaseUser, { displayName: name });
       
       // Create user document in Firestore
-      
-      const newUser: Omit<User, 'id'> = {
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
         email,
-        name,
         createdAt: new Date().toISOString(),
-      };
-      
-      await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-      
-      // Auth state change listener will update the user state
-    } catch (err: any) {
-      console.error('[AuthContext] Signup error:', err);
-      
-      // Handle specific Firebase error codes
-      if (err.code === 'auth/email-already-in-use') {
-        setError('Email is already in use');
-      } else if (err.code === 'auth/weak-password') {
-        setError('Password is too weak. It should be at least 6 characters');
-      } else if (err.code === 'auth/invalid-email') {
-        setError('Invalid email address');
-      } else {
-        setError('Failed to create account. Please try again.');
-      }
+        preferences: {
+          theme: 'light',
+          notifications: true,
+          currency: 'USD',
+        },
+      });
+    } catch (err) {
+      console.error('Sign up error:', err);
+      setError('Failed to create account');
+      throw err;
+    } finally {
       setIsLoading(false);
     }
   };
 
-  // Logout function with Firebase
   const logout = async () => {
     try {
+      setError(null);
       await signOut(auth);
-      // Auth state change listener will update the user state
     } catch (err) {
       console.error('Logout error:', err);
       setError('Failed to log out');
+      throw err;
     }
   };
 
-  // Provide the auth context to children components
+  const updateUserPreferences = async (preferences: Partial<User['preferences']>) => {
+    if (!user) throw new Error('No user logged in');
+    
+    try {
+      setError(null);
+      const userRef = doc(db, 'users', user.id);
+      const userDoc = await getDoc(userRef);
+      const currentPreferences = userDoc.data()?.preferences || {};
+      
+      await setDoc(userRef, {
+        preferences: {
+          ...currentPreferences,
+          ...preferences,
+        },
+      }, { merge: true });
+      
+      setUser(prev => prev ? {
+        ...prev,
+        preferences: {
+          ...prev.preferences,
+          ...preferences,
+        },
+      } : null);
+    } catch (err) {
+      console.error('Error updating preferences:', err);
+      setError('Failed to update preferences');
+      throw err;
+    }
+  };
+
+  const updatePassword = async (currentPassword: string, newPassword: string) => {
+    if (!user?.email || !auth.currentUser) throw new Error('No user logged in');
+    
+    try {
+      setError(null);
+      setIsLoading(true);
+      
+      // First, re-authenticate the user
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      
+      // Then update the password
+      await firebaseUpdatePassword(auth.currentUser, newPassword);
+    } catch (err) {
+      console.error('Password update error:', err);
+      setError('Failed to update password');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <AuthContext.Provider
+    <AuthContext.Provider 
       value={{
         user,
         isAuthenticated: !!user,
         isLoading,
         error,
-        login,
-        signup,
+        signIn,
+        signUp,
         logout,
+        updateUserPreferences,
+        updatePassword,
       }}
     >
       {children}
