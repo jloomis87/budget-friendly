@@ -7,7 +7,11 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
-  Title
+  Title,
+  type ChartData,
+  type ChartArea,
+  type Plugin,
+  type DefaultDataPoint
 } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
 import { Box, useTheme } from '@mui/material';
@@ -23,19 +27,123 @@ ChartJS.register(
   Title
 );
 
+// Define chart option types
+type ChartOptions = {
+  responsive?: boolean;
+  maintainAspectRatio?: boolean;
+  plugins?: {
+    legend?: {
+      position?: 'top' | 'bottom' | 'left' | 'right';
+      align?: 'start' | 'center' | 'end';
+      labels?: {
+        boxWidth?: number;
+        padding?: number;
+        font?: {
+          size?: number;
+        };
+        usePointStyle?: boolean;
+        pointStyle?: string;
+        color?: string;
+      };
+    };
+    tooltip?: {
+      bodyFont?: {
+        size?: number;
+      };
+      titleFont?: {
+        size?: number;
+      };
+      padding?: number;
+      backgroundColor?: string;
+      titleColor?: string;
+      bodyColor?: string;
+      borderColor?: string;
+      borderWidth?: number;
+      callbacks?: {
+        label?: (context: any) => string;
+      };
+    };
+    title?: {
+      display?: boolean;
+      text?: string;
+      font?: {
+        size?: number;
+        weight?: string;
+      };
+      padding?: {
+        top?: number;
+        bottom?: number;
+      };
+      color?: string;
+    };
+  };
+  scales?: {
+    y?: {
+      beginAtZero?: boolean;
+      grid?: {
+        color?: string;
+        drawBorder?: boolean;
+      };
+      ticks?: {
+        callback?: (value: number) => string;
+        font?: {
+          size?: number;
+        };
+        maxTicksLimit?: number;
+        color?: string;
+        padding?: number;
+      };
+    };
+    x?: {
+      grid?: {
+        display?: boolean;
+        drawBorder?: boolean;
+      };
+      ticks?: {
+        font?: {
+          size?: number;
+          weight?: string;
+        };
+        color?: string;
+        padding?: number;
+      };
+    };
+  };
+  layout?: {
+    padding?: {
+      top?: number;
+      right?: number;
+      bottom?: number;
+      left?: number;
+    };
+  };
+};
+
 // This component is lazy loaded to avoid SSR issues with Chart.js
 interface LazyChartsProps {
-  pieData: any;
-  barData: any;
-  barOptions: any;
+  pieData: ChartData<'pie'>;
+  barData: ChartData<'bar'>;
+  barOptions?: ChartOptions;
   showPie?: boolean;
   showBar?: boolean;
 }
 
+const defaultBarOptions: ChartOptions = {
+  plugins: {},
+  scales: {
+    y: {
+      ticks: {}
+    },
+    x: {
+      ticks: {}
+    }
+  }
+};
+
 export default function LazyCharts({ 
   pieData, 
   barData, 
-  barOptions,
+  barOptions = defaultBarOptions,
   showPie = true,
   showBar = true
 }: LazyChartsProps) {
@@ -124,11 +232,13 @@ export default function LazyCharts({
         >
           <Bar 
             options={{
+              ...defaultBarOptions,
               ...barOptions,
               responsive: true,
               maintainAspectRatio: false,
               plugins: {
-                ...barOptions.plugins,
+                ...(defaultBarOptions.plugins || {}),
+                ...(barOptions.plugins || {}),
                 legend: {
                   position: 'top',
                   align: 'center',
@@ -159,26 +269,31 @@ export default function LazyCharts({
                 }
               },
               scales: {
-                ...barOptions.scales,
+                ...(defaultBarOptions.scales || {}),
+                ...(barOptions.scales || {}),
                 y: {
-                  ...barOptions.scales.y,
+                  ...(defaultBarOptions.scales?.y || {}),
+                  ...(barOptions.scales?.y || {}),
                   grid: {
                     color: theme.palette.divider,
                     drawBorder: false,
                   },
                   ticks: {
-                    ...barOptions.scales.y.ticks,
+                    ...(defaultBarOptions.scales?.y?.ticks || {}),
+                    ...(barOptions.scales?.y?.ticks || {}),
                     color: theme.palette.text.secondary,
                   }
                 },
                 x: {
-                  ...barOptions.scales.x,
+                  ...(defaultBarOptions.scales?.x || {}),
+                  ...(barOptions.scales?.x || {}),
                   grid: {
                     display: false,
                     drawBorder: false
                   },
                   ticks: {
-                    ...barOptions.scales.x.ticks,
+                    ...(defaultBarOptions.scales?.x?.ticks || {}),
+                    ...(barOptions.scales?.x?.ticks || {}),
                     color: theme.palette.text.primary,
                   }
                 }

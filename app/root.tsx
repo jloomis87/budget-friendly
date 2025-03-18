@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, useRouteError } from 'react-router-dom';
-import { BudgetApp } from './components/BudgetApp';
+import BudgetApp from './components/BudgetApp';
 import "./app.css";
 
 // Simple layout component

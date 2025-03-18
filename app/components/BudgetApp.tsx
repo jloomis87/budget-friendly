@@ -26,6 +26,9 @@ import { MonthSelector } from './MonthSelector';
 import { saveUserPreferences, getUserPreferences } from '../firebase/firebaseConfig';
 import { doc, getDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+import type { BudgetPreferences } from './BudgetActions';
+import { useTheme as useMuiTheme } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles';
 
 // Add this interface for alert messages
 interface AlertMessage {
@@ -698,8 +701,13 @@ const BudgetSelector: React.FC<{
   );
 };
 
+// Add storage keys for preferences
+const PREFERENCES_KEY = 'friendlyBudgets_preferences';
+const LEGACY_PREFERENCES_KEY = 'budgetFriendly_preferences';
+
 // Main App Component
-const BudgetAppContent = () => {
+const BudgetAppContent: React.FC = () => {
+  const theme = useMuiTheme();
   const [activeStep, setActiveStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
@@ -712,6 +720,47 @@ const BudgetAppContent = () => {
   // Get current month name for default selection
   const currentMonth = new Date().toLocaleString('default', { month: 'long' });
   const [selectedMonths, setSelectedMonths] = useState<string[]>([currentMonth]);
+  
+  // Initialize preferences with default values
+  const [preferences, setPreferences] = useLocalStorage<BudgetPreferences>(
+    PREFERENCES_KEY,
+    LEGACY_PREFERENCES_KEY,
+    {
+      ratios: {
+        essentials: 50,
+        wants: 30,
+        savings: 20
+      },
+      categoryCustomization: {
+        essentials: {
+          name: 'Essentials',
+          color: theme.palette.primary.main,
+          icon: '🏠'
+        },
+        wants: {
+          name: 'Wants',
+          color: theme.palette.secondary.main,
+          icon: '🛍️'
+        },
+        savings: {
+          name: 'Savings',
+          color: theme.palette.success.main,
+          icon: '💰'
+        }
+      },
+      chartPreferences: {
+        showPieChart: true,
+        showBarChart: true,
+        showProgressBars: true,
+        showSuggestions: true
+      },
+      displayPreferences: {
+        showActualAmounts: true,
+        showPercentages: true,
+        showDifferences: true
+      }
+    }
+  );
   
   // Load user preferences from Firebase when component mounts or user changes
   const { user } = useAuth();
@@ -1367,16 +1416,19 @@ const BudgetAppContent = () => {
             background: 'linear-gradient(90deg, rgba(37,99,235,1) 0%, rgba(59,130,246,1) 100%)',
           }
         }}>
-          <BudgetActions />
+          <BudgetActions onPreferencesChange={setPreferences} />
           <BudgetSummary 
             summary={budgetSummary} 
             plan={budgetPlan} 
             suggestions={suggestions}
+            preferences={preferences}
+            transactions={transactions}
+            selectedMonths={selectedMonths}
           />
         </Box>
       </Box>
     );
-  }, [transactions.length, budgetSummary, budgetPlan, suggestions]);
+  }, [transactions.length, budgetSummary, budgetPlan, suggestions, preferences, setPreferences, transactions, selectedMonths]);
   
   // If user is not authenticated, show an elegant login screen
   if (!isAuthenticated) {
@@ -1818,9 +1870,9 @@ const BudgetAppContent = () => {
     <Box sx={{ 
       width: '100%', 
       backgroundColor: 'background.default',
-      mx: 'auto', // Center the content
-      minHeight: '100vh', // Ensure it covers the full viewport height
-      pb: 4, // Add padding at the bottom
+      mx: 'auto',
+      minHeight: '100vh',
+      pb: 4,
     }}>
       <Box 
         sx={{ 
@@ -2193,10 +2245,9 @@ const BudgetAppContent = () => {
       </Box>
     </Box>
   );
-}
+};
 
-// Export the BudgetApp component
-export function BudgetApp() {
+const BudgetApp = () => {
   return (
     <AuthProvider>
       <ThemeProvider>
@@ -2205,14 +2256,12 @@ export function BudgetApp() {
             'html, body': {
               minHeight: '100vh'
             },
-            // Add drag and drop styles
             '.dragging-active': {
               cursor: 'grabbing !important'
             },
             '.dragging-active *': {
               cursor: 'grabbing !important'
             },
-            // Add transition effects for drag targets
             '.drag-target': {
               transition: 'transform 0.2s, box-shadow 0.2s'
             },
@@ -2226,4 +2275,6 @@ export function BudgetApp() {
       </ThemeProvider>
     </AuthProvider>
   );
-} 
+};
+
+export default BudgetApp; 

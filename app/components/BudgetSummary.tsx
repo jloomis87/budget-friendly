@@ -19,10 +19,16 @@ import {
   CardHeader,
   Avatar,
   Tooltip,
-  Icon
+  Icon,
+  Tab,
+  Tabs
 } from '@mui/material';
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import type { BudgetSummary as BudgetSummaryType, BudgetPlan } from '../services/budgetCalculator';
+import type { BudgetPreferences } from './BudgetActions';
+import { BudgetAnalytics } from './BudgetAnalytics';
+import { SmartInsights } from './SmartInsights';
+import { CategoryDeepDive } from './CategoryDeepDive';
 
 // Lazy load Chart.js components to avoid SSR issues
 const LazyCharts = React.lazy(() => import('./LazyCharts'));
@@ -31,13 +37,18 @@ interface BudgetSummaryProps {
   summary: BudgetSummaryType;
   plan: BudgetPlan;
   suggestions: string[];
+  preferences: BudgetPreferences;
+  transactions: Transaction[];
+  selectedMonths: string[];
 }
 
-export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps) {
+export function BudgetSummary({ summary, plan, suggestions, preferences, transactions, selectedMonths }: BudgetSummaryProps) {
   const theme = useMuiTheme();
   const { mode } = useCustomTheme();
   const [isBrowser, setIsBrowser] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
   const isDarkMode = mode === 'dark';
+  const [goals, setGoals] = useState<FinancialGoal[]>([]);
 
   // Only render charts on the client side
   useEffect(() => {
@@ -57,9 +68,9 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
     return `${percentage.toFixed(1)}%`;
   };
 
-  // Prepare data for pie chart
+  // Prepare data for pie chart using custom preferences
   const pieChartData = {
-    labels: ['Essentials', 'Wants', 'Savings'],
+    labels: Object.values(preferences.categoryCustomization).map(cat => cat.name),
     datasets: [
       {
         data: [
@@ -67,31 +78,23 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
           summary.categories.wants,
           summary.categories.savings
         ],
-        backgroundColor: [
-          theme.palette.primary.main,
-          theme.palette.secondary.main,
-          theme.palette.success.main
-        ],
-        borderColor: [
-          theme.palette.primary.dark,
-          theme.palette.secondary.dark,
-          theme.palette.success.dark
-        ],
+        backgroundColor: Object.values(preferences.categoryCustomization).map(cat => cat.color),
+        borderColor: Object.values(preferences.categoryCustomization).map(cat => cat.color),
         borderWidth: 1,
       },
     ],
   };
 
-  // Prepare data for comparison bar chart
+  // Prepare data for comparison bar chart using custom preferences
   const barChartData = {
-    labels: ['Essentials', 'Wants', 'Savings'],
+    labels: Object.values(preferences.categoryCustomization).map(cat => cat.name),
     datasets: [
       {
-        label: 'Recommended (50/30/20)',
+        label: 'Recommended',
         data: [
-          plan.recommended.essentials,
-          plan.recommended.wants,
-          plan.recommended.savings
+          (preferences.ratios.essentials / 100) * summary.totalIncome,
+          (preferences.ratios.wants / 100) * summary.totalIncome,
+          (preferences.ratios.savings / 100) * summary.totalIncome
         ],
         backgroundColor: theme.palette.primary.main,
         borderRadius: 6,
@@ -103,9 +106,9 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
       {
         label: 'Actual Spending',
         data: [
-          plan.actual.essentials,
-          plan.actual.wants,
-          plan.actual.savings
+          summary.categories.essentials,
+          summary.categories.wants,
+          summary.categories.savings
         ],
         backgroundColor: theme.palette.warning.main,
         borderRadius: 6,
@@ -163,7 +166,7 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
     plugins: {
       title: {
         display: true,
-        text: '50/30/20 Budget Comparison',
+        text: 'Budget Comparison',
         font: {
           size: 18,
           weight: 'bold'
@@ -220,567 +223,187 @@ export function BudgetSummary({ summary, plan, suggestions }: BudgetSummaryProps
     return 'error.main';                      // More than 20% over recommendation
   };
 
-  // Helper to get category icon
-  const getCategoryIcon = (category: string) => {
-    switch(category) {
-      case 'Essentials':
-        return '🏠';
-      case 'Wants':
-        return '🛍️';
-      case 'Savings':
-        return '💰';
-      default:
-        return '📊';
-    }
-  };
-
   return (
     <Box sx={{ mb: 4 }}>
-      <Typography 
-        variant="h4" 
-        gutterBottom 
-        sx={{ 
-          fontWeight: 700, 
-          color: isDarkMode ? 'primary.light' : 'primary.dark',
-          mb: 3,
-          position: 'relative',
-          '&::after': {
-            content: '""',
-            position: 'absolute',
-            bottom: -8,
-            left: 0,
-            width: 60,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: 'primary.main'
-          }
-        }}
-      >
-        Budget Summary
-      </Typography>
+      {/* Tab Navigation */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs 
+          value={activeTab} 
+          onChange={(e, newValue) => setActiveTab(newValue)}
+          aria-label="budget summary tabs"
+          sx={{
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '1rem',
+            }
+          }}
+        >
+          <Tab label="Overview" />
+          <Tab label="Analytics" />
+          <Tab label="Insights & Goals" />
+          <Tab label="Deep Dive" />
+        </Tabs>
+      </Box>
 
-      <Grid container spacing={3}>
-        {/* Top Summary Cards */}
-        <Grid item xs={12}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <Card 
-                elevation={2} 
-                sx={{ 
-                  height: '100%',
-                  borderRadius: 2,
-                  transition: 'transform 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4
-                  }
-                }}
-              >
-                <CardContent sx={{ p: 2.5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar sx={{ bgcolor: isDarkMode ? 'success.dark' : 'success.light', mr: 1.5 }}>💵</Avatar>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      Total Income
-                    </Typography>
-                  </Box>
-                  <Typography 
-                    variant="h4" 
-                    sx={{ 
-                      fontWeight: 700, 
-                      color: 'success.main',
-                      mb: 1
-                    }}
-                  >
-                    {formatCurrency(summary.totalIncome)}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <Card 
-                elevation={2} 
-                sx={{ 
-                  height: '100%',
-                  borderRadius: 2,
-                  transition: 'transform 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4
-                  }
-                }}
-              >
-                <CardContent sx={{ p: 2.5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar sx={{ bgcolor: isDarkMode ? 'error.dark' : 'error.light', mr: 1.5 }}>💸</Avatar>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      Total Expenses
-                    </Typography>
-                  </Box>
-                  <Typography 
-                    variant="h4" 
-                    sx={{ 
-                      fontWeight: 700, 
-                      color: 'error.main',
-                      mb: 1
-                    }}
-                  >
-                    {formatCurrency(summary.totalExpenses)}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <Card 
-                elevation={2} 
-                sx={{ 
-                  height: '100%',
-                  borderRadius: 2,
-                  transition: 'transform 0.2s',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4
-                  },
-                  bgcolor: summary.netCashflow >= 0 
-                    ? (isDarkMode ? 'success.dark' : 'success.light') 
-                    : (isDarkMode ? 'error.dark' : 'error.light'),
-                }}
-              >
-                <CardContent sx={{ p: 2.5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Avatar 
+      {/* Overview Tab */}
+      {activeTab === 0 && (
+        <Grid container spacing={3}>
+          {/* Summary Cards */}
+          <Grid item xs={12}>
+            <Grid container spacing={2}>
+              {Object.entries(preferences.categoryCustomization).map(([category, settings], index) => {
+                const actualAmount = summary.categories[category as keyof typeof summary.categories];
+                const recommendedAmount = (preferences.ratios[category as keyof typeof preferences.ratios] / 100) * summary.totalIncome;
+                const difference = actualAmount - recommendedAmount;
+                const percentageOfIncome = (actualAmount / summary.totalIncome) * 100;
+
+                return (
+                  <Grid item xs={12} md={4} key={category}>
+                    <Card 
                       sx={{ 
-                        bgcolor: summary.netCashflow >= 0 ? 'success.main' : 'error.main',
-                        color: 'white',
-                        mr: 1.5 
+                        height: '100%',
+                        borderLeft: 4,
+                        borderColor: settings.color,
+                        position: 'relative',
+                        overflow: 'visible'
                       }}
                     >
-                      {summary.netCashflow >= 0 ? '✓' : '!'}
-                    </Avatar>
-                    <Typography variant="h6" sx={{ 
-                      fontWeight: 600, 
-                      color: summary.netCashflow >= 0 
-                        ? (isDarkMode ? 'success.light' : 'success.dark') 
-                        : (isDarkMode ? 'error.light' : 'error.dark')
-                    }}>
-                      Net Cashflow
-                    </Typography>
-                  </Box>
-                  <Typography 
-                    variant="h4" 
-                    sx={{ 
-                      fontWeight: 700, 
-                      color: summary.netCashflow >= 0 
-                        ? (isDarkMode ? 'success.light' : 'success.dark') 
-                        : (isDarkMode ? 'error.light' : 'error.dark'),
-                      mb: 1
-                    }}
-                  >
-                    {formatCurrency(summary.netCashflow)}
-                  </Typography>
-                </CardContent>
-              </Card>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                          <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <span>{settings.icon}</span>
+                            {settings.name}
+                          </Typography>
+                        </Box>
+
+                        {preferences.displayPreferences.showActualAmounts && (
+                          <Typography variant="h5" color="text.primary" gutterBottom>
+                            {formatCurrency(actualAmount)}
+                          </Typography>
+                        )}
+
+                        {preferences.displayPreferences.showPercentages && (
+                          <Typography variant="body2" color="text.secondary">
+                            {formatPercentage(percentageOfIncome)} of income
+                          </Typography>
+                        )}
+
+                        {preferences.displayPreferences.showDifferences && (
+                          <Typography 
+                            variant="body2" 
+                            color={difference > 0 ? 'error.main' : 'success.main'}
+                            sx={{ mt: 1 }}
+                          >
+                            {difference > 0 ? 'Over by ' : 'Under by '}
+                            {formatCurrency(Math.abs(difference))}
+                          </Typography>
+                        )}
+
+                        {preferences.displayPreferences.showProgressBars && (
+                          <Box sx={{ mt: 2 }}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={Math.min((actualAmount / recommendedAmount) * 100, 100)}
+                              sx={{
+                                height: 8,
+                                borderRadius: 4,
+                                backgroundColor: theme.palette.grey[200],
+                                '& .MuiLinearProgress-bar': {
+                                  backgroundColor: getProgressColor(actualAmount, recommendedAmount),
+                                },
+                              }}
+                            />
+                          </Box>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
             </Grid>
           </Grid>
-        </Grid>
 
-        {/* Expense Categories */}
-        <Grid item xs={12} md={4}>
-          <Card 
-            elevation={2} 
-            sx={{ 
-              height: '100%',
-              borderRadius: 2,
-              overflow: 'hidden'
-            }}
-          >
-            <CardHeader
-              title="Expense Categories"
-              titleTypographyProps={{ 
-                variant: 'h6', 
-                fontWeight: 600,
-                color: 'text.primary'
-              }}
-              sx={{ 
-                bgcolor: isDarkMode ? 'background.default' : 'background.default',
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                pb: 1.5
-              }}
-            />
-            <CardContent sx={{ p: 0 }}>
-              <List sx={{ width: '100%' }}>
-                {[
-                  { 
-                    name: 'Essentials', 
-                    amount: summary.categories.essentials, 
-                    percentage: summary.percentages.essentials,
-                    color: 'primary.main',
-                    icon: '🏠'
-                  },
-                  { 
-                    name: 'Wants', 
-                    amount: summary.categories.wants, 
-                    percentage: summary.percentages.wants,
-                    color: 'secondary.main',
-                    icon: '🛍️'
-                  },
-                  { 
-                    name: 'Savings', 
-                    amount: summary.categories.savings, 
-                    percentage: summary.percentages.savings,
-                    color: 'success.main',
-                    icon: '💰'
-                  }
-                ].map((category, index) => (
-                  <React.Fragment key={category.name}>
-                    <ListItem sx={{ px: 3, py: 2 }}>
-                      <Box sx={{ width: '100%' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                          <Avatar 
-                            sx={{ 
-                              width: 32, 
-                              height: 32, 
-                              mr: 1.5, 
-                              bgcolor: 'transparent',
-                              fontSize: '1.2rem'
-                            }}
-                          >
-                            {category.icon}
-                          </Avatar>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                            {category.name}
-                          </Typography>
-                          <Box sx={{ flexGrow: 1 }} />
-                          <Chip 
-                            label={formatPercentage(category.percentage)} 
-                            size="small"
-                            sx={{ 
-                              bgcolor: isDarkMode ? `${category.color}30` : `${category.color}20`, 
-                              color: category.color,
-                              fontWeight: 600
-                            }} 
-                          />
-                        </Box>
-                        
-                        <Typography 
-                          variant="h6" 
-                          sx={{ 
-                            fontWeight: 700, 
-                            color: category.color,
-                            mb: 1
-                          }}
-                        >
-                          {formatCurrency(category.amount)}
-                        </Typography>
-                        
-                        <LinearProgress 
-                          variant="determinate" 
-                          value={Math.min(category.percentage, 100)} 
-                          sx={{ 
-                            height: 8, 
-                            borderRadius: 4,
-                            bgcolor: isDarkMode ? `${category.color}30` : `${category.color}20`,
-                            '& .MuiLinearProgress-bar': {
-                              bgcolor: category.color
-                            }
-                          }} 
-                        />
-                      </Box>
+          {/* Charts */}
+          {isBrowser && (
+            <React.Suspense fallback={<Box sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading charts...</Box>}>
+              <Grid item xs={12} container spacing={3}>
+                {preferences.chartPreferences.showPieChart && (
+                  <Grid item xs={12} md={6}>
+                    <Paper sx={{ p: 3, height: '100%' }}>
+                      <LazyCharts 
+                        pieData={pieChartData}
+                        barData={barChartData}
+                        barOptions={barChartOptions}
+                        showPie={true}
+                        showBar={false}
+                      />
+                    </Paper>
+                  </Grid>
+                )}
+
+                {preferences.chartPreferences.showBarChart && (
+                  <Grid item xs={12} md={6}>
+                    <Paper sx={{ p: 3, height: '100%' }}>
+                      <LazyCharts 
+                        pieData={pieChartData}
+                        barData={barChartData}
+                        barOptions={barChartOptions}
+                        showPie={false}
+                        showBar={true}
+                      />
+                    </Paper>
+                  </Grid>
+                )}
+              </Grid>
+            </React.Suspense>
+          )}
+
+          {/* Suggestions */}
+          {preferences.chartPreferences.showSuggestions && suggestions.length > 0 && (
+            <Grid item xs={12}>
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <AlertTitle>Suggestions to Optimize Your Budget</AlertTitle>
+                <List dense>
+                  {suggestions.map((suggestion, index) => (
+                    <ListItem key={index}>
+                      <ListItemText primary={suggestion} />
                     </ListItem>
-                    {index < 2 && <Divider />}
-                  </React.Fragment>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
+                  ))}
+                </List>
+              </Alert>
+            </Grid>
+          )}
         </Grid>
+      )}
 
-        {/* Pie Chart */}
-        <Grid item xs={12} md={4}>
-          <Card 
-            elevation={2} 
-            sx={{ 
-              height: '100%',
-              borderRadius: 2,
-              display: 'flex',
-              flexDirection: 'column'
-            }}
-          >
-            <CardHeader
-              title="Spending Distribution"
-              titleTypographyProps={{ 
-                variant: 'h6', 
-                fontWeight: 600,
-                color: 'text.primary'
-              }}
-              sx={{ 
-                bgcolor: 'background.default',
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                pb: 1.5
-              }}
-            />
-            <CardContent sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexGrow: 1,
-              p: 3
-            }}>
-              <Box sx={{ width: '100%', height: 250, display: 'flex', justifyContent: 'center' }}>
-                {isBrowser && (
-                  <React.Suspense fallback={<Typography>Loading chart...</Typography>}>
-                    <LazyCharts 
-                      pieData={pieChartData} 
-                      barData={barChartData} 
-                      barOptions={barChartOptions} 
-                      showPie={true}
-                      showBar={false}
-                      key={`pie-chart-instance-${Date.now()}`}
-                    />
-                  </React.Suspense>
-                )}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+      {/* Analytics Tab */}
+      {activeTab === 1 && (
+        <BudgetAnalytics
+          transactions={transactions}
+          summary={summary}
+          plan={plan}
+          preferences={preferences}
+          selectedMonths={selectedMonths}
+        />
+      )}
 
-        {/* 50/30/20 Plan */}
-        <Grid item xs={12} md={4}>
-          <Card 
-            elevation={2} 
-            sx={{ 
-              height: '100%',
-              borderRadius: 2,
-              overflow: 'hidden'
-            }}
-          >
-            <CardHeader
-              title="Budget Health"
-              titleTypographyProps={{ 
-                variant: 'h6', 
-                fontWeight: 600,
-                color: 'text.primary'
-              }}
-              sx={{ 
-                bgcolor: 'background.default',
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                pb: 1.5
-              }}
-            />
-            <CardContent sx={{ p: 0 }}>
-              <List sx={{ width: '100%' }}>
-                {[
-                  { 
-                    name: 'Essentials', 
-                    target: '50%',
-                    recommended: plan.recommended.essentials,
-                    actual: plan.actual.essentials,
-                    icon: '🏠'
-                  },
-                  { 
-                    name: 'Wants', 
-                    target: '30%',
-                    recommended: plan.recommended.wants,
-                    actual: plan.actual.wants,
-                    icon: '🛍️'
-                  },
-                  { 
-                    name: 'Savings', 
-                    target: '20%',
-                    recommended: plan.recommended.savings,
-                    actual: plan.actual.savings,
-                    icon: '💰'
-                  }
-                ].map((category, index) => {
-                  const progressColor = getProgressColor(category.actual, category.recommended);
-                  const progressPercentage = Math.min((category.actual / category.recommended) * 100, 150);
-                  
-                  return (
-                    <React.Fragment key={category.name}>
-                      <ListItem sx={{ px: 3, py: 2 }}>
-                        <Box sx={{ width: '100%' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                            <Avatar 
-                              sx={{ 
-                                width: 32, 
-                                height: 32, 
-                                mr: 1.5, 
-                                bgcolor: 'transparent',
-                                fontSize: '1.2rem'
-                              }}
-                            >
-                              {category.icon}
-                            </Avatar>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                              {category.name} <span style={{ fontWeight: 400, fontSize: '0.9rem' }}>({category.target})</span>
-                            </Typography>
-                          </Box>
-                          
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                            <Tooltip title="Recommended amount">
-                              <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 600 }}>
-                                Target: {formatCurrency(category.recommended)}
-                              </Typography>
-                            </Tooltip>
-                            <Tooltip title="Your actual spending">
-                              <Typography variant="body2" sx={{ color: progressColor, fontWeight: 600 }}>
-                                Actual: {formatCurrency(category.actual)}
-                              </Typography>
-                            </Tooltip>
-                          </Box>
-                          
-                          <Box sx={{ position: 'relative', pt: 1 }}>
-                            <LinearProgress 
-                              variant="determinate" 
-                              value={progressPercentage} 
-                              sx={{ 
-                                height: 10, 
-                                borderRadius: 5,
-                                bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'grey.200',
-                                '& .MuiLinearProgress-bar': {
-                                  bgcolor: progressColor
-                                }
-                              }} 
-                            />
-                            <Box 
-                              sx={{ 
-                                position: 'absolute', 
-                                top: 0, 
-                                left: '100%', 
-                                height: '100%', 
-                                borderLeft: '2px dashed',
-                                borderColor: 'primary.main',
-                                zIndex: 2
-                              }} 
-                            />
-                          </Box>
-                        </Box>
-                      </ListItem>
-                      {index < 2 && <Divider />}
-                    </React.Fragment>
-                  );
-                })}
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
+      {/* Insights & Goals Tab */}
+      {activeTab === 2 && (
+        <SmartInsights
+          transactions={transactions}
+          selectedMonths={selectedMonths}
+          totalIncome={summary.totalIncome}
+          onGoalUpdate={setGoals}
+        />
+      )}
 
-        {/* 50/30/20 Chart */}
-        <Grid item xs={12}>
-          <Card 
-            elevation={2} 
-            sx={{ 
-              borderRadius: 2,
-              overflow: 'hidden'
-            }}
-          >
-            <CardHeader
-              title="50/30/20 Budget Comparison"
-              titleTypographyProps={{ 
-                variant: 'h6', 
-                fontWeight: 600,
-                color: 'text.primary'
-              }}
-              sx={{ 
-                bgcolor: 'background.default',
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                pb: 1.5
-              }}
-            />
-            <CardContent sx={{ p: 3 }}>
-              <Box sx={{ 
-                height: 400, 
-                width: '100%',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center'
-              }}>
-                {isBrowser && (
-                  <React.Suspense fallback={<Typography>Loading chart...</Typography>}>
-                    <LazyCharts 
-                      pieData={pieChartData} 
-                      barData={barChartData} 
-                      barOptions={barChartOptions} 
-                      showPie={false}
-                      showBar={true}
-                      key={`bar-chart-instance-${Date.now()}`}
-                    />
-                  </React.Suspense>
-                )}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Budget Suggestions */}
-        <Grid item xs={12}>
-          <Card 
-            elevation={2} 
-            sx={{ 
-              borderRadius: 2,
-              overflow: 'hidden',
-              bgcolor: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : 'info.light',
-              border: '1px solid',
-              borderColor: isDarkMode ? 'info.dark' : 'info.main',
-              boxShadow: isDarkMode 
-                ? `0 0 20px ${theme.palette.info.dark}30` 
-                : `0 0 20px ${theme.palette.info.light}`
-            }}
-          >
-            <CardHeader
-              avatar={
-                <Avatar sx={{ bgcolor: isDarkMode ? 'info.dark' : 'info.main' }}>💡</Avatar>
-              }
-              title="Budget Suggestions"
-              titleTypographyProps={{ 
-                variant: 'h6', 
-                fontWeight: 600,
-                color: isDarkMode ? 'info.light' : 'info.dark'
-              }}
-              sx={{ 
-                borderBottom: '1px solid',
-                borderColor: isDarkMode ? 'info.dark' : 'info.main',
-                pb: 1.5
-              }}
-            />
-            <CardContent sx={{ p: 0 }}>
-              <List>
-                {suggestions.map((suggestion, index) => (
-                  <ListItem key={index} sx={{ 
-                    py: 1.5,
-                    px: 3,
-                    borderBottom: index < suggestions.length - 1 ? '1px solid' : 'none',
-                    borderColor: isDarkMode ? 'info.dark' : 'info.main',
-                    '&:hover': {
-                      bgcolor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.2)'
-                    }
-                  }}>
-                    <ListItemText 
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Box component="span" sx={{ mr: 1, fontSize: '1.2rem' }}>•</Box>
-                          <Typography variant="body1" sx={{ 
-                            color: isDarkMode ? 'info.light' : 'info.dark', 
-                            fontWeight: 500 
-                          }}>
-                            {suggestion}
-                          </Typography>
-                        </Box>
-                      } 
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      {activeTab === 3 && (
+        <CategoryDeepDive 
+          transactions={transactions}
+          selectedMonths={selectedMonths}
+        />
+      )}
     </Box>
   );
 } 
