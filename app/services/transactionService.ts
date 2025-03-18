@@ -27,14 +27,41 @@ const getUserTransactionsRef = (userId: string) => {
   return collection(db, 'users', userId, 'transactions');
 };
 
+// Get the transactions subcollection for a specific budget
+const getBudgetTransactionsRef = (userId: string, budgetId: string) => {
+  if (!userId || typeof userId !== 'string') {
+    console.error('[Firebase] getBudgetTransactionsRef called with invalid userId:', userId);
+    throw new Error('Valid user ID string is required');
+  }
+
+  if (!budgetId || typeof budgetId !== 'string') {
+    console.error('[Firebase] getBudgetTransactionsRef called with invalid budgetId:', budgetId);
+    throw new Error('Valid budget ID string is required');
+  }
+ 
+  return collection(db, 'users', userId, 'budgets', budgetId, 'transactions');
+};
+
 // Add a transaction to Firestore
-export const addTransaction = async (userId: string, transactionData: Omit<Transaction, 'id'>): Promise<string> => {
+export const addTransaction = async (
+  userId: string, 
+  transactionData: Omit<Transaction, 'id'>,
+  budgetId?: string
+): Promise<string> => {
   if (!userId) {
     throw new Error('User ID is required to add a transaction');
   }
 
   try {
-    const transactionsRef = getUserTransactionsRef(userId);
+    let transactionsRef;
+    
+    if (budgetId) {
+      // If budgetId is provided, add to the budget's transactions collection
+      transactionsRef = getBudgetTransactionsRef(userId, budgetId);
+    } else {
+      // Otherwise use the legacy path (for backward compatibility)
+      transactionsRef = getUserTransactionsRef(userId);
+    }
     
     // Default to 'Uncategorized' if category is undefined
     const category = transactionData.category || 'Uncategorized';
@@ -60,13 +87,21 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
       nextOrder = highestOrder + 1;
     }
 
-    const docRef = await addDoc(transactionsRef, {
+    // Create the document data, ensuring we don't include undefined values
+    const docData = {
       ...transactionData,
       category, // Use the category with fallback
       userId,
       order: nextOrder, // Set the order field
       createdAt: new Date().toISOString()
-    });
+    };
+
+    // Only add budgetId to the document if it exists
+    if (budgetId) {
+      docData.budgetId = budgetId;
+    }
+
+    const docRef = await addDoc(transactionsRef, docData);
 
     return docRef.id;
   } catch (error) {
@@ -76,14 +111,24 @@ export const addTransaction = async (userId: string, transactionData: Omit<Trans
 };
 
 // Get all transactions for a user
-export const getUserTransactions = async (userId: string): Promise<Transaction[]> => {
+export const getUserTransactions = async (userId: string, budgetId?: string): Promise<Transaction[]> => {
   try {
     if (!userId) {
       console.error('[Firebase] Error: getUserTransactions called with empty userId');
       return [];
     }
     
-    const transactionsRef = getUserTransactionsRef(userId);
+    let transactionsRef;
+    
+    if (budgetId) {
+      console.log('[transactionService] Loading transactions for budget:', budgetId);
+      // If budgetId is provided, get from the budget's transactions collection
+      transactionsRef = getBudgetTransactionsRef(userId, budgetId);
+    } else {
+      console.log('[transactionService] Loading transactions from legacy path (no budget ID)');
+      // Otherwise use the legacy path (for backward compatibility)
+      transactionsRef = getUserTransactionsRef(userId);
+    }
     
     // Use a simpler query without composite ordering
     const q = query(transactionsRef);
@@ -91,7 +136,14 @@ export const getUserTransactions = async (userId: string): Promise<Transaction[]
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.size === 0) {
+      console.log('[transactionService] No transactions found', { budgetId, userId });
       // No transactions found
+    } else {
+      console.log('[transactionService] Found transactions:', { 
+        count: querySnapshot.size, 
+        budgetId, 
+        userId 
+      });
     }
     
     const transactions: Transaction[] = [];
@@ -122,48 +174,61 @@ export const getUserTransactions = async (userId: string): Promise<Transaction[]
           processedDate = new Date(); // Default to current date as fallback
         }
         
+        // Add to transactions array
         transactions.push({
           id: doc.id,
+          description: data.description || 'Unknown',
+          amount: parseFloat(data.amount) || 0,
           date: processedDate,
-          description: data.description || 'Unnamed Transaction',
-          amount: typeof data.amount === 'number' ? data.amount : 0,
-          category: data.category || 'Uncategorized',
-          order: data.order || 0  // Make sure to include the order field
+          category: data.category,
+          order: data.order || 0
         });
       } catch (docError) {
-        console.error(`[Firebase] Error processing transaction document ${doc.id}:`, docError);
-        // Continue processing other documents
+        console.error(`[Firebase] Error processing document ${doc.id}:`, docError);
       }
     });
     
-    // Sort the transactions in memory instead of in the query
-    transactions.sort((a, b) => {
+    // Sort by category then by order within each category
+    return transactions.sort((a, b) => {
       // First sort by category
-      if (a.category !== b.category) {
-        return (a.category || '').localeCompare(b.category || '');
+      const categoryA = a.category || '';
+      const categoryB = b.category || '';
+      
+      if (categoryA !== categoryB) {
+        return categoryA.localeCompare(categoryB);
       }
-      // Then sort by order within each category
+      
+      // Then sort by order within the category
       return (a.order || 0) - (b.order || 0);
     });
-    
-    return transactions;
   } catch (error) {
-    console.error('[Firebase] Error in getUserTransactions:', error);
-    
-    // Return empty array instead of throwing error
-    return [];
+    console.error('[transactionService] Error fetching transactions:', error);
+    throw error;
   }
 };
 
 // Update a transaction
-export const updateTransaction = async (transactionId: string, updates: Partial<Transaction>, userId: string) => {
+export const updateTransaction = async (
+  transactionId: string, 
+  updates: Partial<Transaction>, 
+  userId: string,
+  budgetId?: string
+) => {
   if (!userId || !transactionId) {
     throw new Error('User ID and transaction ID are required to update a transaction');
   }
 
   try {
-   
-    const transactionRef = doc(getUserTransactionsRef(userId), transactionId);
+    let transactionRef;
+    
+    if (budgetId) {
+      // If budgetId is provided, update in the budget's transactions collection
+      transactionRef = doc(getBudgetTransactionsRef(userId, budgetId), transactionId);
+    } else {
+      // Otherwise use the legacy path (for backward compatibility)
+      transactionRef = doc(getUserTransactionsRef(userId), transactionId);
+    }
+    
     await updateDoc(transactionRef, { ...updates, updatedAt: new Date().toISOString() });
    
   } catch (error) {
@@ -173,14 +238,26 @@ export const updateTransaction = async (transactionId: string, updates: Partial<
 };
 
 // Delete a transaction
-export const deleteTransaction = async (transactionId: string, userId: string) => {
+export const deleteTransaction = async (
+  transactionId: string, 
+  userId: string,
+  budgetId?: string
+) => {
   if (!userId || !transactionId) {
     throw new Error('User ID and transaction ID are required to delete a transaction');
   }
 
   try {
-   
-    const transactionRef = doc(getUserTransactionsRef(userId), transactionId);
+    let transactionRef;
+    
+    if (budgetId) {
+      // If budgetId is provided, delete from the budget's transactions collection
+      transactionRef = doc(getBudgetTransactionsRef(userId, budgetId), transactionId);
+    } else {
+      // Otherwise use the legacy path (for backward compatibility)
+      transactionRef = doc(getUserTransactionsRef(userId), transactionId);
+    }
+    
     await deleteDoc(transactionRef);
    
   } catch (error) {
@@ -193,14 +270,23 @@ export const deleteTransaction = async (transactionId: string, userId: string) =
 export const moveTransactionToCategory = async (
   transactionId: string, 
   newCategory: 'Income' | 'Essentials' | 'Wants' | 'Savings',
-  userId: string
+  userId: string,
+  budgetId?: string
 ): Promise<void> => {
   if (!userId) {
     throw new Error('User ID is required to move a transaction');
   }
   
   try {
-    const transactionsRef = getUserTransactionsRef(userId);
+    let transactionsRef;
+    
+    if (budgetId) {
+      // If budgetId is provided, use the budget's transactions collection
+      transactionsRef = getBudgetTransactionsRef(userId, budgetId);
+    } else {
+      // Otherwise use the legacy path (for backward compatibility)
+      transactionsRef = getUserTransactionsRef(userId);
+    }
     
     // Use a simpler query that doesn't require a composite index
     const categoryQuery = query(
@@ -224,10 +310,15 @@ export const moveTransactionToCategory = async (
     }
     
     // Update the transaction with the new category and order
-    return updateTransaction(transactionId, { 
-      category: newCategory,
-      order: nextOrder // Place at the end of the target category
-    }, userId);
+    return updateTransaction(
+      transactionId, 
+      { 
+        category: newCategory,
+        order: nextOrder // Place at the end of the target category
+      }, 
+      userId,
+      budgetId
+    );
   } catch (error) {
     console.error('[transactionService] Error moving transaction:', error);
     throw error;
@@ -238,14 +329,24 @@ export const moveTransactionToCategory = async (
 export const reorderTransactions = async (
   userId: string,
   category: string,
-  orderedTransactionIds: string[]
+  orderedTransactionIds: string[],
+  budgetId?: string
 ): Promise<void> => {
   if (!userId) {
     throw new Error('User ID is required to reorder transactions');
   }
   
   try {
-    const transactionsRef = getUserTransactionsRef(userId);
+    let transactionsRef;
+    
+    if (budgetId) {
+      // If budgetId is provided, use the budget's transactions collection
+      transactionsRef = getBudgetTransactionsRef(userId, budgetId);
+    } else {
+      // Otherwise use the legacy path (for backward compatibility)
+      transactionsRef = getUserTransactionsRef(userId);
+    }
+    
     const batch = writeBatch(db);
     
     // Update each transaction with its new order in a single batch

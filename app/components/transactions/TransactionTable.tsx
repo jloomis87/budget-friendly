@@ -146,8 +146,8 @@ const TransactionTableContent: React.FC = () => {
     setDragSourceMonth(sourceMonth);
     setIsDragging(true);
     
-    // Check if the user is holding the Ctrl/Cmd key for copy mode
-    setIsCopyMode(e.ctrlKey || e.metaKey);
+    // Always start in move mode
+    setIsCopyMode(false);
     
     // Call the parent drag start handler if provided
     if (props.onDragStart) {
@@ -158,58 +158,77 @@ const TransactionTableContent: React.FC = () => {
   
   const handleTransactionDragOver = (e: React.DragEvent, targetMonth: string, targetIndex: number) => {
     e.preventDefault();
+    e.stopPropagation();
     
-    // Log the drag over event
-    console.log("Transaction Drag Over", targetMonth, targetIndex);
+    // Special indices: -888 for Copy Here zone, -999 for Move Here zone
+    const isOverCopyZone = targetIndex === -888;
+    const isOverMoveZone = targetIndex === -999;
     
-    // Update copy mode based on current key state or if over the copy zone
-    // Special index -888 is used for the "Copy Here" zone
-    const newCopyMode = e.ctrlKey || e.metaKey || targetIndex === -888;
-    console.log("Setting copy mode to", newCopyMode, "because targetIndex is", targetIndex);
-    
-    // Always set copy mode to true when over the copy zone
-    if (targetIndex === -888) {
-      setIsCopyMode(true);
-    } else if (isCopyMode !== newCopyMode) {
-      setIsCopyMode(newCopyMode);
-    }
-    
-    e.dataTransfer.dropEffect = (targetIndex === -888 || newCopyMode) ? 'copy' : 'move';
-    
-    // Update drag over state
-    setDragOverMonth(targetMonth);
-    setDragOverIndex(targetIndex);
-    
-    // Determine if this is an intra-month drag (within the same month)
-    setIsIntraMonthDrag(dragSourceMonth === targetMonth);
-    
-    // Clear any existing drag leave timeout
+    // Clear any existing drag leave timeout first
     if (dragLeaveTimeout) {
       window.clearTimeout(dragLeaveTimeout);
       setDragLeaveTimeout(null);
     }
+
+    // Always set the mode based on which zone we're over
+    if (isOverCopyZone) {
+      setIsCopyMode(true);
+      e.dataTransfer.dropEffect = 'copy';
+      console.log("Over Copy Zone: Setting copy mode");
+    } else if (isOverMoveZone) {
+      setIsCopyMode(false);
+      e.dataTransfer.dropEffect = 'move';
+      console.log("Over Move Zone: Setting move mode");
+    } else {
+      // For regular areas, default to move mode
+      setIsCopyMode(false);
+      e.dataTransfer.dropEffect = 'move';
+      console.log("Over Regular Area: Setting move mode");
+    }
+
+    // Update drag over state
+    setDragOverMonth(targetMonth);
+    setDragOverIndex(targetIndex);
+    setIsIntraMonthDrag(dragSourceMonth === targetMonth);
+
+    console.log("Drag State Updated:", {
+      targetMonth,
+      targetIndex,
+      isOverCopyZone,
+      isOverMoveZone,
+      isCopyMode: isOverCopyZone,
+      dropEffect: e.dataTransfer.dropEffect
+    });
   };
   
   const handleMonthDragOver = (e: React.DragEvent, targetMonth: string) => {
     e.preventDefault();
+    e.stopPropagation();
     
-    // Update copy mode based on current key state
-    // For general month drag, we still respect the key press
-    const newCopyMode = e.ctrlKey || e.metaKey;
-    if (isCopyMode !== newCopyMode) {
-      setIsCopyMode(newCopyMode);
-    }
-    
-    e.dataTransfer.dropEffect = newCopyMode ? 'copy' : 'move';
-    
-    // Update drag over state
+    // Don't change copy mode, just update drag over state
     setDragOverMonth(targetMonth);
+    
+    // Set drag effect based on current copy mode
+    if (isCopyMode) {
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.dropEffect = 'copy';
+    } else {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.dropEffect = 'move';
+    }
     
     // Clear any existing drag leave timeout
     if (dragLeaveTimeout) {
       window.clearTimeout(dragLeaveTimeout);
       setDragLeaveTimeout(null);
     }
+
+    console.log("Month Drag Over:", {
+      targetMonth,
+      dragOverIndex,
+      isCopyMode,
+      dropEffect: e.dataTransfer.dropEffect
+    });
   };
   
   const handleMonthDragLeave = (e: React.DragEvent) => {
@@ -225,6 +244,7 @@ const TransactionTableContent: React.FC = () => {
   
   const handleTransactionDrop = (e: React.DragEvent, targetMonth: string, targetIndex: number) => {
     e.preventDefault();
+    e.stopPropagation();
     
     console.log("Transaction Drop", {
       targetMonth,
@@ -232,136 +252,176 @@ const TransactionTableContent: React.FC = () => {
       draggedTransaction,
       draggedIndex,
       dragSourceMonth,
-      isCopyMode
+      isCopyMode,
+      state: {
+        dragOverMonth,
+        dragOverIndex,
+        isIntraMonthDrag
+      }
     });
     
     // Only process if we have a dragged transaction
-    if (draggedTransaction && draggedIndex !== null && dragSourceMonth) {
-      // Get the source and target transactions
-      const sourceTransactions = groupedTransactions[dragSourceMonth] || [];
-      const targetTransactions = groupedTransactions[targetMonth] || [];
+    if (!draggedTransaction || draggedIndex === null || !dragSourceMonth) {
+      console.log("Drop aborted: Missing required drag state");
+      resetDragState();
+      return;
+    }
+
+    try {
+      // Check if we're dropping on the copy zone (-888) or move zone (-999)
+      const isDropOnCopyZone = targetIndex === -888;
+      const isDropOnMoveZone = targetIndex === -999;
       
-      // Clone the transaction to avoid modifying the original
-      const transactionToMove = { ...draggedTransaction };
+      console.log("Drop Zone Check:", {
+        isDropOnCopyZone,
+        isDropOnMoveZone,
+        targetIndex,
+        isCopyMode
+      });
+
+      // Get transactions for the target month
+      const targetMonthTransactions = props.allTransactions.filter(t => {
+        const transactionMonth = new Date(t.date).toLocaleString('default', { month: 'long' });
+        return transactionMonth === targetMonth;
+      });
+
+      // Check for duplicates in the target month
+      const isDuplicate = targetMonthTransactions.some(
+        transaction => 
+          transaction.description === draggedTransaction.description && 
+          Math.abs(transaction.amount) === Math.abs(draggedTransaction.amount) &&
+          transaction.id !== draggedTransaction.id // Exclude the transaction being dragged
+      );
+
+      if (isDuplicate) {
+        console.log("Duplicate transaction found - drop prevented");
+        showNotification('Cannot create duplicate transaction in the same month', 'error');
+        resetDragState();
+        return;
+      }
       
-      console.log("Copy Mode", isCopyMode, "Target Index", targetIndex);
-      
-      // Force copy mode when dropping on the copy zone
-      if (targetIndex === -888) {
-        console.log("Forcing copy mode because dropping on copy zone");
-        // This is a copy operation
-        // Generate a new ID for the copied transaction
-        const transactionCopy = { ...draggedTransaction, id: uuidv4() };
+      // Handle copy operations - either explicit copy zone or copy mode
+      if (isDropOnCopyZone || (isCopyMode && !isDropOnMoveZone)) {
+        console.log("Copying transaction (Copy Zone Drop)");
         
-        // Update the date to the target month
-        const date = new Date(transactionCopy.date);
+        // Generate a new ID for the copied transaction
+        const transactionCopy = { 
+          ...draggedTransaction, 
+          id: uuidv4(),
+          // Keep the original category and ensure date is properly set
+          category: draggedTransaction.category,
+          date: new Date(draggedTransaction.date)
+        };
+        
+        // Update the date to the target month while preserving the year and day
+        const currentDate = new Date(transactionCopy.date);
         const targetMonthIndex = new Date(`${targetMonth} 1`).getMonth();
-        const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
-        transactionCopy.date = newDate;
+        transactionCopy.date = new Date(
+          currentDate.getFullYear(),
+          targetMonthIndex,
+          currentDate.getDate()
+        );
+        
+        console.log("Adding copied transaction:", {
+          original: draggedTransaction,
+          copy: transactionCopy,
+          targetMonth,
+          targetMonthIndex
+        });
         
         // Add the transaction to the target month
         props.onAddTransaction(transactionCopy);
         
         // Show a notification
         showNotification(`Copied transaction to ${targetMonth}`, 'success');
-      } 
-      // Handle normal copy mode (Ctrl/Cmd key)
-      else if (isCopyMode) {
-        console.log('Copy operation via Ctrl/Cmd key');
-        // This is a copy operation
-        // Generate a new ID for the copied transaction
-        const transactionCopy = { ...draggedTransaction, id: uuidv4() };
         
+        // Reset drag state after successful copy
+        resetDragState();
+        return;
+      }
+      
+      // Handle move operations - either move zone or regular move
+      if (isDropOnMoveZone || (!isCopyMode && !isDropOnCopyZone)) {
+        console.log("Moving transaction (Move Zone Drop)");
         // Update the date to the target month
-        const date = new Date(transactionCopy.date);
+        const date = new Date(draggedTransaction.date);
         const targetMonthIndex = new Date(`${targetMonth} 1`).getMonth();
         const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
-        transactionCopy.date = newDate;
+        const transactionToMove = { ...draggedTransaction, date: newDate };
         
-        // Add the transaction to the target month
-        props.onAddTransaction(transactionCopy);
+        // Find the global index of the transaction to remove
+        const globalIndex = utils.findGlobalIndex(draggedTransaction, props.allTransactions);
         
-        // Show a notification
-        showNotification(`Copied transaction to ${targetMonth}`, 'success');
-      } else {
-        // This is a move operation
-        
-        // If moving within the same month, we need to handle reordering
-        if (dragSourceMonth === targetMonth) {
-          // Get all transactions for this month and category
-          const monthTransactions = [...sourceTransactions];
+        if (globalIndex !== -1) {
+          // First, remove the transaction from its original position
+          props.onDeleteTransaction(globalIndex);
           
-          // Remove the transaction from its original position
-          const [removedTransaction] = monthTransactions.splice(draggedIndex, 1);
-          
-          // Insert it at the new position
-          monthTransactions.splice(targetIndex > draggedIndex ? targetIndex - 1 : targetIndex, 0, removedTransaction);
-          
-          // Update all transactions
-          const updatedTransactions = [...props.transactions];
-          
-          // Remove all transactions for this month and category
-          const remainingTransactions = updatedTransactions.filter(t => {
-            const tDate = new Date(t.date);
-            const tMonth = tDate.toLocaleString('default', { month: 'long' });
-            return !(tMonth === dragSourceMonth && t.category === props.category);
-          });
-          
-          // Add the reordered transactions
-          const finalTransactions = [...remainingTransactions, ...monthTransactions];
-          
-          // Update the parent component
-          props.onTransactionsChange(finalTransactions);
+          // Then add it to the new month
+          props.onAddTransaction(transactionToMove);
           
           // Show a notification
-          showNotification(`Reordered transaction in ${targetMonth}`, 'success');
+          showNotification(`Moved transaction to ${targetMonth}`, 'success');
         } else {
-          // Moving between different months
-          
-          // Update the date to the target month
-          const date = new Date(transactionToMove.date);
-          const targetMonthIndex = new Date(`${targetMonth} 1`).getMonth();
-          const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
-          transactionToMove.date = newDate;
-          
-          // Find the global index of the transaction to remove
-          const globalIndex = utils.findGlobalIndex(draggedTransaction, props.allTransactions);
-          
-          if (globalIndex !== -1) {
-            // First, remove the transaction from its original position
-            props.onDeleteTransaction(globalIndex);
-            
-            // Then add it to the new month
-            props.onAddTransaction(transactionToMove);
-            
-            // Show a notification
-            showNotification(`Moved transaction to ${targetMonth}`, 'success');
-          } else {
-            showNotification('Error: Could not find transaction to move', 'error');
-          }
+          showNotification('Error: Could not find transaction to move', 'error');
         }
+        
+        // Reset drag state after successful move
+        resetDragState();
+        return;
       }
+    } catch (error) {
+      console.error("Error handling drop:", error);
+      showNotification('Error handling drop operation', 'error');
+    } finally {
+      // Always reset drag state
+      resetDragState();
     }
-    
-    // Reset drag state
-    resetDragState();
   };
   
   const handleMonthDrop = (e: React.DragEvent, targetMonth: string) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    // Don't handle if we're over the copy zone
+    if (dragOverIndex === -888) {
+      console.log("Month Drop - Ignoring due to copy zone");
+      return;
+    }
     
     console.log("Month Drop", {
       targetMonth,
       draggedTransaction,
       draggedIndex,
       dragSourceMonth,
-      isCopyMode
+      isCopyMode,
+      dragOverIndex
     });
     
     // Only process if we have a dragged transaction
     if (draggedTransaction && draggedIndex !== null && dragSourceMonth) {
       // Skip if dropping on the same month it came from (when not copying)
       if (!isCopyMode && dragSourceMonth === targetMonth) {
+        resetDragState();
+        return;
+      }
+
+      // Get transactions for the target month
+      const targetMonthTransactions = props.allTransactions.filter(t => {
+        const transactionMonth = new Date(t.date).toLocaleString('default', { month: 'long' });
+        return transactionMonth === targetMonth;
+      });
+
+      // Check for duplicates in the target month
+      const isDuplicate = targetMonthTransactions.some(
+        transaction => 
+          transaction.description === draggedTransaction.description && 
+          Math.abs(transaction.amount) === Math.abs(draggedTransaction.amount) &&
+          transaction.id !== draggedTransaction.id // Exclude the transaction being dragged
+      );
+
+      if (isDuplicate) {
+        console.log("Duplicate transaction found - drop prevented");
+        showNotification('Cannot create duplicate transaction in the same month', 'error');
         resetDragState();
         return;
       }
@@ -420,8 +480,8 @@ const TransactionTableContent: React.FC = () => {
   
   const handleDragEnd = (e: React.DragEvent) => {
     console.log("Drag End, resetting copy mode");
-    // Always reset drag state completely, including copy mode
-    resetDragState(false); // Explicitly pass false to ensure copy mode is reset
+    // Reset drag state completely
+    resetDragState();
   };
   
   // Get the background styles for the table
@@ -466,12 +526,12 @@ const TransactionTableContent: React.FC = () => {
             display: 'block',
             textAlign: 'center',
             mb: 1,
-            mt: -1,
+            mt: -3,
             color: category === 'Income' ? 'rgba(0, 0, 0, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
           }}
         >
           {filteredTransactions.length > 0 
-            ? 'Drag to move or copy transactions between months' 
+            ? 'Drag to move transactions between months' 
             : 'Add transactions using the + button in each month'}
         </Typography>
         

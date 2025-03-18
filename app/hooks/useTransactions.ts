@@ -12,8 +12,9 @@ import { useAuth } from '../contexts/AuthContext';
 import * as transactionService from '../services/transactionService';
 import { collection, getDocs, writeBatch, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+import ReactDOM from 'react-dom';
 
-export function useTransactions() {
+export function useTransactions(initialBudgetId?: string) {
   // Get current user from auth context
   const { user, isAuthenticated } = useAuth();
   
@@ -24,6 +25,40 @@ export function useTransactions() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
+  // State for current budget ID
+  const [currentBudgetId, setCurrentBudgetId] = useState<string | undefined>(initialBudgetId);
+  
+  // Add a reset flag to trigger transaction reload
+  const [shouldReload, setShouldReload] = useState(false);
+
+  // Update currentBudgetId when initialBudgetId changes
+  useEffect(() => {
+    console.log('[useTransactions] Budget ID change detected:', {
+      currentBudgetId,
+      initialBudgetId,
+      hasExistingTransactions: transactions.length > 0
+    });
+
+    // Only update if initialBudgetId is defined and different from currentBudgetId
+    if (initialBudgetId && initialBudgetId !== currentBudgetId) {
+      console.log('[useTransactions] Budget ID changed:', {
+        from: currentBudgetId,
+        to: initialBudgetId
+      });
+      
+      // Immediately clear all data when budget changes
+      setTransactions([]);
+      setBudgetSummary(null);
+      setBudgetPlan(null);
+      setSuggestions([]);
+      
+      // Set the new budget ID
+      setCurrentBudgetId(initialBudgetId);
+      // Force a reload of transactions
+      setShouldReload(true);
+    }
+  }, [initialBudgetId]); // Only depend on initialBudgetId changes
+
   // Fallback to localStorage for non-authenticated users or during loading
   const [localTransactions, setLocalTransactions] = useLocalStorage<Transaction[]>(
     STORAGE_KEYS.TRANSACTIONS, 
@@ -54,61 +89,7 @@ export function useTransactions() {
     message: string 
   } | null>(null);
 
-  // Add a reset flag to trigger transaction reload
-  const [shouldReload, setShouldReload] = useState(false);
-
-  // Load transactions from Firestore when authenticated
-  useEffect(() => {
-    const loadTransactions = async () => {
-      // Only proceed if we have both authentication and a valid user ID
-      if (isAuthenticated && user?.id) {
-        
-        setIsLoading(true);
-        try {
-          const userTransactions = await transactionService.getUserTransactions(user.id);
-          
-          setTransactions(userTransactions);
-          
-          if (userTransactions.length > 0) {
-            const summary = calculateBudgetSummary(userTransactions);
-            setBudgetSummary(summary);
-            
-            const plan = create503020Plan(summary);
-            setBudgetPlan(plan);
-            
-            const budgetSuggestions = getBudgetSuggestions(plan);
-            setSuggestions(budgetSuggestions);
-          } else {
-            setBudgetSummary(null);
-            setBudgetPlan(null);
-            setSuggestions([]);
-          }
-        } catch (error) {
-          console.error('[useTransactions] Error loading transactions:', error);
-          setTransactions([]);
-          setBudgetSummary(null);
-          setBudgetPlan(null);
-          setSuggestions([]);
-        } finally {
-          setIsLoading(false);
-          setShouldReload(false);
-        }
-      } else if (!isAuthenticated) {
-        // If not authenticated, use local storage
-        setTransactions(localTransactions);
-        setBudgetSummary(localBudgetSummary);
-        setBudgetPlan(localBudgetPlan);
-        setSuggestions(localSuggestions);
-      } else {
-        // User is authenticated but id is not yet available
-        setIsLoading(true);
-      }
-    };
-    
-    loadTransactions();
-  }, [isAuthenticated, user?.id, localTransactions, localBudgetSummary, localBudgetPlan, localSuggestions, shouldReload]);
-
-  // Add a transaction
+  // Add a transaction with batched updates
   const addTransaction = useCallback(async (transaction: Transaction) => {
     console.log('addTransaction called with:', {
       description: transaction.description,
@@ -119,83 +100,39 @@ export function useTransactions() {
     });
     
     try {
+      setIsLoading(true);
       const newTransaction = {
         ...transaction,
         date: transaction.date instanceof Date ? transaction.date : new Date(transaction.date)
       };
-      
-      console.log('Processed transaction:', {
-        description: newTransaction.description,
-        amount: newTransaction.amount,
-        date: newTransaction.date,
-        category: newTransaction.category,
-        id: newTransaction.id
-      });
       
       let transactionId: string | undefined;
       
       // If authenticated, save to Firestore
       if (isAuthenticated && user?.id) {
         console.log('Saving to Firestore for user:', user.id);
-        setIsLoading(true);
+        transactionId = await transactionService.addTransaction(user.id, newTransaction, currentBudgetId);
+        newTransaction.id = transactionId;
         
-        try {
-          transactionId = await transactionService.addTransaction(user.id, newTransaction);
-          
-          // Add the id to the transaction
-          newTransaction.id = transactionId;
-          console.log('Transaction saved to Firestore with ID:', transactionId);
-        } catch (firebaseError) {
-          console.error('[useTransactions] Firebase error:', firebaseError);
-          throw firebaseError;
-        }
-      } else {
-        console.log('User not authenticated, skipping Firestore save');
+        // Set shouldReload to true after successful Firestore save
+        setShouldReload(true);
       }
-      
-      // Update local state
-      const updatedTransactions = [...transactions, newTransaction];
-      console.log('Updating local state with new transaction');
 
-      setTransactions(updatedTransactions);
-      console.log('Local state updated, transactions count:', updatedTransactions.length);
-      
-      // If not authenticated, save to localStorage
-      if (!isAuthenticated || !user?.id) {
-        console.log('Saving to localStorage');
-        setLocalTransactions(updatedTransactions);
-      }
-      
-      // Process transactions for budget calculations
-      try {
-        // Calculate budget summary
+      // Update all states in a single batch
+      ReactDOM.unstable_batchedUpdates(() => {
+        const updatedTransactions = [...transactions, newTransaction];
+        
+        // Calculate all updates at once
         const summary = calculateBudgetSummary(updatedTransactions);
-        setBudgetSummary(summary);
-        
-        // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.id) {
-          setLocalBudgetSummary(summary);
-        }
-        
-        // Create budget plan
         const plan = create503020Plan(summary);
-        setBudgetPlan(plan);
-        
-        // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.id) {
-          setLocalBudgetPlan(plan);
-        }
-        
-        // Generate suggestions
         const budgetSuggestions = getBudgetSuggestions(plan);
+        
+        // Update all states together
+        setTransactions(updatedTransactions);
+        setBudgetSummary(summary);
+        setBudgetPlan(plan);
         setSuggestions(budgetSuggestions);
-        
-        // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.id) {
-          setLocalSuggestions(budgetSuggestions);
-        }
-        
-        // Show success message
+        setIsLoading(false);
         setAlertMessage({
           type: 'success',
           message: transactions.length === 0 
@@ -203,37 +140,104 @@ export function useTransactions() {
             : 'Transaction added successfully!'
         });
         
-        // Trigger a reload to ensure Firebase data is in sync
-        setShouldReload(true);
-        
-      } catch (error) {
-        console.error('[useTransactions] Error processing transaction:', error);
-        setAlertMessage({
-          type: 'error',
-          message: 'Error processing transaction. Please try again.'
-        });
-      }
+        // Update localStorage if needed
+        if (!isAuthenticated || !user?.id) {
+          setLocalTransactions(updatedTransactions);
+          setLocalBudgetSummary(summary);
+          setLocalBudgetPlan(plan);
+          setLocalSuggestions(budgetSuggestions);
+        }
+      });
+      
     } catch (error) {
       console.error('[useTransactions] Error adding transaction:', error);
-      setAlertMessage({
-        type: 'error',
-        message: `Error adding transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
-    } finally {
-      if (isAuthenticated && user?.id) {
+      ReactDOM.unstable_batchedUpdates(() => {
         setIsLoading(false);
-      }
+        setAlertMessage({
+          type: 'error',
+          message: `Error adding transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
+      });
     }
   }, [
-    transactions, 
-    isAuthenticated, 
-    user, 
-    setLocalTransactions, 
-    setLocalBudgetSummary, 
-    setLocalBudgetPlan, 
+    transactions,
+    isAuthenticated,
+    user,
+    currentBudgetId,
+    setLocalTransactions,
+    setLocalBudgetSummary,
+    setLocalBudgetPlan,
     setLocalSuggestions,
     setShouldReload
   ]);
+
+  // Load transactions from Firestore when authenticated or when budget changes
+  useEffect(() => {
+    const loadTransactions = async () => {
+      if (!isAuthenticated || !user?.id || !currentBudgetId) {
+        console.log('[useTransactions] Skipping transaction load due to missing requirements:', {
+          isAuthenticated,
+          userId: user?.id,
+          currentBudgetId
+        });
+        return;
+      }
+
+      // Remove the shouldReload check to ensure we load transactions when needed
+      if (isLoading) {
+        console.log('[useTransactions] Skipping load - already loading');
+        return;
+      }
+
+      console.log('[useTransactions] Loading transactions for budget:', {
+        userId: user.id,
+        currentBudgetId,
+        isAuthenticated,
+        shouldReload
+      });
+      
+      try {
+        setIsLoading(true);
+        const userTransactions = await transactionService.getUserTransactions(user.id, currentBudgetId);
+        
+        // Sort transactions by category and order
+        const sortedTransactions = [...userTransactions].sort((a, b) => {
+          if (a.category !== b.category) {
+            return (a.category || '').localeCompare(b.category || '');
+          }
+          return (a.order || 0) - (b.order || 0);
+        });
+
+        // Calculate all updates at once
+        const summary = calculateBudgetSummary(sortedTransactions);
+        const plan = create503020Plan(summary);
+        const budgetSuggestions = getBudgetSuggestions(plan);
+        
+        // Update all states in a single batch
+        ReactDOM.unstable_batchedUpdates(() => {
+          setTransactions(sortedTransactions);
+          setBudgetSummary(summary);
+          setBudgetPlan(plan);
+          setSuggestions(budgetSuggestions);
+          setShouldReload(false);
+          setIsLoading(false);
+        });
+        
+      } catch (error) {
+        console.error('[useTransactions] Error loading transactions:', error);
+        ReactDOM.unstable_batchedUpdates(() => {
+          setShouldReload(false);
+          setIsLoading(false);
+          setAlertMessage({
+            type: 'error',
+            message: 'Failed to load transactions. Please try again.'
+          });
+        });
+      }
+    };
+    
+    loadTransactions();
+  }, [isAuthenticated, user, currentBudgetId, shouldReload]);
 
   // Update a transaction
   const updateTransaction = useCallback(async (index: number, updatedFields: Partial<Transaction>) => {
@@ -274,9 +278,9 @@ export function useTransactions() {
     try {
       // If authenticated and transaction has an ID, update in Firestore
       if (isAuthenticated && user?.id && transaction.id) {
-
         setIsLoading(true);
-        await transactionService.updateTransaction(transaction.id, updatedFields, user.id);
+        // Pass the budgetId for updating in the specific budget collection
+        await transactionService.updateTransaction(transaction.id, updatedFields, user.id, currentBudgetId);
       } 
       
       // Update local state
@@ -323,22 +327,19 @@ export function useTransactions() {
           message: 'Transaction updated successfully!'
         });
       } catch (error) {
-        console.error('Error processing transactions:', error);
+        console.error('[useTransactions] Error recalculating budget:', error);
         setAlertMessage({
           type: 'error',
-          message: `Error updating transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
+          message: 'Error updating budget calculations. Please try again.'
         });
-      } finally {
-        if (isAuthenticated && user?.id) {
-          setIsLoading(false);
-        }
       }
     } catch (error) {
-      console.error('Error updating transaction:', error);
+      console.error('[useTransactions] Error updating transaction:', error);
       setAlertMessage({
         type: 'error',
         message: `Error updating transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
+    } finally {
       if (isAuthenticated && user?.id) {
         setIsLoading(false);
       }
@@ -350,8 +351,54 @@ export function useTransactions() {
     setLocalTransactions, 
     setLocalBudgetSummary, 
     setLocalBudgetPlan, 
-    setLocalSuggestions
+    setLocalSuggestions,
+    currentBudgetId  // Add currentBudgetId dependency
   ]);
+
+  // Update transaction by description
+  const updateTransactionByDescription = useCallback((description: string, updates: Partial<Transaction>) => {
+    // Find the transaction index
+    const index = transactions.findIndex(t => t.description === description);
+    
+    // If the transaction exists, update it
+    if (index !== -1) {
+      updateTransaction(index, updates);
+    } else {
+      console.warn(`Transaction with description "${description}" not found`);
+    }
+  }, [transactions, updateTransaction]);
+
+  // Get transactions by category
+  const getTransactionsByCategory = useCallback(() => {
+    // Create an object to hold transactions by category
+    const categories = {
+      'Essentials': [] as Transaction[],
+      'Wants': [] as Transaction[],
+      'Savings': [] as Transaction[]
+    } as Record<string, Transaction[]>;
+    
+    // Loop through transactions and group by category
+    transactions.forEach(transaction => {
+      // Skip income transactions as they are handled separately
+      if (transaction.category !== 'Income' && transaction.category) {
+        // Ensure category exists in the object
+        if (!categories[transaction.category]) {
+          categories[transaction.category] = [];
+        }
+        // Add transaction to appropriate category
+        categories[transaction.category].push(transaction);
+      }
+    });
+    
+    return categories;
+  }, [transactions]);
+
+  // Get total income
+  const getTotalIncome = useCallback(() => {
+    return transactions
+      .filter(t => t.category === 'Income')
+      .reduce((sum, t) => sum + t.amount, 0);
+  }, [transactions]);
 
   // Delete a transaction
   const deleteTransaction = useCallback(async (index: number) => {
@@ -371,7 +418,8 @@ export function useTransactions() {
       // If authenticated and transaction has an ID, delete from Firestore
       if (isAuthenticated && user?.id && transaction.id) {
         setIsLoading(true);
-        await transactionService.deleteTransaction(transaction.id, user.id);
+        // Pass budgetId to delete from the specific budget collection
+        await transactionService.deleteTransaction(transaction.id, user.id, currentBudgetId);
       }
       
       // Update local state
@@ -385,31 +433,45 @@ export function useTransactions() {
       
       // Recalculate budget
       try {
-        // Calculate budget summary
-        const summary = calculateBudgetSummary(updatedTransactions);
-        setBudgetSummary(summary);
-        
-        // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.id) {
-          setLocalBudgetSummary(summary);
-        }
-        
-        // Create budget plan
-        const plan = create503020Plan(summary);
-        setBudgetPlan(plan);
-        
-        // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.id) {
-          setLocalBudgetPlan(plan);
-        }
-        
-        // Get suggestions
-        const budgetSuggestions = getBudgetSuggestions(plan);
-        setSuggestions(budgetSuggestions);
-        
-        // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.id) {
-          setLocalSuggestions(budgetSuggestions);
+        // If no transactions left, clear everything
+        if (updatedTransactions.length === 0) {
+          setBudgetSummary(null);
+          setBudgetPlan(null);
+          setSuggestions([]);
+          
+          // Update localStorage if needed
+          if (!isAuthenticated || !user?.id) {
+            setLocalBudgetSummary(null);
+            setLocalBudgetPlan(null);
+            setLocalSuggestions([]);
+          }
+        } else {
+          // Calculate new budget summary
+          const summary = calculateBudgetSummary(updatedTransactions);
+          setBudgetSummary(summary);
+          
+          // Save to localStorage if not authenticated
+          if (!isAuthenticated || !user?.id) {
+            setLocalBudgetSummary(summary);
+          }
+          
+          // Create new budget plan
+          const plan = create503020Plan(summary);
+          setBudgetPlan(plan);
+          
+          // Save to localStorage if not authenticated
+          if (!isAuthenticated || !user?.id) {
+            setLocalBudgetPlan(plan);
+          }
+          
+          // Generate new suggestions
+          const budgetSuggestions = getBudgetSuggestions(plan);
+          setSuggestions(budgetSuggestions);
+          
+          // Save to localStorage if not authenticated
+          if (!isAuthenticated || !user?.id) {
+            setLocalSuggestions(budgetSuggestions);
+          }
         }
         
         setAlertMessage({
@@ -417,22 +479,19 @@ export function useTransactions() {
           message: 'Transaction deleted successfully!'
         });
       } catch (error) {
-        console.error('Error processing transactions after deletion:', error);
+        console.error('[useTransactions] Error recalculating budget after deletion:', error);
         setAlertMessage({
           type: 'error',
-          message: `Error updating budget after deletion: ${error instanceof Error ? error.message : 'Unknown error'}`
+          message: 'Error updating budget calculations. Please try again.'
         });
-      } finally {
-        if (isAuthenticated && user?.id) {
-          setIsLoading(false);
-        }
       }
     } catch (error) {
-      console.error('Error deleting transaction:', error);
+      console.error('[useTransactions] Error deleting transaction:', error);
       setAlertMessage({
         type: 'error',
         message: `Error deleting transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
+    } finally {
       if (isAuthenticated && user?.id) {
         setIsLoading(false);
       }
@@ -444,163 +503,68 @@ export function useTransactions() {
     setLocalTransactions, 
     setLocalBudgetSummary, 
     setLocalBudgetPlan, 
-    setLocalSuggestions
+    setLocalSuggestions,
+    currentBudgetId  // Add currentBudgetId dependency
   ]);
 
-  // Update transaction by description (for speech recognition)
-  const updateTransactionByDescription = useCallback((description: string, newAmount: number) => {
-    // Clean up the description for better matching
-    const cleanDescription = description
-      .replace(/^(the|my)\s+/i, '') // Remove "the" or "my" from the beginning
-      .replace(/\s+(expense|transaction|bill|payment)$/i, '') // Remove trailing "expense", "transaction", etc.
-      .trim();
-
-    // Try exact match first (case-insensitive)
-    let transactionIndex = transactions.findIndex(t => 
-      t.description.toLowerCase() === cleanDescription.toLowerCase()
-    );
-
-    // If no exact match, try fuzzy matching
-    if (transactionIndex === -1) {
-      // Try to find a transaction that contains the description as a substring
-      transactionIndex = transactions.findIndex(t => 
-        t.description.toLowerCase().includes(cleanDescription.toLowerCase())
-      );
-
-      // If still no match, try to find a transaction where the description contains any word from the search
-      if (transactionIndex === -1) {
-        const searchWords = cleanDescription.toLowerCase().split(/\s+/).filter(word => word.length > 2);
-
-        if (searchWords.length > 0) {
-          for (let i = 0; i < transactions.length; i++) {
-            const transactionDesc = transactions[i].description.toLowerCase();
-
-            // Check if any search word is in the transaction description
-            for (const word of searchWords) {
-              if (transactionDesc.includes(word)) {
-                transactionIndex = i;
-                break;
-              }
-            }
-
-            if (transactionIndex !== -1) break;
-          }
-        }
-      }
-    }
-
-    if (transactionIndex !== -1) {
-      const transaction = transactions[transactionIndex];
-      const isIncome = transaction.category === 'Income';
-      const signedAmount = isIncome ? Math.abs(newAmount) : -Math.abs(newAmount);
-
-      updateTransaction(transactionIndex, { amount: signedAmount });
-      return true;
-    }
-    
-    return false;
-  }, [transactions, updateTransaction]);
-
-  // Group transactions by category
-  const getTransactionsByCategory = useCallback(() => {
-    const grouped: Record<string, Transaction[]> = {
-      'Essentials': [],
-      'Wants': [],
-      'Savings': []
-    };
-    
-    
-    // Group transactions (excluding Income)
-    transactions.forEach(transaction => {
-      
-      if (transaction.category && transaction.category !== 'Income' && 
-          (transaction.category === 'Essentials' || 
-           transaction.category === 'Wants' || 
-           transaction.category === 'Savings')) {
-        grouped[transaction.category].push(transaction);
-      }
-    });
-
-    
-    return grouped;
-  }, [transactions]);
-  
-  // Calculate total income
-  const getTotalIncome = useCallback(() => {
-    return transactions
-      .filter(t => t.category === 'Income')
-      .reduce((sum, t) => sum + t.amount, 0);
-  }, [transactions]);
-  
-  // Reset all data
+  // Reset all transactions
   const resetTransactions = useCallback(async () => {
-    // Check for both authentication and valid user ID
-    if (!isAuthenticated || !user?.id) {
-    
-      // Reset local storage only
-      setLocalTransactions([]);
-      setLocalBudgetSummary(null);
-      setLocalBudgetPlan(null);
-      setLocalSuggestions([]);
-      return;
-    }
-
     try {
-      setIsLoading(true);
-  
-
-      // Delete all transactions from Firebase for the current user
-      const transactionsRef = collection(db, 'users', user.id, 'transactions');
-      
-      const querySnapshot = await getDocs(transactionsRef);
-
-      if (!querySnapshot.empty) {
-        const batch = writeBatch(db);
-        let deleteCount = 0;
-
-        querySnapshot.forEach((doc: QueryDocumentSnapshot) => {
-          batch.delete(doc.ref);
-          deleteCount++;
-        });
-
-
-        await batch.commit();
-
-
-        // Verify deletion
-        const verifySnapshot = await getDocs(transactionsRef);
-        if (verifySnapshot.empty) {
-
+      // If user is authenticated, delete all Firebase transactions
+      if (isAuthenticated && user?.id) {
+        setIsLoading(true);
+        
+        if (currentBudgetId) {
+          // Get all transactions for this budget
+          const allTransactions = await transactionService.getUserTransactions(user.id, currentBudgetId);
+          
+          // Delete each transaction
+          const deletePromises = allTransactions.map(transaction => {
+            if (transaction.id) {
+              return transactionService.deleteTransaction(transaction.id, user.id, currentBudgetId);
+            }
+            return Promise.resolve();
+          });
+          
+          await Promise.all(deletePromises);
         } else {
-          console.warn('[resetTransactions] Verification: Some transactions still exist:', verifySnapshot.size);
+          // Get all transactions from the legacy path
+          const allTransactions = await transactionService.getUserTransactions(user.id);
+          
+          // Delete each transaction
+          const deletePromises = allTransactions.map(transaction => {
+            if (transaction.id) {
+              return transactionService.deleteTransaction(transaction.id, user.id);
+            }
+            return Promise.resolve();
+          });
+          
+          await Promise.all(deletePromises);
         }
-      } 
-
-      // Reset all state and trigger reload
- 
+      }
+      
+      // Clear local state
       setTransactions([]);
       setBudgetSummary(null);
       setBudgetPlan(null);
       setSuggestions([]);
-      setShouldReload(true);
-
+      
+      // Clear localStorage if not authenticated or as a backup
+      setLocalTransactions([]);
+      setLocalBudgetSummary(null);
+      setLocalBudgetPlan(null);
+      setLocalSuggestions([]);
+      
       setAlertMessage({
         type: 'success',
-        message: 'Your budget has been reset successfully.'
+        message: 'All transactions have been cleared.'
       });
-
     } catch (error) {
-      console.error('[resetTransactions] Error details:', {
-        error,
-        errorName: error instanceof Error ? error.name : 'Unknown',
-        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        errorStack: error instanceof Error ? error.stack : undefined
-      });
+      console.error('[useTransactions] Error resetting transactions:', error);
       setAlertMessage({
         type: 'error',
-        message: 'Failed to reset your budget. Please try again.'
+        message: `Error resetting budget: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
-      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -610,12 +574,11 @@ export function useTransactions() {
     setLocalTransactions, 
     setLocalBudgetSummary, 
     setLocalBudgetPlan, 
-    setLocalSuggestions, 
-    setAlertMessage,
-    setIsLoading
+    setLocalSuggestions,
+    currentBudgetId  // Add currentBudgetId dependency
   ]);
-  
-  // Move a transaction to a different category
+
+  // Move a transaction to a new category
   const moveTransaction = useCallback(async (index: number, targetCategory: string) => {
     // Ensure the index is valid
     if (index < 0 || index >= transactions.length) {
@@ -638,7 +601,8 @@ export function useTransactions() {
         await transactionService.moveTransactionToCategory(
           transaction.id, 
           targetCategory as 'Income' | 'Essentials' | 'Wants' | 'Savings',
-          user.id
+          user.id,
+          currentBudgetId  // Pass currentBudgetId
         );
       }
       
@@ -655,7 +619,7 @@ export function useTransactions() {
     } finally {
       setIsLoading(false);
     }
-  }, [transactions, updateTransaction, isAuthenticated, user, setAlertMessage]);
+  }, [transactions, updateTransaction, isAuthenticated, user, setAlertMessage, currentBudgetId]);
 
   // Reorder transactions within a category
   const reorderTransactions = useCallback(async (category: string, orderedTransactionIds: string[]) => {
@@ -663,7 +627,12 @@ export function useTransactions() {
       // If authenticated, update in Firestore
       if (isAuthenticated && user?.id) {
         setIsLoading(true);
-        await transactionService.reorderTransactions(user.id, category, orderedTransactionIds);
+        await transactionService.reorderTransactions(
+          user.id, 
+          category, 
+          orderedTransactionIds,
+          currentBudgetId  // Pass currentBudgetId
+        );
       }
       
       // Update local state
@@ -680,17 +649,6 @@ export function useTransactions() {
         if (transaction.category === category && transaction.id && orderMap.has(transaction.id)) {
           transaction.order = orderMap.get(transaction.id);
         }
-      });
-      
-      // Sort transactions by order within each category
-      updatedTransactions.sort((a, b) => {
-        // First sort by category
-        if (a.category !== b.category) {
-          return (a.category || '').localeCompare(b.category || '');
-        }
-        
-        // Then sort by order within the category
-        return (a.order || 0) - (b.order || 0);
       });
       
       setTransactions(updatedTransactions);
@@ -713,7 +671,14 @@ export function useTransactions() {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, user?.id, transactions, setLocalTransactions, setAlertMessage]);
+  }, [
+    transactions, 
+    isAuthenticated, 
+    user, 
+    setLocalTransactions, 
+    setAlertMessage,
+    currentBudgetId  // Add currentBudgetId dependency
+  ]);
 
   return {
     transactions,
@@ -722,6 +687,8 @@ export function useTransactions() {
     suggestions,
     alertMessage,
     isLoading,
+    currentBudgetId,
+    setCurrentBudgetId,
     setAlertMessage,
     addTransaction,
     updateTransaction,

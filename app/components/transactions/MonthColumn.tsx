@@ -35,6 +35,8 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
   getNextMonth,
   getMonthOrder
 }) => {
+  const [isCopyModeState, setIsCopyMode] = React.useState(isCopyMode);
+
   return (
     <Box 
       sx={{ 
@@ -46,13 +48,19 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           lg: '113px',
           xl: 'unset',
         },
-        maxWidth: 'none',
+        maxWidth:{
+          xs: '113px',
+          sm: '113px',
+          md: 'unset',
+          lg: 'unset',
+          xl: 'unset',
+        },
         flexGrow: 1,
         flexShrink: {
           xs: 0,
           sm: 0,
-          md: 0,
-          lg: 0,
+          md: 1,
+          lg: 1,
           xl: 1,
         },
         flexBasis: 'auto',
@@ -61,20 +69,74 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
         flexDirection: 'column',
         // Add styles for when this month is the drop target
         ...(dragOverMonth === month ? {
-          backgroundColor: isCopyMode 
-            ? 'rgba(76, 175, 80, 0.15)' // Green for copy
-            : 'rgba(33, 150, 243, 0.15)', // Blue for move
+          backgroundColor: 'rgba(33, 150, 243, 0.15)', // Blue for move
           borderRadius: 1,
           transition: 'all 0.3s ease',
           transform: 'scale(1.02)',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-          border: `2px dashed ${isCopyMode ? '#4caf50' : '#2196f3'}`,
+          border: '2px dashed #2196f3',
         } : {})
       }}
-      // Add drag and drop event handlers for the month column
-      onDragOver={(e) => handleMonthDragOver(e, month)}
-      onDragLeave={handleMonthDragLeave}
-      onDrop={(e) => handleMonthDrop(e, month)}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Check if we have a dragged transaction
+        if (!draggedTransaction) {
+          return;
+        }
+
+        // Check for duplicates in the target month
+        const isDuplicate = (monthTransactions as Transaction[]).some(
+          transaction => 
+            transaction.description === draggedTransaction.description && 
+            Math.abs(transaction.amount) === Math.abs(draggedTransaction.amount)
+        );
+
+        if (isDuplicate) {
+          // If it's a duplicate, don't allow the drag over
+          e.dataTransfer.dropEffect = 'none';
+          handleMonthDragLeave(e);
+          return;
+        }
+
+        e.dataTransfer.dropEffect = 'move';
+        handleMonthDragOver(e, month);
+      }}
+      onDragLeave={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handleMonthDragLeave(e);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Check if we have a dragged transaction
+        if (!draggedTransaction) {
+          return;
+        }
+
+        // Check for duplicates in the target month
+        const isDuplicate = (monthTransactions as Transaction[]).some(
+          transaction => 
+            transaction.description === draggedTransaction.description && 
+            Math.abs(transaction.amount) === Math.abs(draggedTransaction.amount)
+        );
+
+        if (isDuplicate) {
+          // If it's a duplicate, don't allow the drop
+          console.log('Duplicate transaction found in month - drop prevented');
+          handleMonthDragLeave(e);
+          return;
+        }
+
+        handleMonthDrop(e, month);
+      }}
     >
       <Box sx={{ 
         display: 'flex',
@@ -134,6 +196,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           pr: 0.5,
           pt: 0.5,
           pb: 0.5,
+          position: 'relative',
           '&::-webkit-scrollbar': {
             width: '6px',
           },
@@ -149,9 +212,29 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           }
         }}
         onDragOver={(e) => {
-          // Handle drag over the stack itself (for dropping at the end of the list)
           e.preventDefault();
           e.stopPropagation();
+          
+          // Check if we have a dragged transaction
+          if (!draggedTransaction) {
+            return;
+          }
+
+          // Check for duplicates in the target month
+          const isDuplicate = (monthTransactions as Transaction[]).some(
+            transaction => 
+              transaction.description === draggedTransaction.description && 
+              Math.abs(transaction.amount) === Math.abs(draggedTransaction.amount)
+          );
+
+          if (isDuplicate) {
+            // If it's a duplicate, don't allow the drag over
+            e.dataTransfer.dropEffect = 'none';
+            handleMonthDragLeave(e);
+            return;
+          }
+
+          e.dataTransfer.dropEffect = 'move';
           
           // Only update if we're not already over a specific card
           if (dragOverIndex === null || dragOverIndex >= (monthTransactions as Transaction[]).length) {
@@ -159,14 +242,74 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           }
         }}
         onDrop={(e) => {
-          // Handle drop on the stack itself (for dropping at the end of the list)
           e.preventDefault();
           e.stopPropagation();
+          
+          // Check if we have a dragged transaction
+          if (!draggedTransaction) {
+            return;
+          }
+
+          // Check for duplicates in the target month
+          const isDuplicate = (monthTransactions as Transaction[]).some(
+            transaction => 
+              transaction.description === draggedTransaction.description && 
+              Math.abs(transaction.amount) === Math.abs(draggedTransaction.amount)
+          );
+
+          if (isDuplicate) {
+            // If it's a duplicate, don't allow the drop
+            console.log('Duplicate transaction found in stack - drop prevented');
+            handleMonthDragLeave(e);
+            return;
+          }
           
           // Drop at the end of the list
           handleTransactionDrop(e, month, (monthTransactions as Transaction[]).length);
         }}
       >
+        {/* Add button if there are no transactions */}
+        {(monthTransactions as Transaction[]).length === 0 && (
+          <Card
+            onClick={() => handleOpenMobileAdd(month)}
+            sx={{
+              p: 0.75,
+              height: '60px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              bgcolor: getCardBackgroundColor(),
+              border: 'none',
+              borderRadius: 1,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease-in-out',
+              boxShadow: '0 3px 6px rgba(0,0,0,0.1), 0 3px 6px rgba(0,0,0,0.15)',
+              '&:hover': {
+                boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
+                transform: 'translateY(-2px)',
+                bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getCardBackgroundColor(true)
+              }
+            }}
+          >
+            <AddIcon 
+              sx={{ 
+                fontSize: {
+                  xs: '1.125rem',
+                  sm: '1.125rem',
+                  md: '1.125rem',
+                  lg: '1.125rem',
+                  xl: '1.5rem',
+                },
+                color: getTextColor(),
+                '&:hover': {
+                  color: getTextColor(true)
+                }
+              }} 
+            />
+          </Card>
+        )}
+
         {(monthTransactions as Transaction[]).map((transaction, index) => (
           <TransactionCard
             key={transaction.id || `${transaction.description}-${index}`}
@@ -194,255 +337,48 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
             handleOpenMobileEdit={handleOpenMobileEdit}
           />
         ))}
-        
-        {/* Empty drop zone at the end of the list - enhance the visual indicator */}
-        {dragOverMonth === month && dragOverIndex === (monthTransactions as Transaction[]).length && (
-          <Box
-            sx={{
-              height: '30px', // Increased height for better visibility
-              borderRadius: 1,
-              border: `3px dashed ${isCopyMode ? '#4caf50' : '#2196f3'}`, // Thicker border
-              backgroundColor: isCopyMode 
-                ? 'rgba(76, 175, 80, 0.15)' 
-                : 'rgba(33, 150, 243, 0.15)',
-              mb: 1,
-              transition: 'all 0.3s ease',
-              boxShadow: isCopyMode 
-                ? '0 0 12px rgba(76, 175, 80, 0.4)' 
-                : '0 0 12px rgba(33, 150, 243, 0.4)', // More pronounced shadow
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            {/* Add a text indicator */}
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                color: isCopyMode ? '#4caf50' : '#2196f3',
-                fontWeight: 'bold',
-                fontSize: '0.7rem',
-              }}
-            >
-              {isCopyMode ? 'Copy Here' : 'Move Here'}
-            </Typography>
-          </Box>
-        )}
-        
-        {/* "Move Here" drop zone - only visible when dragging */}
-        {isDragging && (
-          <Box
-            className="drop-zone"
-            sx={{
-              height: '50px',
-              borderRadius: 1,
-              border: `3px dashed #2196f3`,
-              backgroundColor: (dragOverMonth === month && dragOverIndex === -999) 
-                ? 'rgba(33, 150, 243, 0.2)'
-                : 'rgba(33, 150, 243, 0.05)',
-              mb: 1,
-              transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-              boxShadow: (dragOverMonth === month && dragOverIndex === -999)
-                ? '0 0 15px rgba(33, 150, 243, 0.5)'
-                : 'none',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              cursor: 'pointer',
-              transform: (dragOverMonth === month && dragOverIndex === -999) ? 'scale(1.03)' : 'scale(1)',
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (isDragging && draggedTransaction) {
-                // Use a special index (-999) to indicate bottom of the list
-                handleTransactionDragOver(e, month, -999);
-                
-                // Force move mode (not copy)
-                // This would be handled in the parent component
-              }
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log("Move zone drop event", month, -999);
-              if (isDragging && draggedTransaction) {
-                // Handle drop at the bottom of the month with move mode
-                console.log("Calling handleTransactionDrop for move zone");
-                handleTransactionDrop(e, month, -999); // Use -999 to indicate move zone
-              }
-            }}
-          >
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                color: 'rgba(33, 150, 243, 1)',
-                fontWeight: (dragOverMonth === month && dragOverIndex === -999 && !isCopyMode) ? 'bold' : 'normal',
-                fontSize: '0.85rem',
-              }}
-            >
-              Move Here
-            </Typography>
-          </Box>
-        )}
 
-         {/* "Copy Here" drop zone - only visible when dragging */}
-         {isDragging &&  (
-          <Box
-            className="drop-zone"
+        {/* Add button after transactions if there are any */}
+        {(monthTransactions as Transaction[]).length > 0 && (
+          <Card
+            onClick={() => handleOpenMobileAdd(month)}
             sx={{
-              height: '50px',
-              borderRadius: 1,
-              border: `3px dashed rgb(53, 249, 46)`,
-              backgroundColor: (dragOverMonth === month && dragOverIndex === -888) 
-                ? 'rgba(255, 255, 255, 0.2)'
-                : 'rgba(255, 255, 255, 0.05)',
-              mb: 1,
-              transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-              boxShadow: (dragOverMonth === month && dragOverIndex === -888)
-                ? '0 0 15px rgba(33, 243, 65, 0.5)'
-                : 'none',
+              p: 0.75,
+              height: '60px',
               display: 'flex',
+              flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              cursor: 'pointer',
-              transform: (dragOverMonth === month && dragOverIndex === -888) ? 'scale(1.03)' : 'scale(1)',
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (isDragging && draggedTransaction) {
-                // Use a special index (-999) to indicate bottom of the list
-              
-                handleTransactionDragOver(e, month, -999);
-                
-                // Force move mode (not copy)
-                isCopyMode = true;
-                // This would be handled in the parent component
-              }
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log("Move zone drop event", month, -999);
-              if (isDragging && draggedTransaction) {
-                // Handle drop at the bottom of the month with copy mode
-                console.log("Calling handleTransactionDrop for copy zone");
-                isCopyMode = true;
-                handleTransactionDrop(e, month, -888); // Use -888 to indicate copy zone
-              }
-            }}
-          >
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                color: 'rgb(33, 243, 93)',
-                fontWeight: (dragOverMonth === month && dragOverIndex === -999 && isCopyMode) ? 'bold' : 'normal',
-                fontSize: '0.85rem',
-              }}
-            >
-              Copy Here
-            </Typography>
-          </Box>
-        )}
-
-        {/* "Copy Here" drop zone - only visible when dragging
-        {isDragging && (
-          <Box
-            className="drop-zone"
-            sx={{
-              height: '50px',
+              bgcolor: getCardBackgroundColor(),
+              border: 'none',
               borderRadius: 1,
-              border: `3px dashed rgb(61, 222, 109)`,
-              backgroundColor: (dragOverMonth === month && dragOverIndex === -999) 
-                ? 'rgba(68, 248, 89, 0.2)'
-                : 'rgba(33, 243, 107, 0.05)',
-              mb: 1,
-              transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-              boxShadow: (dragOverMonth === month && dragOverIndex === -999)
-                ? '0 0 15px rgba(90, 212, 133, 0.5)'
-                : 'none',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
               cursor: 'pointer',
-              transform: (dragOverMonth === month && dragOverIndex === -999) ? 'scale(1.03)' : 'scale(1)',
-              pointerEvents: 'all', // Ensure pointer events are enabled
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log("Copy zone drag over", month);
-              if (isDragging && draggedTransaction) {
-                // Use a special index (-888) to indicate copy zone
-                handleTransactionDragOver(e, month, -888);
-              }
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log("Copy zone drop event", month, -999);
-              if (isDragging && draggedTransaction) {
-                // Handle drop at the bottom of the month with copy mode
-                console.log("Calling handleTransactionDrop for copy zone");
-                handleTransactionDrop(e, month, -999); // Use -888 to indicate copy zone
-              }
-            }}
-          >
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                color: 'rgb(61, 222, 109)',
-                fontWeight: (dragOverMonth === month && dragOverIndex === -999) ? 'bold' : 'normal',
-                fontSize: '0.85rem',
-                pointerEvents: 'none', // Prevent text from interfering with drag events
-              }}
-            >
-              Copy Here
-            </Typography>
-          </Box>
-        )} */}
-        
-        {/* Add button as the last card in the list */}
-        <Card
-          onClick={() => handleOpenMobileAdd(month)}
-          sx={{
-            p: 0.75,
-            height: '60px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            bgcolor: getCardBackgroundColor(),
-            border: 'none',
-            borderRadius: 1,
-            cursor: 'pointer',
-            transition: 'all 0.2s ease-in-out',
-            boxShadow: '0 3px 6px rgba(0,0,0,0.1), 0 3px 6px rgba(0,0,0,0.15)',
-            mb: 3,
-            '&:hover': {
-              boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
-              transform: 'translateY(-2px)',
-              bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getCardBackgroundColor(true)
-            }
-          }}
-        >
-          <AddIcon 
-            sx={{ 
-              fontSize: {
-                xs: '1.125rem',
-                sm: '1.125rem',
-                md: '1.125rem',
-                lg: '1.125rem',
-                xl: '1.5rem',
-              },
-              color: getTextColor(),
+              transition: 'all 0.2s ease-in-out',
+              boxShadow: '0 3px 6px rgba(0,0,0,0.1), 0 3px 6px rgba(0,0,0,0.15)',
               '&:hover': {
-                color: getTextColor(true)
+                boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
+                transform: 'translateY(-2px)',
+                bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getCardBackgroundColor(true)
               }
-            }} 
-          />
-        </Card>
+            }}
+          >
+            <AddIcon 
+              sx={{ 
+                fontSize: {
+                  xs: '1.125rem',
+                  sm: '1.125rem',
+                  md: '1.125rem',
+                  lg: '1.125rem',
+                  xl: '1.5rem',
+                },
+                color: getTextColor(),
+                '&:hover': {
+                  color: getTextColor(true)
+                }
+              }} 
+            />
+          </Card>
+        )}
       </Stack>
     </Box>
   );
