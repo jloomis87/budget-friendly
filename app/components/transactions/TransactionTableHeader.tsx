@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { CategoryColorPicker } from '../CategoryColorPicker';
+import { TransactionSort } from './TransactionSort';
 import type { TransactionTableHeaderProps } from './types';
 
 export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
@@ -9,7 +10,9 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
   hasCustomColor,
   hasCustomDarkColor,
   isDark,
-  tableColors
+  tableColors,
+  sortOption,
+  onSortChange
 }) => {
   return (
     <Box sx={{ 
@@ -43,6 +46,13 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
         >
           (Total: ${Math.abs(totalAmount).toFixed(2)})
         </Typography>
+        <TransactionSort
+          sortOption={sortOption}
+          onSortChange={onSortChange}
+          hasCustomDarkColor={hasCustomDarkColor}
+          isDark={isDark}
+          category={category}
+        />
         <CategoryColorPicker category={category} />
       </Box>
     </Box>

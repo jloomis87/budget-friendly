@@ -211,6 +211,8 @@ export interface DragIndicatorProps {
   dragSourceMonth: string | null;
 }
 
+export type SortOption = 'amount' | 'date' | 'description';
+
 export interface TransactionTableHeaderProps {
   category: string;
   totalAmount: number;
@@ -218,6 +220,8 @@ export interface TransactionTableHeaderProps {
   hasCustomDarkColor: boolean;
   isDark: boolean;
   tableColors: Record<string, string>;
+  sortOption: SortOption;
+  onSortChange: (option: SortOption) => void;
 }
 
 export interface TransactionTableContextProps {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Box, Paper, Typography, useTheme, useMediaQuery } from '@mui/material';
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
 import { MobileEditDialog } from './MobileEditDialog';
@@ -9,8 +9,11 @@ import { TransactionTableHeader } from './TransactionTableHeader';
 import { MonthColumn } from './MonthColumn';
 import { DragIndicator } from './DragIndicator';
 import type { Transaction } from '../../services/fileParser';
-import type { TransactionTableContextProps } from './types';
+import type { TransactionTableContextProps, SortOption } from './types';
 import { v4 as uuidv4 } from 'uuid';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../../firebase/firebaseConfig';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface TransactionTableProps {
   category: string;
@@ -39,8 +42,10 @@ export const TransactionTable: React.FC<TransactionTableProps> = (props) => {
   );
 };
 
-const TransactionTableContent: React.FC = () => {
+export const TransactionTableContent: React.FC = () => {
   const context = useTransactionTableContext();
+  const { user } = useAuth();
+  const [sortOption, setSortOption] = useState<SortOption>('date');
   
   const { 
     props, 
@@ -98,8 +103,67 @@ const TransactionTableContent: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
+  // Load sort preference from Firebase
+  useEffect(() => {
+    const loadSortPreference = async () => {
+      if (!user?.id || !props.category) return;
+      
+      try {
+        const sortPrefDoc = await getDoc(doc(db, 'users', user.id, 'sortPreferences', props.category));
+        if (sortPrefDoc.exists()) {
+          setSortOption(sortPrefDoc.data().option as SortOption);
+        }
+      } catch (error) {
+        console.error('Error loading sort preference:', error);
+      }
+    };
+    
+    loadSortPreference();
+  }, [user?.id, props.category]);
+
+  // Save sort preference to Firebase
+  const handleSortChange = async (newSortOption: SortOption) => {
+    setSortOption(newSortOption);
+    
+    if (!user?.id || !props.category) return;
+    
+    try {
+      await setDoc(doc(db, 'users', user.id, 'sortPreferences', props.category), {
+        option: newSortOption,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error saving sort preference:', error);
+    }
+  };
+
+  // Sort transactions
+  const sortTransactions = (transactions: Transaction[]) => {
+    return [...transactions].sort((a, b) => {
+      switch (sortOption) {
+        case 'amount':
+          return Math.abs(b.amount) - Math.abs(a.amount);
+        case 'date':
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        case 'description':
+          return a.description.localeCompare(b.description);
+        default:
+          return 0;
+      }
+    });
+  };
+
   // Group transactions by month - use filteredTransactions to respect selectedMonths
-  const groupedTransactions = groupTransactionsByMonth(filteredTransactions);
+  const groupedTransactions = useMemo(() => {
+    const grouped = groupTransactionsByMonth(filteredTransactions);
+    
+    // Sort transactions in each month
+    Object.keys(grouped).forEach(month => {
+      grouped[month] = sortTransactions(grouped[month]);
+    });
+    
+    return grouped;
+  }, [filteredTransactions, sortOption]);
   
   // Ensure all months are displayed, even if they have no transactions
   const ensureAllMonths = () => {
@@ -511,12 +575,14 @@ const TransactionTableContent: React.FC = () => {
       >
         {/* Table header with category name and total */}
         <TransactionTableHeader 
-          category={category}
+          category={props.category}
           totalAmount={filteredTransactions.reduce((sum, t) => sum + t.amount, 0)}
           isDark={isDark}
           hasCustomColor={hasCustomColor}
           hasCustomDarkColor={hasCustomDarkColor}
           tableColors={{}}
+          sortOption={sortOption}
+          onSortChange={handleSortChange}
         />
         
         {/* Instructions for dragging - show even if no transactions */}
@@ -527,7 +593,7 @@ const TransactionTableContent: React.FC = () => {
             textAlign: 'center',
             mb: 1,
             mt: -3,
-            color: category === 'Income' ? 'rgba(0, 0, 0, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
+            color: props.category === 'Income' ? 'rgba(0, 0, 0, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
           }}
         >
           {filteredTransactions.length > 0 
@@ -551,10 +617,10 @@ const TransactionTableContent: React.FC = () => {
               backgroundColor: 'rgba(0,0,0,0.05)',
             },
             '&::-webkit-scrollbar-thumb': {
-              backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : (category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
+              backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : (props.category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
               borderRadius: '4px',
               '&:hover': {
-                backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : (category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
+                backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : (props.category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
               }
             }
           }}
@@ -564,7 +630,7 @@ const TransactionTableContent: React.FC = () => {
               key={month}
               month={month}
               monthTransactions={groupedTransactions[month] || []}
-              category={category}
+              category={props.category}
               isDark={isDark}
               hasCustomColor={hasCustomColor}
               hasCustomDarkColor={hasCustomDarkColor}
@@ -619,7 +685,7 @@ const TransactionTableContent: React.FC = () => {
             handleCloseMobileEdit(); // Close the dialog after delete
           }
         }}
-        category={category}
+        category={props.category}
         editingRow={dialogState.editingRow}
         handleEditingChange={handleEditingChange}
         generateDayOptions={() => Array.from({ length: 31 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) }))}
@@ -640,7 +706,7 @@ const TransactionTableContent: React.FC = () => {
         open={dialogState.mobileAddDialogOpen}
         onClose={handleCloseMobileAdd}
         onAdd={handleAddTransaction}
-        category={category}
+        category={props.category}
         newDescription={dialogState.newDescription}
         newAmount={dialogState.newAmount}
         newDate={dialogState.newDate}
@@ -667,7 +733,7 @@ const TransactionTableContent: React.FC = () => {
         onConfirm={handleCopyMonthConfirm}
         sourceMonth={dialogState.copySourceMonth}
         targetMonth={dialogState.copyTargetMonth}
-        category={category}
+        category={props.category}
         transactionCount={dialogState.copyTransactions.length}
       />
     </Box>

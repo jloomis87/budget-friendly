@@ -191,7 +191,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
         sx={{ 
           flexGrow: 1,
           minHeight: '100px',
-          maxHeight: '500px',
+          height: 'auto',
           overflowY: 'auto',
           pr: 0.5,
           pt: 0.5,
