@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Box, Typography, Card, CardContent, LinearProgress, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField, MenuItem, IconButton, Stack, Alert, Grid, Tooltip } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
-import type { Transaction } from '../types/Transaction';
+import type { Transaction } from '../services/fileParser';
 import type { FinancialGoal } from '../services/goalService';
 import { loadGoals, addGoal, updateGoal, deleteGoal, updateGoalsProgress } from '../services/goalService';
 import type { User } from '../types/User';
@@ -32,10 +32,16 @@ interface SmartInsightsProps {
   transactions: Transaction[];
   selectedMonths: string[];
   totalIncome: number;
-  onGoalUpdate: (goals: FinancialGoal[]) => void;
+  onGoalUpdate: React.Dispatch<React.SetStateAction<FinancialGoal[]>>;
   openSavingsDialog: boolean;
   onCloseSavingsDialog: () => void;
 }
+
+interface FinancialGoalWithLastUpdated extends FinancialGoal {
+  lastUpdated?: string;
+}
+
+type ValidCategory = 'Essentials' | 'Wants' | 'Savings' | 'Income';
 
 // Utility function to format currency
 const formatCurrency = (amount: number): string => {
@@ -45,6 +51,25 @@ const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
+// Add type guard for transaction category
+const isValidCategory = (category: string | undefined): category is ValidCategory => {
+  return category === 'Essentials' || category === 'Wants' || category === 'Savings' || category === 'Income';
+};
+
+// Add type guard for transaction date
+const getMonthFromDate = (date: string): string => {
+  return new Date(date).toISOString().slice(0, 7);
+};
+
+// Update the component logic
+const processTransactions = (transactions: Transaction[]): (Transaction & { category: ValidCategory })[] => {
+  return transactions.map(t => ({
+    ...t,
+    category: isValidCategory(t.category) ? t.category : 'Essentials'
+  }));
+};
+
+// Update the component
 export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoalUpdate, openSavingsDialog, onCloseSavingsDialog }: SmartInsightsProps) {
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
   const [openGoalDialog, setOpenGoalDialog] = useState(false);
@@ -63,21 +88,56 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
   // Add new state for actual savings dialog
   const [actualSavingsAmount, setActualSavingsAmount] = useState(0);
 
+  // Process transactions to ensure they have valid categories
+  const processedTransactions = processTransactions(transactions);
+  
+  // Update the transaction filtering logic
+  const filteredTransactions = processedTransactions.filter(t => {
+    const dateStr = t.date instanceof Date ? t.date.toISOString() : String(t.date);
+    const month = getMonthFromDate(dateStr);
+    return selectedMonths.includes(month);
+  });
+
+  // Update category calculations with type-safe categories
+  const categoryTotals = filteredTransactions.reduce((acc, t) => {
+    if (t.type === 'expense' && isValidCategory(t.category)) {
+      acc[t.category] = (acc[t.category] ?? 0) + Math.abs(t.amount);
+    }
+    return acc;
+  }, {
+    Essentials: 0,
+    Wants: 0,
+    Savings: 0,
+    Income: 0
+  } as Record<ValidCategory, number>);
+
+  // Update savingsGoal reference with all required fields
+  const defaultSavingsGoal: FinancialGoal = {
+    id: 'savings',
+    name: 'Savings Goal',
+    targetAmount: 0,
+    currentAmount: 0,
+    deadline: new Date().toISOString(),
+    category: 'Savings',
+    createdAt: new Date().toISOString()
+  };
+
+  const savingsGoal = goals.find(g => g.category === 'Savings') ?? defaultSavingsGoal;
+
   // Add new function for generating smart goal suggestions
   const generateSmartGoalSuggestions = (transactions: Transaction[], income: number): Insight[] => {
     const suggestions: Insight[] = [];
     
     // Calculate annual expenses by category
     const annualExpenses = transactions.reduce((acc, t) => {
-      // Only include savings, wants, and essentials for emergency fund calculation
-      if (['Savings', 'Wants', 'Essentials'].includes(t.category)) {
-        acc[t.category] = (acc[t.category] || 0) + Math.abs(t.amount);
+      if (isValidCategory(t.category)) {
+        acc[t.category] = (acc[t.category] ?? 0) + Math.abs(t.amount);
       }
       return acc;
-    }, {} as Record<string, number>);
+    }, {} as Record<ValidCategory, number>);
 
-    // Emergency Fund Goal - calculate based on monthly savings, wants, and essentials
-    const monthlyExpenses = Object.values(annualExpenses).reduce((sum, amount) => sum + amount, 0) / 12;
+    // Emergency Fund Goal - calculate based on monthly expenses
+    const monthlyExpenses = (annualExpenses.Essentials + annualExpenses.Wants + annualExpenses.Savings) / 12;
     const emergencyFundTarget = monthlyExpenses * 6; // 6 months of expenses
     if (!goals.some(g => g.name.toLowerCase().includes('emergency'))) {
       suggestions.push({
@@ -100,7 +160,8 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
 
     // Debt Reduction Goal
     const debtPayments = transactions
-      .filter(t => t.category.toLowerCase().includes('debt') || t.category.toLowerCase().includes('loan'))
+      .filter(t => isValidCategory(t.category) && 
+        (t.category.toLowerCase().includes('debt') || t.category.toLowerCase().includes('loan')))
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
     if (debtPayments > 0 && !goals.some(g => g.category === 'Debt')) {
       suggestions.push({
@@ -332,13 +393,6 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
     }
 
     // Spending pattern insights
-    const categoryTotals = transactions.reduce((acc, t) => {
-      if (t.type === 'expense') {
-        acc[t.category] = (acc[t.category] || 0) + Math.abs(t.amount);
-      }
-      return acc;
-    }, {} as Record<string, number>);
-
     const sortedCategories = Object.entries(categoryTotals)
       .sort(([, a], [, b]) => b - a);
 
@@ -585,7 +639,7 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
         await updateGoal(user.id, savingsGoal.id, updatedGoal);
         // Immediately update the goals state to reflect the change
         const updatedGoals = goals.map(g => 
-          g.id === savingsGoal.id ? updatedGoal : g
+          savingsGoal && g.id === savingsGoal.id ? updatedGoal : g
         );
         setGoals(updatedGoals);
         onGoalUpdate(updatedGoals);
@@ -612,8 +666,17 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
     });
   }, [insights]);
 
+  // Update savingsGoal handling
+  const handleSavingsGoalUpdate = (goal: FinancialGoalWithLastUpdated | undefined) => {
+    if (goal) {
+      onGoalUpdate((prevGoals: FinancialGoal[]) => 
+        prevGoals.map(g => g.id === goal.id ? goal : g)
+      );
+    }
+  };
+
   return (
-    <Box sx={{ mt: 3 }}>
+    <Box id="smart-insights" sx={{ mt: 3 }}>
       <Typography variant="h6" gutterBottom>
         Smart Insights
       </Typography>
@@ -652,6 +715,22 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
             </Box>
           )}
 
+          {/* Recommendations Section */}
+          {groupedInsights.info.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle1" sx={{ mb: 1, color: 'info.main', fontWeight: 'bold' }}>
+                💡 Smart Recommendations
+              </Typography>
+              <Stack spacing={1}>
+                {groupedInsights.info.map((insight, index) => (
+                  <Alert key={`info-${index}`} severity="info" variant="outlined">
+                    {insight.message}
+                  </Alert>
+                ))}
+              </Stack>
+            </Box>
+          )}
+
           {/* Financial Summary Section */}
           <Box sx={{ mb: 3 }}>
             <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
@@ -678,11 +757,11 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Box>
                           <Typography variant="h6" sx={{ mb: 0 }}>
-                            {formatCurrency(goals.find(g => g.category === 'Savings')?.currentAmount || 0)}
+                            {formatCurrency(savingsGoal.currentAmount)}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {goals.find(g => g.category === 'Savings')?.lastUpdated 
-                              ? `Last updated: ${new Date(goals.find(g => g.category === 'Savings')!.lastUpdated).toLocaleDateString()}`
+                            {savingsGoal.lastUpdated 
+                              ? `Last updated: ${new Date(savingsGoal.lastUpdated).toLocaleDateString()}`
                               : 'Not updated yet'}
                           </Typography>
                         </Box>
@@ -708,22 +787,6 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
               </CardContent>
             </Card>
           </Box>
-
-          {/* Recommendations Section */}
-          {groupedInsights.info.length > 0 && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ mb: 1, color: 'info.main', fontWeight: 'bold' }}>
-                💡 Smart Recommendations
-              </Typography>
-              <Stack spacing={1}>
-                {groupedInsights.info.map((insight, index) => (
-                  <Alert key={`info-${index}`} severity="info" variant="outlined">
-                    {insight.message}
-                  </Alert>
-                ))}
-              </Stack>
-            </Box>
-          )}
         </Box>
       ) : (
         <Alert severity="info">

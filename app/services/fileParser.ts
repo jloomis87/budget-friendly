@@ -11,6 +11,7 @@ export interface Transaction {
   description: string;
   amount: number;
   category?: 'Essentials' | 'Wants' | 'Savings' | 'Income';
+  type: 'income' | 'expense'; // Add required type field
   order?: number; // Order within the category for sorting
 }
 

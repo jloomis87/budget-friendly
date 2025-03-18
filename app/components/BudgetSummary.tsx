@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -29,7 +29,7 @@ import type { BudgetPreferences } from './BudgetActions';
 import { BudgetAnalytics } from './BudgetAnalytics';
 import { SmartInsights } from './SmartInsights';
 import { CategoryDeepDive } from './CategoryDeepDive';
-import type { Transaction } from '../types/Transaction';
+import type { Transaction } from '../services/fileParser';
 import type { FinancialGoal } from '../services/goalService';
 
 // Lazy load Chart.js components to avoid SSR issues
@@ -42,19 +42,105 @@ interface BudgetSummaryProps {
   preferences: BudgetPreferences;
   transactions: Transaction[];
   selectedMonths: string[];
+  showActualAmounts: boolean;
+  showPercentages: boolean;
+  showDifferences: boolean;
+  showProgressBars: boolean;
 }
 
-export function BudgetSummary({ summary, plan, suggestions, preferences, transactions, selectedMonths }: BudgetSummaryProps) {
+export function BudgetSummary({ summary, plan, suggestions, preferences, transactions, selectedMonths, showActualAmounts, showPercentages, showDifferences, showProgressBars }: BudgetSummaryProps) {
   const theme = useMuiTheme();
   const { mode } = useCustomTheme();
   const [isBrowser, setIsBrowser] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const isDarkMode = mode === 'dark';
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
+  const [monthlyTransactions, setMonthlyTransactions] = useState<Transaction[]>([]);
+
+  // Filter transactions for selected months
+  const filteredTransactions = useMemo(() => {
+    if (!transactions || !selectedMonths || selectedMonths.length === 0) {
+      console.log('No transactions or selected months');
+      return [];
+    }
+    
+    return transactions.filter(transaction => {
+      const transactionDate = new Date(transaction.date);
+      const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+      const isIncluded = selectedMonths.includes(transactionMonth);
+      console.log('Transaction:', {
+        date: transactionDate,
+        month: transactionMonth,
+        amount: transaction.amount,
+        category: transaction.category,
+        isIncluded
+      });
+      return isIncluded;
+    });
+  }, [transactions, selectedMonths]);
+
+  // Calculate category totals from filtered transactions
+  const categoryTotals = useMemo(() => {
+    console.log('Calculating category totals from filtered transactions:', filteredTransactions);
+    
+    const totals = {
+      essentials: 0,
+      wants: 0,
+      savings: 0,
+      income: 0
+    };
+
+    filteredTransactions.forEach(transaction => {
+      // Handle income
+      if (transaction.amount >= 0) {
+        console.log('Adding income:', transaction.amount);
+        totals.income += transaction.amount;
+        return;
+      }
+
+      // Handle expenses (negative amounts)
+      const amount = Math.abs(transaction.amount);
+      let category = (transaction.category || 'essentials').toLowerCase();
+      console.log('Processing expense:', { amount, category });
+      
+      // Normalize category names
+      if (category.includes('essential')) category = 'essentials';
+      else if (category.includes('want')) category = 'wants';
+      else if (category.includes('saving')) category = 'savings';
+      else category = 'essentials'; // Default to essentials if no match
+
+      console.log('Normalized category:', category);
+
+      if (category in totals) {
+        totals[category as keyof typeof totals] += amount;
+        console.log(`Updated ${category} total:`, totals[category as keyof typeof totals]);
+      }
+    });
+
+    console.log('Final category totals:', totals);
+    return totals;
+  }, [filteredTransactions]);
+
+  // Keep track of monthly transactions
+  useEffect(() => {
+    setMonthlyTransactions(filteredTransactions);
+  }, [filteredTransactions]);
 
   // Only render charts on the client side
   useEffect(() => {
     setIsBrowser(true);
+  }, []);
+
+  // Listen for tab switch events
+  useEffect(() => {
+    const handleSwitchToInsights = (event: CustomEvent) => {
+      setActiveTab(event.detail.tabIndex);
+    };
+
+    window.addEventListener('switchToInsights', handleSwitchToInsights as EventListener);
+    return () => {
+      window.removeEventListener('switchToInsights', handleSwitchToInsights as EventListener);
+    };
   }, []);
 
   // Format currency
@@ -70,159 +156,18 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
     return `${percentage.toFixed(1)}%`;
   };
 
-  // Prepare data for pie chart using custom preferences
-  const pieChartData = {
-    labels: Object.values(preferences.categoryCustomization).map(cat => cat.name),
-    datasets: [
-      {
-        data: [
-          summary.categories.essentials,
-          summary.categories.wants,
-          summary.categories.savings
-        ],
-        backgroundColor: Object.values(preferences.categoryCustomization).map(cat => cat.color),
-        borderColor: Object.values(preferences.categoryCustomization).map(cat => cat.color),
-        borderWidth: 1,
-      },
-    ],
-  };
+  // Calculate progress and status
+  const calculateProgress = (actual: number, target: number) => {
+    const progress = (actual / target) * 100;
+    let status: 'success' | 'warning' | 'error' = 'success';
+    
+    if (progress > 100) {
+      status = 'error';
+    } else if (progress > 90) {
+      status = 'warning';
+    }
 
-  // Prepare data for comparison bar chart using custom preferences
-  const barChartData = {
-    labels: Object.values(preferences.categoryCustomization).map(cat => cat.name),
-    datasets: [
-      {
-        label: 'Recommended',
-        data: [
-          (preferences.ratios.essentials / 100) * summary.totalIncome,
-          (preferences.ratios.wants / 100) * summary.totalIncome,
-          (preferences.ratios.savings / 100) * summary.totalIncome
-        ],
-        backgroundColor: theme.palette.primary.main,
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: theme.palette.primary.dark,
-        barThickness: 40,
-        maxBarThickness: 60,
-      },
-      {
-        label: 'Actual Spending',
-        data: [
-          summary.categories.essentials,
-          summary.categories.wants,
-          summary.categories.savings
-        ],
-        backgroundColor: theme.palette.warning.main,
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: theme.palette.warning.dark,
-        barThickness: 40,
-        maxBarThickness: 60,
-      },
-    ],
-  };
-
-  const barChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    layout: {
-      padding: {
-        top: 20,
-        right: 25,
-        bottom: 20,
-        left: 15
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        grid: {
-          color: theme.palette.divider,
-          drawBorder: false,
-        },
-        ticks: {
-          callback: (value: number) => formatCurrency(value),
-          font: {
-            size: 13
-          },
-          maxTicksLimit: 8,
-          color: theme.palette.text.secondary,
-          padding: 10
-        }
-      },
-      x: {
-        grid: {
-          display: false,
-          drawBorder: false
-        },
-        ticks: {
-          font: {
-            size: 14,
-            weight: 'bold'
-          },
-          color: theme.palette.text.primary,
-          padding: 10
-        }
-      }
-    },
-    plugins: {
-      title: {
-        display: true,
-        text: 'Budget Comparison',
-        font: {
-          size: 18,
-          weight: 'bold'
-        },
-        padding: {
-          top: 10,
-          bottom: 30
-        },
-        color: theme.palette.text.primary
-      },
-      legend: {
-        position: 'top',
-        align: 'center',
-        labels: {
-          boxWidth: 15,
-          padding: 20,
-          font: {
-            size: 14
-          },
-          usePointStyle: true,
-          pointStyle: 'circle',
-          color: theme.palette.text.primary
-        }
-      },
-      tooltip: {
-        titleFont: {
-          size: 16
-        },
-        bodyFont: {
-          size: 14
-        },
-        padding: 12,
-        callbacks: {
-          label: function(context: any) {
-            let label = context.dataset.label || '';
-            if (label) {
-              label += ': ';
-            }
-            if (context.parsed.y !== null) {
-              label += formatCurrency(context.parsed.y);
-            }
-            return label;
-          }
-        }
-      }
-    },
-  };
-
-  // Calculate progress percentages for visual indicators
-  const getProgressColor = (actual: number, recommended: number) => {
-    const ratio = actual / recommended;
-    if (ratio <= 1.05) return 'success.main'; // Within 5% of recommendation
-    if (ratio <= 1.2) return 'warning.main';  // Within 20% of recommendation
-    return 'error.main';                      // More than 20% over recommendation
+    return { progress, status };
   };
 
   return (
@@ -251,129 +196,245 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
       {/* Overview Tab */}
       {activeTab === 0 && (
         <Grid container spacing={3}>
-          {/* Summary Cards */}
+          {/* Income Summary */}
           <Grid item xs={12}>
-            <Grid container spacing={2}>
-              {Object.entries(preferences.categoryCustomization).map(([category, settings], index) => {
-                const actualAmount = summary.categories[category as keyof typeof summary.categories];
-                const recommendedAmount = (preferences.ratios[category as keyof typeof preferences.ratios] / 100) * summary.totalIncome;
-                const difference = actualAmount - recommendedAmount;
-                const percentageOfIncome = (actualAmount / summary.totalIncome) * 100;
-
-                return (
-                  <Grid item xs={12} md={4} key={category}>
-                    <Card 
-                      sx={{ 
-                        height: '100%',
-                        borderLeft: 4,
-                        borderColor: settings.color,
-                        position: 'relative',
-                        overflow: 'visible'
-                      }}
-                    >
-                      <CardContent>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                          <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <span>{settings.icon}</span>
-                            {settings.name}
-                          </Typography>
-                        </Box>
-
-                        {preferences.displayPreferences.showActualAmounts && (
-                          <Typography variant="h5" color="text.primary" gutterBottom>
-                            {formatCurrency(actualAmount)}
-                          </Typography>
-                        )}
-
-                        {preferences.displayPreferences.showPercentages && (
-                          <Typography variant="body2" color="text.secondary">
-                            {formatPercentage(percentageOfIncome)} of income
-                          </Typography>
-                        )}
-
-                        {preferences.displayPreferences.showDifferences && (
-                          <Typography 
-                            variant="body2" 
-                            color={difference > 0 ? 'error.main' : 'success.main'}
-                            sx={{ mt: 1 }}
-                          >
-                            {difference > 0 ? 'Over by ' : 'Under by '}
-                            {formatCurrency(Math.abs(difference))}
-                          </Typography>
-                        )}
-
-                        {preferences.displayPreferences.showProgressBars && (
-                          <Box sx={{ mt: 2 }}>
-                            <LinearProgress
-                              variant="determinate"
-                              value={Math.min((actualAmount / recommendedAmount) * 100, 100)}
-                              sx={{
-                                height: 8,
-                                borderRadius: 4,
-                                backgroundColor: theme.palette.grey[200],
-                                '& .MuiLinearProgress-bar': {
-                                  backgroundColor: getProgressColor(actualAmount, recommendedAmount),
-                                },
-                              }}
-                            />
-                          </Box>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                );
-              })}
-            </Grid>
+            <Card sx={{ mb: 3, p: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Income Summary
+                </Typography>
+                <Chip 
+                  label={`${selectedMonths.length} month${selectedMonths.length > 1 ? 's' : ''} selected`}
+                  color="primary"
+                  size="small"
+                />
+              </Box>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={4}>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">Total Income</Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
+                      {formatCurrency(categoryTotals.income)}
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">Total Expenses</Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 700, color: 'error.main' }}>
+                      {formatCurrency(categoryTotals.essentials + categoryTotals.wants + categoryTotals.savings)}
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary">Net Income</Typography>
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(categoryTotals.income - (categoryTotals.essentials + categoryTotals.wants + categoryTotals.savings))}
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Card>
           </Grid>
 
-          {/* Charts */}
-          {isBrowser && (
+          {/* Category Cards */}
+          {Object.entries(preferences.categoryCustomization).map(([category, settings]) => {
+            const actualAmount = categoryTotals[category as keyof typeof categoryTotals];
+            const targetAmount = (preferences.ratios[category as keyof typeof preferences.ratios] / 100) * categoryTotals.income;
+            const { progress, status } = calculateProgress(actualAmount, targetAmount);
+            const difference = actualAmount - targetAmount;
+            const percentageOfIncome = categoryTotals.income > 0 ? (actualAmount / categoryTotals.income) * 100 : 0;
+
+            return (
+              <Grid item xs={12} md={4} key={category}>
+                <Card sx={{ 
+                  height: '100%',
+                  borderLeft: 4,
+                  borderColor: settings.color,
+                  position: 'relative',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 4,
+                    transition: 'all 0.2s ease-in-out'
+                  }
+                }}>
+                  <CardContent>
+                    {/* Category Header */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6" sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1,
+                        fontWeight: 600
+                      }}>
+                        <span>{settings.icon}</span>
+                        {settings.name}
+                      </Typography>
+                    </Box>
+
+                    {/* Amount Display */}
+                    <Box sx={{ mb: 3 }}>
+                      <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
+                        {formatCurrency(actualAmount)}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 1 }}>
+                        Target: {formatCurrency(targetAmount)}
+                        <Chip
+                          size="small"
+                          label={`${difference >= 0 ? '+' : ''}${formatCurrency(difference)}`}
+                          color={difference > 0 ? 'error' : 'success'}
+                          sx={{ fontWeight: 600 }}
+                        />
+                      </Typography>
+                    </Box>
+
+                    {/* Progress Section */}
+                    <Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Budget Usage
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: `${status}.main` }}>
+                          {formatPercentage(progress)}
+                        </Typography>
+                      </Box>
+                      <LinearProgress
+                        variant="determinate"
+                        value={Math.min(progress, 100)}
+                        color={status}
+                        sx={{
+                          height: 8,
+                          borderRadius: 4,
+                          bgcolor: theme.palette.grey[200],
+                          '& .MuiLinearProgress-bar': {
+                            borderRadius: 4,
+                          },
+                        }}
+                      />
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          {formatPercentage(percentageOfIncome)} of Income
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: `${status}.main`, fontWeight: 500 }}>
+                          {progress > 100 ? '⚠️ Over Budget' : progress > 90 ? '⚡ Near Limit' : '✅ On Track'}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            );
+          })}
+
+          {/* Charts Section */}
+          {isBrowser && categoryTotals.income > 0 && (
             <React.Suspense fallback={<Box sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading charts...</Box>}>
               <Grid item xs={12} container spacing={3}>
                 {preferences.chartPreferences.showPieChart && (
                   <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 3, height: '100%' }}>
+                    <Card sx={{ height: '450px', p: 3 }}>
+                      <Typography variant="h6" sx={{ mb: 2 }}>Expense Distribution</Typography>
                       <LazyCharts 
-                        pieData={pieChartData}
-                        barData={barChartData}
-                        barOptions={barChartOptions}
+                        pieData={{
+                          labels: Object.values(preferences.categoryCustomization).map(cat => cat.name),
+                          datasets: [{
+                            data: [categoryTotals.essentials, categoryTotals.wants, categoryTotals.savings],
+                            backgroundColor: Object.values(preferences.categoryCustomization).map(cat => cat.color),
+                            borderColor: Object.values(preferences.categoryCustomization).map(cat => cat.color),
+                            borderWidth: 1,
+                          }],
+                        }}
+                        barData={{
+                          labels: [],
+                          datasets: []
+                        }}
+                        barOptions={{}}
                         showPie={true}
                         showBar={false}
                       />
-                    </Paper>
+                    </Card>
                   </Grid>
                 )}
 
                 {preferences.chartPreferences.showBarChart && (
                   <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 3, height: '100%' }}>
+                    <Card sx={{ height: '450px', p: 3 }}>
+                      <Typography variant="h6" sx={{ mb: 2 }}>Budget vs. Actual</Typography>
                       <LazyCharts 
-                        pieData={pieChartData}
-                        barData={barChartData}
-                        barOptions={barChartOptions}
+                        pieData={{
+                          labels: [],
+                          datasets: []
+                        }}
+                        barData={{
+                          labels: Object.values(preferences.categoryCustomization).map(cat => cat.name),
+                          datasets: [
+                            {
+                              label: 'Target',
+                              data: Object.entries(preferences.ratios).map(([_, ratio]) => (ratio / 100) * categoryTotals.income),
+                              backgroundColor: theme.palette.primary.main,
+                              borderRadius: 6,
+                              barThickness: 40,
+                            },
+                            {
+                              label: 'Actual',
+                              data: [categoryTotals.essentials, categoryTotals.wants, categoryTotals.savings],
+                              backgroundColor: theme.palette.warning.main,
+                              borderRadius: 6,
+                              barThickness: 40,
+                            },
+                          ],
+                        }}
+                        barOptions={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          scales: {
+                            y: {
+                              beginAtZero: true,
+                              ticks: {
+                                callback: (value: number) => formatCurrency(value),
+                              },
+                            },
+                          },
+                          plugins: {
+                            legend: {
+                              position: 'top',
+                            },
+                          },
+                        }}
                         showPie={false}
                         showBar={true}
                       />
-                    </Paper>
+                    </Card>
                   </Grid>
                 )}
               </Grid>
             </React.Suspense>
           )}
 
-          {/* Suggestions */}
+          {/* Suggestions Section */}
           {preferences.chartPreferences.showSuggestions && suggestions.length > 0 && (
             <Grid item xs={12}>
-              <Alert severity="info" sx={{ mt: 2 }}>
-                <AlertTitle>Suggestions to Optimize Your Budget</AlertTitle>
-                <List dense>
-                  {suggestions.map((suggestion, index) => (
-                    <ListItem key={index}>
-                      <ListItemText primary={suggestion} />
-                    </ListItem>
-                  ))}
-                </List>
-              </Alert>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" sx={{ mb: 2 }}>Budget Insights</Typography>
+                  <List>
+                    {suggestions.map((suggestion, index) => (
+                      <ListItem key={index}>
+                        <ListItemText 
+                          primary={suggestion}
+                          sx={{
+                            '& .MuiListItemText-primary': {
+                              fontSize: '0.9rem',
+                              color: 'text.secondary',
+                            },
+                          }}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </CardContent>
+              </Card>
             </Grid>
           )}
         </Grid>
@@ -382,8 +443,22 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
       {/* Analytics Tab */}
       {activeTab === 1 && (
         <BudgetAnalytics
-          transactions={transactions}
-          summary={summary}
+          transactions={monthlyTransactions}
+          summary={{
+            categories: {
+              essentials: categoryTotals.essentials,
+              wants: categoryTotals.wants,
+              savings: categoryTotals.savings
+            },
+            totalIncome: categoryTotals.income,
+            totalExpenses: categoryTotals.essentials + categoryTotals.wants + categoryTotals.savings,
+            percentages: {
+              essentials: (categoryTotals.essentials / categoryTotals.income) * 100,
+              wants: (categoryTotals.wants / categoryTotals.income) * 100,
+              savings: (categoryTotals.savings / categoryTotals.income) * 100
+            },
+            netCashflow: categoryTotals.income - (categoryTotals.essentials + categoryTotals.wants + categoryTotals.savings)
+          }}
           plan={plan}
           preferences={preferences}
           selectedMonths={selectedMonths}
@@ -393,16 +468,19 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
       {/* Insights & Goals Tab */}
       {activeTab === 2 && (
         <SmartInsights
-          transactions={transactions}
+          transactions={monthlyTransactions}
           selectedMonths={selectedMonths}
-          totalIncome={summary.totalIncome}
+          totalIncome={categoryTotals.income}
           onGoalUpdate={setGoals}
+          openSavingsDialog={false}
+          onCloseSavingsDialog={() => {}}
         />
       )}
 
+      {/* Deep Dive Tab */}
       {activeTab === 3 && (
-        <CategoryDeepDive 
-          transactions={transactions}
+        <CategoryDeepDive
+          transactions={monthlyTransactions}
           selectedMonths={selectedMonths}
         />
       )}

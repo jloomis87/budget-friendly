@@ -19,7 +19,7 @@ import { TransactionTable } from './transactions/TransactionTable';
 import { BudgetActions } from './BudgetActions';
 import { useTransactions } from '../hooks/useTransactions';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
-import { UserMenu } from './auth/UserMenu';
+import UserMenu from './auth/UserMenu';
 import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { MonthSelector } from './MonthSelector';

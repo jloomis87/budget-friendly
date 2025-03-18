@@ -10,21 +10,33 @@ import {
   ListItemIcon,
   Switch,
   CircularProgress,
+  Badge,
+  Tooltip,
 } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { SavingsUpdateBadge } from '../SavingsUpdateBadge';
+import { useSavings } from '../../contexts/SavingsContext';
+import { useNavigate } from 'react-router-dom';
 
 // Import specific icons from materialIcons utility
-import { PersonIcon, LogoutIcon, AccountCircleIcon, DarkModeIcon, LightModeIcon } from '../../utils/materialIcons';
+import { 
+  LogoutIcon, 
+  AccountCircleIcon, 
+  DarkModeIcon, 
+  LightModeIcon,
+  NotificationsIcon,
+  SecurityIcon,
+  HelpIcon
+} from '../../utils/materialIcons';
 
 interface UserMenuProps {
-  onOpenSavingsDialog: () => void;
 }
 
-export function UserMenu({ onOpenSavingsDialog }: UserMenuProps) {
+const UserMenu: React.FC<UserMenuProps> = () => {
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { mode, toggleColorMode, isLoading } = useTheme();
+  const { lastUpdated } = useSavings();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
@@ -56,18 +68,32 @@ export function UserMenu({ onOpenSavingsDialog }: UserMenuProps) {
     }
   };
 
-  // Get user first name
-  const getFirstName = () => {
-    if (!user || !user.name) return 'User';
-    return user.name.split(' ')[0];
-  };
-
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-      <SavingsUpdateBadge
-        onUpdateClick={onOpenSavingsDialog}
-        onMenuItemClick={handleClick}
-      />
+      <Button
+        onClick={handleClick}
+        sx={{
+          textTransform: 'none',
+          color: 'inherit',
+          p: 0.5,
+          minWidth: 'auto',
+          borderRadius: 2,
+          '&:hover': {
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+          },
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 32,
+            height: 32,
+            bgcolor: 'primary.main',
+            fontSize: '0.875rem',
+          }}
+        >
+          {getUserInitials()}
+        </Avatar>
+      </Button>
       <Menu
         anchorEl={anchorEl}
         id="user-menu"
@@ -79,7 +105,7 @@ export function UserMenu({ onOpenSavingsDialog }: UserMenuProps) {
         PaperProps={{
           sx: {
             mt: 1,
-            width: 200,
+            width: 280,
             borderRadius: 2,
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
           }
@@ -98,21 +124,35 @@ export function UserMenu({ onOpenSavingsDialog }: UserMenuProps) {
         
         <MenuItem onClick={handleClose} sx={{ py: 1.5 }}>
           <ListItemIcon>
-            <PersonIcon fontSize="small" />
-          </ListItemIcon>
-          My Profile
-        </MenuItem>
-        
-        <MenuItem onClick={handleClose} sx={{ py: 1.5 }}>
-          <ListItemIcon>
             <AccountCircleIcon fontSize="small" />
           </ListItemIcon>
           Account Settings
         </MenuItem>
+
+        <MenuItem onClick={handleClose} sx={{ py: 1.5 }}>
+          <ListItemIcon>
+            <NotificationsIcon fontSize="small" />
+          </ListItemIcon>
+          Notifications
+        </MenuItem>
+
+        <MenuItem onClick={handleClose} sx={{ py: 1.5 }}>
+          <ListItemIcon>
+            <SecurityIcon fontSize="small" />
+          </ListItemIcon>
+          Privacy & Security
+        </MenuItem>
+
+        <MenuItem onClick={handleClose} sx={{ py: 1.5 }}>
+          <ListItemIcon>
+            <HelpIcon fontSize="small" />
+          </ListItemIcon>
+          Help & Support
+        </MenuItem>
         
         <Divider />
         
-        <MenuItem onClick={(e) => e.stopPropagation()} sx={{ py: 1.5 }}>
+        <MenuItem sx={{ py: 1.5 }}>
           <ListItemIcon>
             {mode === 'light' ? <DarkModeIcon fontSize="small" /> : <LightModeIcon fontSize="small" />}
           </ListItemIcon>
@@ -143,4 +183,6 @@ export function UserMenu({ onOpenSavingsDialog }: UserMenuProps) {
       </Menu>
     </Box>
   );
-} 
+}
+
+export default UserMenu; 
