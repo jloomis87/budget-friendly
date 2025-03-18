@@ -29,6 +29,8 @@ import { db } from '../firebase/firebaseConfig';
 import type { BudgetPreferences } from './BudgetActions';
 import { useTheme as useMuiTheme } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
+import { SavingsProvider } from '../contexts/SavingsContext';
+import { SmartInsights } from './SmartInsights';
 
 // Add this interface for alert messages
 interface AlertMessage {
@@ -2247,7 +2249,7 @@ const BudgetAppContent: React.FC = () => {
   );
 };
 
-const BudgetApp = () => {
+export default function BudgetApp() {
   return (
     <AuthProvider>
       <ThemeProvider>
@@ -2271,10 +2273,10 @@ const BudgetApp = () => {
             }
           }}
         />
-        <BudgetAppContent />
+        <SavingsProvider>
+          <BudgetAppContent />
+        </SavingsProvider>
       </ThemeProvider>
     </AuthProvider>
   );
-};
-
-export default BudgetApp; 
+} 

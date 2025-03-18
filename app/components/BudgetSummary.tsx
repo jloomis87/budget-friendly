@@ -29,6 +29,8 @@ import type { BudgetPreferences } from './BudgetActions';
 import { BudgetAnalytics } from './BudgetAnalytics';
 import { SmartInsights } from './SmartInsights';
 import { CategoryDeepDive } from './CategoryDeepDive';
+import type { Transaction } from '../types/Transaction';
+import type { FinancialGoal } from '../services/goalService';
 
 // Lazy load Chart.js components to avoid SSR issues
 const LazyCharts = React.lazy(() => import('./LazyCharts'));

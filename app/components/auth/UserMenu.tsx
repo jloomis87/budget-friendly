@@ -13,11 +13,16 @@ import {
 } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { SavingsUpdateBadge } from '../SavingsUpdateBadge';
 
 // Import specific icons from materialIcons utility
 import { PersonIcon, LogoutIcon, AccountCircleIcon, DarkModeIcon, LightModeIcon } from '../../utils/materialIcons';
 
-export function UserMenu() {
+interface UserMenuProps {
+  onOpenSavingsDialog: () => void;
+}
+
+export function UserMenu({ onOpenSavingsDialog }: UserMenuProps) {
   const { user, logout } = useAuth();
   const { mode, toggleColorMode, isLoading } = useTheme();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -59,36 +64,10 @@ export function UserMenu() {
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-      <Button
-        onClick={handleClick}
-        color="inherit"
-        sx={{
-          borderRadius: 2,
-          textTransform: 'none',
-          '&:hover': {
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          },
-        }}
-        startIcon={
-          <Avatar
-            sx={{
-              width: 32,
-              height: 32,
-              bgcolor: 'primary.light',
-              color: 'white',
-              fontSize: '0.9rem',
-              fontWeight: 600,
-            }}
-          >
-            {getUserInitials()}
-          </Avatar>
-        }
-      >
-        <Typography sx={{ ml: 1, fontWeight: 500 }}>
-          {getFirstName()}
-        </Typography>
-      </Button>
-      
+      <SavingsUpdateBadge
+        onUpdateClick={onOpenSavingsDialog}
+        onMenuItemClick={handleClick}
+      />
       <Menu
         anchorEl={anchorEl}
         id="user-menu"
