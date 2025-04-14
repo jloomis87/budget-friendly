@@ -1386,7 +1386,7 @@ const BudgetAppContent: React.FC = () => {
       <Box sx={{ 
         mt: 4,
         mb: 6,
-        px: { xs: 1, sm: 2, md: 3 },
+       
         position: 'relative',
         '&::before': {
           content: '""',
@@ -1427,6 +1427,10 @@ const BudgetAppContent: React.FC = () => {
             preferences={preferences}
             transactions={transactions}
             selectedMonths={selectedMonths}
+            showActualAmounts={preferences.displayPreferences.showActualAmounts}
+            showPercentages={preferences.displayPreferences.showPercentages}
+            showDifferences={preferences.displayPreferences.showDifferences}
+            showProgressBars={preferences.chartPreferences.showProgressBars}
           />
         </Box>
       </Box>
@@ -2066,16 +2070,16 @@ const BudgetAppContent: React.FC = () => {
             setAlertMessage={setAlertMessage}
           />
 
+          {/* Month Selector - Shown in both Transaction and Budget Plan pages */}
+          <Box sx={{ mb: '10px' }}>
+            <MonthSelector 
+              selectedMonths={selectedMonths}
+              onChange={setSelectedMonths}
+            />
+          </Box>
+
           {activeStep === 0 && (
             <>
-              {/* Month Selector - Only shown on Transactions page */}
-              <Box sx={{ mb: '10px' }}>
-                <MonthSelector 
-                  selectedMonths={selectedMonths}
-                  onChange={setSelectedMonths}
-                />
-              </Box>
-
               {/* Getting Started - Only show for first-time users */}
               {!hasSeenGettingStarted && transactions.length === 0 && (
                 <Paper sx={{ p: 3, borderRadius: 2, mb: 3, backgroundColor: 'background.paper' }}>

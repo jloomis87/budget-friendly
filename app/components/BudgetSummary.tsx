@@ -201,7 +201,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
             <Card sx={{ mb: 3, p: 2 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  Income Summary
+                  Financial Overview
                 </Typography>
                 <Chip 
                   label={`${selectedMonths.length} month${selectedMonths.length > 1 ? 's' : ''} selected`}
@@ -210,27 +210,19 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
                 />
               </Box>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} md={6}>
                   <Box>
-                    <Typography variant="subtitle2" color="text.secondary">Total Income</Typography>
+                    <Typography variant="subtitle2" color="text.secondary">Total Net Income</Typography>
                     <Typography variant="h4" sx={{ fontWeight: 700, color: 'success.main' }}>
                       {formatCurrency(categoryTotals.income)}
                     </Typography>
                   </Box>
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} md={6}>
                   <Box>
                     <Typography variant="subtitle2" color="text.secondary">Total Expenses</Typography>
                     <Typography variant="h4" sx={{ fontWeight: 700, color: 'error.main' }}>
                       {formatCurrency(categoryTotals.essentials + categoryTotals.wants + categoryTotals.savings)}
-                    </Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <Box>
-                    <Typography variant="subtitle2" color="text.secondary">Net Income</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {formatCurrency(categoryTotals.income - (categoryTotals.essentials + categoryTotals.wants + categoryTotals.savings))}
                     </Typography>
                   </Box>
                 </Grid>
@@ -239,12 +231,71 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
           </Grid>
 
           {/* Category Cards */}
-          {Object.entries(preferences.categoryCustomization).map(([category, settings]) => {
+          {/* First display Essentials, then Wants, then Savings in that order */}
+          {['essentials', 'wants', 'savings'].map((categoryKey) => {
+            const category = categoryKey as keyof typeof preferences.categoryCustomization;
+            const settings = preferences.categoryCustomization[category];
             const actualAmount = categoryTotals[category as keyof typeof categoryTotals];
             const targetAmount = (preferences.ratios[category as keyof typeof preferences.ratios] / 100) * categoryTotals.income;
             const { progress, status } = calculateProgress(actualAmount, targetAmount);
             const difference = actualAmount - targetAmount;
             const percentageOfIncome = categoryTotals.income > 0 ? (actualAmount / categoryTotals.income) * 100 : 0;
+
+            // Category descriptions
+            const categoryDescriptions = {
+              essentials: "Essential expenses like housing, food, utilities, and other necessities that are required for basic living.",
+              wants: "Discretionary spending on non-essential items like entertainment, dining out, hobbies, and other lifestyle choices.",
+              savings: "Money set aside for future goals, emergency funds, investments, and other long-term financial planning."
+            };
+
+            // Get relevant insights for each category
+            const getCategoryInsight = (category: string) => {
+              if (categoryTotals.income === 0) return "No income recorded. Add income transactions to see budget insights.";
+              
+              if (category === 'essentials') {
+                if (difference < 0) {
+                  return `You're spending ${formatCurrency(Math.abs(difference))} more than recommended on essentials. Consider reviewing your essential expenses.`;
+                } else if (difference > 0) {
+                  return `Great! You're spending ${formatCurrency(difference)} less than recommended on essentials, giving you more flexibility.`;
+                } else {
+                  return "Your essential spending is exactly on target with the recommended amount.";
+                }
+              } else if (category === 'wants') {
+                if (difference < 0) {
+                  return `You're spending ${formatCurrency(Math.abs(difference))} more than recommended on wants. Consider reducing non-essential purchases.`;
+                } else if (difference > 0) {
+                  return `Good job! You're spending ${formatCurrency(difference)} less than the recommended amount on discretionary items.`;
+                } else {
+                  return "Your discretionary spending is perfectly balanced with the recommended amount.";
+                }
+              } else if (category === 'savings') {
+                if (difference > 0) {
+                  return `Excellent! You're saving ${formatCurrency(difference)} more than recommended, which boosts your financial security.`;
+                } else if (difference < 0) {
+                  return `You're saving ${formatCurrency(Math.abs(difference))} less than the 20% recommendation. Try to increase your savings rate.`;
+                } else {
+                  return "Your savings rate matches the recommended amount perfectly.";
+                }
+              }
+              
+              return "";
+            };
+
+            // Get tips for improvement based on category and current spending
+            const getCategoryTip = (category: string) => {
+              if (category === 'essentials' && difference < 0) {
+                return "Tip: Review recurring expenses like subscriptions or consider negotiating bills to reduce monthly costs.";
+              } else if (category === 'wants' && difference < 0) {
+                return "Tip: Try implementing a 24-hour rule before making non-essential purchases to reduce impulse buying.";
+              } else if (category === 'savings' && difference < 0) {
+                return "Tip: Set up automatic transfers to a savings account on payday to ensure you pay yourself first.";
+              }
+              
+              return "";
+            };
+
+            const insight = getCategoryInsight(category);
+            const tip = getCategoryTip(category);
 
             return (
               <Grid item xs={12} md={4} key={category}>
@@ -271,38 +322,86 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
                         <span>{settings.icon}</span>
                         {settings.name}
                       </Typography>
+                      <Typography variant="body2" sx={{ ml: 'auto', color: 'text.secondary', fontWeight: 500 }}>
+                        {preferences.ratios[category as keyof typeof preferences.ratios]}% of Income
+                      </Typography>
                     </Box>
+
+                    {/* Category Description */}
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      {categoryDescriptions[category as keyof typeof categoryDescriptions]}
+                    </Typography>
 
                     {/* Amount Display */}
                     <Box sx={{ mb: 3 }}>
                       <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
                         {formatCurrency(actualAmount)}
                       </Typography>
-                      <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 1 }}>
-                        Target: {formatCurrency(targetAmount)}
+                      <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+                        <Tooltip 
+                          title={`This is the recommended amount (${preferences.ratios[category as keyof typeof preferences.ratios]}% of your income) that you should aim to spend in this category based on your budget plan.`}
+                          placement="top"
+                          arrow
+                        >
+                          <span style={{ cursor: 'help' }}>Target ({preferences.ratios[category as keyof typeof preferences.ratios]}%):</span>
+                        </Tooltip> {formatCurrency(targetAmount)}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                          <Tooltip 
+                            title={category === 'savings' 
+                              ? "The difference between your actual savings and the target amount. A positive number means you're saving more than recommended (good), while a negative means you're saving less than recommended (needs attention)."
+                              : category === 'wants'
+                                ? "The difference between your actual spending and the target amount for 'wants'. Ideally, you should be within $100 of your target (On-Target). If positive, you're overspending on wants and might consider shifting some to essentials or savings."
+                                : "The difference between your actual spending and the target amount. A positive number means you're spending more than your budget (needs attention), while a negative means you're spending less than your budget (good)."
+                            }
+                            placement="top"
+                            arrow
+                          >
+                            <span style={{ cursor: 'help' }}>Difference:</span>
+                          </Tooltip>
+                        </Typography>
                         <Chip
                           size="small"
                           label={`${difference >= 0 ? '+' : ''}${formatCurrency(difference)}`}
-                          color={difference > 0 ? 'error' : 'success'}
+                          color={category === 'savings' 
+                            ? (difference > 100 ? 'success' : (difference >= -100 ? 'success' : 'error')) 
+                            : category === 'wants'
+                              ? (Math.abs(difference) <= 100 ? 'success' : (difference > 0 ? 'error' : 'warning'))
+                              : (difference > 0 ? 'error' : 'success')}
                           sx={{ fontWeight: 600 }}
                         />
-                      </Typography>
+                      </Box>
                     </Box>
 
                     {/* Progress Section */}
-                    <Box>
+                    <Box sx={{ mb: 3 }}>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                         <Typography variant="body2" color="text.secondary">
                           Budget Usage
                         </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: `${status}.main` }}>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            fontWeight: 600, 
+                            color: category === 'wants' && difference > 1000 
+                              ? 'warning.main' 
+                              : category === 'savings' 
+                                ? (difference > 100 ? 'success' : (difference >= -100 ? 'success' : 'error'))
+                                : `${status}.main`
+                          }}
+                        >
                           {formatPercentage(progress)}
                         </Typography>
                       </Box>
                       <LinearProgress
                         variant="determinate"
                         value={Math.min(progress, 100)}
-                        color={status}
+                        color={category === 'wants' && difference > 1000 
+                          ? 'warning' 
+                          : category === 'savings' 
+                            ? (difference > 100 ? 'success' : (difference >= -100 ? 'success' : 'error'))
+                            : status}
                         sx={{
                           height: 8,
                           borderRadius: 4,
@@ -316,127 +415,140 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
                         <Typography variant="caption" color="text.secondary">
                           {formatPercentage(percentageOfIncome)} of Income
                         </Typography>
-                        <Typography variant="caption" sx={{ color: `${status}.main`, fontWeight: 500 }}>
-                          {progress > 100 ? '⚠️ Over Budget' : progress > 90 ? '⚡ Near Limit' : '✅ On Track'}
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            color: category === 'wants' && difference > 1000 
+                              ? 'warning.main'
+                              : category === 'wants' && difference < 0
+                                ? 'warning.main'
+                              : category === 'wants' && Math.abs(difference) <= 100
+                                ? 'success.main'
+                              : category === 'savings' && difference > 100
+                                ? 'success.main'
+                              : category === 'savings' && difference >= -100
+                                ? 'success.main'
+                              : category === 'savings' && difference < -100
+                                ? 'error.main'
+                              : `${status}.main`, 
+                            fontWeight: 500 
+                          }}
+                        >
+                          {category === 'wants' && Math.abs(difference) <= 100
+                            ? '✅ On-Target'
+                            : category === 'wants' && difference > 100
+                              ? '⚠️ Over-Allocated'
+                              : category === 'wants' && difference < -100
+                                ? '⚠️ Under-Allocated'
+                              : category === 'savings' && difference > 100
+                                ? '✅ Exceeding Goal'
+                              : category === 'savings' && difference >= -100
+                                ? '✅ On-Track'
+                              : category === 'savings' && difference < -100
+                                ? '⚠️ Need to Save More'
+                              : progress > 100 
+                                ? '⚠️ Over Budget' 
+                                : progress > 90 
+                                  ? '⚡ Near Limit' 
+                                  : '✅ On Track'}
                         </Typography>
                       </Box>
                     </Box>
+
+                    {/* Insights Section */}
+                    {categoryTotals.income > 0 && (
+                      <Box sx={{ 
+                        p: 1.5, 
+                        borderRadius: 1, 
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(66, 66, 66, 0.2)' : 'rgba(240, 240, 240, 0.5)',
+                        border: '1px dashed',
+                        borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
+                      }}>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            color: category === 'wants' && difference > 1000 
+                              ? 'warning.main'
+                              : category === 'wants' && difference < 0
+                                ? 'warning.main'
+                              : category === 'savings' && difference > 100
+                                ? 'success.main'
+                              : category === 'savings' && difference >= -100
+                                ? 'success.main'
+                              : category === 'savings' && difference < -100
+                                ? 'error.main'
+                              : progress > 100
+                                ? 'error.main'
+                                : progress > 90
+                                  ? 'warning.main'
+                                  : 'success.main',
+                            fontWeight: 500, 
+                            mb: 0.5 
+                          }}
+                        >
+                          {/* Custom messages for each situation */}
+                          {category === 'wants' && Math.abs(difference) <= 100 ? (
+                            `Your 'wants' spending is on target at ${formatCurrency(actualAmount)}, which is within $100 of your recommended budget.`
+                          ) : category === 'wants' && difference > 100 ? (
+                            `You're spending ${formatCurrency(Math.abs(difference))} more than recommended on wants. Consider shifting some to essentials or savings.`
+                          ) : category === 'wants' && difference < -100 ? (
+                            `You're spending ${formatCurrency(Math.abs(difference))} less than recommended on wants. Consider allocating more to enjoy life.`
+                          ) : category === 'savings' && difference > 100 ? (
+                            `Excellent! You're ${formatCurrency(Math.abs(difference))} above your savings target. This strengthens your financial security.`
+                          ) : category === 'savings' && difference >= -100 ? (
+                            `You're on track with your savings goal, within $100 of your target amount.`
+                          ) : category === 'savings' && difference < -100 ? (
+                            `You're saving ${formatCurrency(Math.abs(difference))} less than recommended. Try to increase your savings rate.`
+                          ) : progress > 100 ? (
+                            `You're ${formatCurrency(Math.abs(difference))} over your ${category} budget. Consider adjusting your spending in this category.`
+                          ) : progress > 90 ? (
+                            `You're approaching your ${category} budget limit. Monitor your spending closely.`
+                          ) : difference < 0 ? (
+                            `You're spending more than recommended on ${category}. Consider reviewing your expenses.`
+                          ) : (
+                            `You're on track with your ${category} budget with ${formatCurrency(difference)} remaining.`
+                          )}
+                        </Typography>
+                        
+                        {/* Display tips based on budget status - simplified conditions */}
+                        <Typography variant="caption" sx={{ display: 'block', mt: 1, color: 'text.secondary' }}>
+                          {category === 'wants' && Math.abs(difference) <= 100 ? (
+                            "Tip: You've achieved a good balance with your 'wants' spending. Continue monitoring to maintain this healthy balance."
+                          ) : category === 'wants' && difference > 100 ? (
+                            "Tip: Consider reducing discretionary spending and redirecting those funds to essentials or boosting your savings."
+                          ) : category === 'wants' && difference < -100 ? (
+                            "Tip: Consider reducing your essentials or using some of your savings to enjoy life more. Balance is important for long-term financial wellness."
+                          ) : category === 'savings' && difference > 100 ? (
+                            "Tip: Great job saving extra! If desired, you could allocate some of this excess towards your 'wants' category as a reward for good financial habits."
+                          ) : category === 'savings' && difference >= -100 ? (
+                            "Tip: You're doing well with your savings. Maintain this habit to build financial security over time."
+                          ) : category === 'savings' && difference < -100 ? (
+                            "Tip: Consider setting up automatic transfers to your savings account when you receive income to make saving easier."
+                          ) : progress > 100 ? (
+                            category === 'essentials'
+                              ? "Tip: Review recurring bills and look for potential savings on utilities, groceries, or insurance."
+                              : "Tip: Consider delaying non-essential purchases until next month or finding less expensive alternatives."
+                          ) : progress > 90 ? (
+                            category === 'essentials'
+                              ? "Tip: Be careful with any additional essential expenses this month to avoid going over budget."
+                              : category === 'wants'
+                                ? "Tip: Be mindful of any additional discretionary spending this month."
+                                : "Tip: Monitor your savings rate closely for the rest of the month."
+                          ) : (
+                            category === 'essentials'
+                              ? "Tip: Keep tracking essential expenses and look for long-term savings through better rates or eliminating unused subscriptions."
+                              : category === 'wants'
+                                ? "Tip: Plan purchases in advance and set spending limits for entertainment and discretionary items."
+                                : "Tip: Consider increasing automatic transfers to savings if you consistently meet your budget goals."
+                          )}
+                        </Typography>
+                      </Box>
+                    )}
                   </CardContent>
                 </Card>
               </Grid>
             );
           })}
-
-          {/* Charts Section */}
-          {isBrowser && categoryTotals.income > 0 && (
-            <React.Suspense fallback={<Box sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading charts...</Box>}>
-              <Grid item xs={12} container spacing={3}>
-                {preferences.chartPreferences.showPieChart && (
-                  <Grid item xs={12} md={6}>
-                    <Card sx={{ height: '450px', p: 3 }}>
-                      <Typography variant="h6" sx={{ mb: 2 }}>Expense Distribution</Typography>
-                      <LazyCharts 
-                        pieData={{
-                          labels: Object.values(preferences.categoryCustomization).map(cat => cat.name),
-                          datasets: [{
-                            data: [categoryTotals.essentials, categoryTotals.wants, categoryTotals.savings],
-                            backgroundColor: Object.values(preferences.categoryCustomization).map(cat => cat.color),
-                            borderColor: Object.values(preferences.categoryCustomization).map(cat => cat.color),
-                            borderWidth: 1,
-                          }],
-                        }}
-                        barData={{
-                          labels: [],
-                          datasets: []
-                        }}
-                        barOptions={{}}
-                        showPie={true}
-                        showBar={false}
-                      />
-                    </Card>
-                  </Grid>
-                )}
-
-                {preferences.chartPreferences.showBarChart && (
-                  <Grid item xs={12} md={6}>
-                    <Card sx={{ height: '450px', p: 3 }}>
-                      <Typography variant="h6" sx={{ mb: 2 }}>Budget vs. Actual</Typography>
-                      <LazyCharts 
-                        pieData={{
-                          labels: [],
-                          datasets: []
-                        }}
-                        barData={{
-                          labels: Object.values(preferences.categoryCustomization).map(cat => cat.name),
-                          datasets: [
-                            {
-                              label: 'Target',
-                              data: Object.entries(preferences.ratios).map(([_, ratio]) => (ratio / 100) * categoryTotals.income),
-                              backgroundColor: theme.palette.primary.main,
-                              borderRadius: 6,
-                              barThickness: 40,
-                            },
-                            {
-                              label: 'Actual',
-                              data: [categoryTotals.essentials, categoryTotals.wants, categoryTotals.savings],
-                              backgroundColor: theme.palette.warning.main,
-                              borderRadius: 6,
-                              barThickness: 40,
-                            },
-                          ],
-                        }}
-                        barOptions={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          scales: {
-                            y: {
-                              beginAtZero: true,
-                              ticks: {
-                                callback: (value: number) => formatCurrency(value),
-                              },
-                            },
-                          },
-                          plugins: {
-                            legend: {
-                              position: 'top',
-                            },
-                          },
-                        }}
-                        showPie={false}
-                        showBar={true}
-                      />
-                    </Card>
-                  </Grid>
-                )}
-              </Grid>
-            </React.Suspense>
-          )}
-
-          {/* Suggestions Section */}
-          {preferences.chartPreferences.showSuggestions && suggestions.length > 0 && (
-            <Grid item xs={12}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" sx={{ mb: 2 }}>Budget Insights</Typography>
-                  <List>
-                    {suggestions.map((suggestion, index) => (
-                      <ListItem key={index}>
-                        <ListItemText 
-                          primary={suggestion}
-                          sx={{
-                            '& .MuiListItemText-primary': {
-                              fontSize: '0.9rem',
-                              color: 'text.secondary',
-                            },
-                          }}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
         </Grid>
       )}
 
