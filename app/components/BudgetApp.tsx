@@ -1282,7 +1282,7 @@ const BudgetAppContent: React.FC = () => {
     return (
       <Box sx={{ 
         mt: 3,
-        px: { xs: 1, sm: 2, md: 3 },
+        
         maxWidth: '100%',
       }}>
         {/* Always show Income Table */}

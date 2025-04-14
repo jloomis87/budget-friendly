@@ -553,7 +553,7 @@ export const TransactionTableContent: React.FC = () => {
   const hasCustomDarkColor = hasCustomColor && isColorDark(getCategoryBackgroundColor() || '');
 
   return (
-    <Box sx={{ position: 'relative', mb: 2, padding:0}}>
+    <Box sx={{ position: 'relative', mb: 2}}>
       {/* Drag mode indicator */}
       <DragIndicator 
         isDragging={isDragging} 
