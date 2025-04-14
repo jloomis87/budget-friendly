@@ -26,8 +26,7 @@ import {
 import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import type { BudgetSummary as BudgetSummaryType, BudgetPlan } from '../services/budgetCalculator';
 import type { BudgetPreferences } from './BudgetActions';
-import { BudgetAnalytics } from './BudgetAnalytics';
-import { SmartInsights } from './SmartInsights';
+import { FinancialGoals } from './FinancialGoals';
 import { CategoryDeepDive } from './CategoryDeepDive';
 import type { Transaction } from '../services/fileParser';
 import type { FinancialGoal } from '../services/goalService';
@@ -78,7 +77,6 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
   const [isBrowser, setIsBrowser] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const isDarkMode = mode === 'dark';
-  const [goals, setGoals] = useState<FinancialGoal[]>([]);
   const [monthlyTransactions, setMonthlyTransactions] = useState<Transaction[]>([]);
 
   // Filter transactions for selected months
@@ -314,7 +312,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
           }}
         >
           <Tab label="Overview" />
-          <Tab label="Insights & Goals" />
+          <Tab label="Goals" />
           <Tab label="Deep Dive" />
         </Tabs>
       </Box>
@@ -479,15 +477,12 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
         </Grid>
       )}
 
-      {/* Insights & Goals Tab */}
+      {/* Goals Tab */}
       {activeTab === 1 && (
-        <SmartInsights
+        <FinancialGoals
           transactions={monthlyTransactions}
           selectedMonths={selectedMonths}
           totalIncome={categoryTotals.income}
-          onGoalUpdate={setGoals}
-          openSavingsDialog={false}
-          onCloseSavingsDialog={() => {}}
         />
       )}
 
