@@ -58,13 +58,15 @@ const UserMenu: React.FC<UserMenuProps> = () => {
 
   // Get user initials for avatar
   const getUserInitials = () => {
-    if (!user || !user.name) return '?';
+    if (!user?.name) return '?';
     
-    const nameParts = user.name.split(' ');
+    const nameParts = user.name.trim().split(' ');
     if (nameParts.length === 1) {
       return nameParts[0].charAt(0).toUpperCase();
     } else {
-      return (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase();
+      const firstName = nameParts[0];
+      const lastName = nameParts[nameParts.length - 1];
+      return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
     }
   };
 
@@ -85,10 +87,20 @@ const UserMenu: React.FC<UserMenuProps> = () => {
       >
         <Avatar
           sx={{
-            width: 32,
-            height: 32,
+            width: 36,
+            height: 36,
             bgcolor: 'primary.main',
-            fontSize: '0.875rem',
+            fontSize: '1rem',
+            fontWeight: 600,
+            color: 'white',
+            textTransform: 'uppercase',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            border: '2px solid',
+            borderColor: 'background.paper',
+            '&:hover': {
+              transform: 'scale(1.05)',
+              transition: 'transform 0.2s ease'
+            }
           }}
         >
           {getUserInitials()}

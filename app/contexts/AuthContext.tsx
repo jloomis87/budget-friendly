@@ -15,6 +15,7 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 interface User {
   id: string;
   email: string | null;
+  name: string;
   displayName: string | null;
   preferences?: {
     theme?: 'light' | 'dark';
@@ -29,7 +30,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUserPreferences: (preferences: Partial<User['preferences']>) => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -65,6 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser({
             id: firebaseUser.uid,
             email: firebaseUser.email,
+            name: userData?.name || '',
             displayName: firebaseUser.displayName,
             preferences: userData?.preferences || {},
           });
@@ -96,7 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, name: string) => {
     try {
       setError(null);
       setIsLoading(true);
@@ -105,6 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Create user document in Firestore
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         email,
+        name,
         createdAt: new Date().toISOString(),
         preferences: {
           theme: 'light',
