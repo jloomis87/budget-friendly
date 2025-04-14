@@ -879,7 +879,7 @@ const BudgetAppContent: React.FC = () => {
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
   
   // Auth state
-  const { isAuthenticated, isLoading: authLoading, user: authUser, logout, login, signup, error } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user: authUser, logout, signIn, signUp, error } = useAuth();
   const [activeAuthTab, setActiveAuthTab] = useState(0);
   
   // Login form state
@@ -905,83 +905,37 @@ const BudgetAppContent: React.FC = () => {
   // Handle login form submission
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Reset previous errors
-    setFormErrors({});
-    
-    // Validate form
-    let isValid = true;
-    const errors: typeof formErrors = {};
-    
-    if (!loginEmail) {
-      errors.loginEmail = 'Email is required';
-      isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(loginEmail)) {
-      errors.loginEmail = 'Email is invalid';
-      isValid = false;
+    setIsLoading(true);
+    try {
+      await signIn(loginEmail, loginPassword);
+      setLoginEmail('');
+      setLoginPassword('');
+      setActiveAuthTab(0);
+    } catch (error) {
+      console.error('Login error:', error);
+      setAlertMessage({ type: 'error', message: 'Failed to log in. Please check your credentials.' });
+    } finally {
+      setIsLoading(false);
     }
-    
-    if (!loginPassword) {
-      errors.loginPassword = 'Password is required';
-      isValid = false;
-    }
-    
-    if (!isValid) {
-      setFormErrors(errors);
-      return;
-    }
-    
-    // Submit form
-    await login(loginEmail, loginPassword);
   };
   
   // Handle signup form submission
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Reset previous errors
-    setFormErrors({});
-    
-    // Validate form
-    let isValid = true;
-    const errors: typeof formErrors = {};
-    
-    if (!signupName) {
-      errors.signupName = 'Name is required';
-      isValid = false;
+    setIsLoading(true);
+    try {
+      // Submit form
+      await signUp(signupEmail, signupPassword, signupName);
+      setSignupEmail('');
+      setSignupPassword('');
+      setSignupName('');
+      setActiveAuthTab(0);
+    } catch (error) {
+      console.error('Signup error:', error);
+      setAlertMessage({ type: 'error', message: 'Failed to create account. Please try again.' });
+    } finally {
+      setIsLoading(false);
     }
-    
-    if (!signupEmail) {
-      errors.signupEmail = 'Email is required';
-      isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(signupEmail)) {
-      errors.signupEmail = 'Email is invalid';
-      isValid = false;
-    }
-    
-    if (!signupPassword) {
-      errors.signupPassword = 'Password is required';
-      isValid = false;
-    } else if (signupPassword.length < 6) {
-      errors.signupPassword = 'Password must be at least 6 characters';
-      isValid = false;
-    }
-    
-    if (!signupConfirmPassword) {
-      errors.signupConfirmPassword = 'Please confirm your password';
-      isValid = false;
-    } else if (signupPassword !== signupConfirmPassword) {
-      errors.signupConfirmPassword = 'Passwords do not match';
-      isValid = false;
-    }
-    
-    if (!isValid) {
-      setFormErrors(errors);
-      return;
-    }
-    
-    // Submit form
-    await signup(signupEmail, signupPassword, signupName);
   };
   
   const [tableHover, setTableHover] = useState<number | null>(null);
@@ -1017,17 +971,8 @@ const BudgetAppContent: React.FC = () => {
 
   // Handle drag start
   const handleDragStart = useCallback((e: React.DragEvent, transaction: Transaction, index: number) => {
-    // Set the drag data
     setDraggedTransaction({ transaction, index });
-    
-    // Add some visual feedback
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', transaction.description);
-    
-    // Add a class to the body to indicate dragging is in progress
     document.body.classList.add('dragging-active');
-    
-    // Note: The custom drag image is now created in the TransactionRow component
   }, []);
 
   // Handle drag over
@@ -1043,163 +988,71 @@ const BudgetAppContent: React.FC = () => {
   const handleDrop = useCallback((e: React.DragEvent, targetCategory: string) => {
     e.preventDefault();
     setDragOverCategory(null);
-    
-    // Remove the dragging class
     document.body.classList.remove('dragging-active');
     
-    // Ensure we have a dragged transaction
     if (!draggedTransaction) return;
     
-    // If dropping in the same category, this might be a reordering operation
     if (draggedTransaction.transaction.category === targetCategory) {
-      // This will be handled by the handleReorder function
-      // Reset dragged transaction
       setDraggedTransaction(null);
       return;
     }
     
-    // If dropping in a different category, move the transaction
-    if (draggedTransaction.transaction.category !== targetCategory) {
-      // Move the transaction to the new category
-      moveTransaction(draggedTransaction.index, targetCategory);
-      
-      // Visual feedback for drop
-      setRecentlyDropped(targetCategory);
-      setTimeout(() => {
-        setRecentlyDropped(null);
-      }, 1500);
-    }
+    moveTransaction(draggedTransaction.index, targetCategory);
+    setRecentlyDropped(targetCategory);
+    setTimeout(() => {
+      setRecentlyDropped(null);
+    }, 1500);
     
-    // Reset dragged transaction
     setDraggedTransaction(null);
   }, [draggedTransaction, moveTransaction]);
 
   // Handle reordering within a category
   const handleReorder = useCallback((category: string, sourceIndex: number, targetIndex: number) => {
-    console.log(`Handling reorder for category: ${category}`, {
-      sourceIndex,
-      targetIndex,
-      totalTransactions: transactions.length
-    });
-    
-    // Get transactions for this category
     const categoryTransactions = transactions.filter(t => t.category === category);
     
-    console.log(`Found ${categoryTransactions.length} transactions for category ${category}`);
-    
-    // Ensure indices are valid
     if (sourceIndex < 0 || sourceIndex >= transactions.length || 
         targetIndex < 0 || targetIndex >= transactions.length) {
-      console.error('Invalid indices for reordering', { 
-        sourceIndex, 
-        targetIndex, 
-        transactionsLength: transactions.length 
-      });
       return;
     }
     
-    try {
-      // Get the actual transactions from the global indices
-      const sourceTransaction = transactions[sourceIndex];
-      const targetTransaction = transactions[targetIndex];
-      
-      if (!sourceTransaction || !targetTransaction) {
-        console.error('Source or target transaction not found', {
-          sourceFound: !!sourceTransaction,
-          targetFound: !!targetTransaction,
-          sourceIndex,
-          targetIndex
-        });
-        return;
-      }
-      
-      console.log('Reordering transactions:', {
-        source: {
-          description: sourceTransaction.description,
-          category: sourceTransaction.category,
-          index: sourceIndex,
-          id: sourceTransaction.id,
-          order: sourceTransaction.order
-        },
-        target: {
-          description: targetTransaction.description,
-          category: targetTransaction.category,
-          index: targetIndex,
-          id: targetTransaction.id,
-          order: targetTransaction.order
-        }
-      });
-      
-      // Verify both transactions are in the same category
-      if (sourceTransaction.category !== category || targetTransaction.category !== category) {
-        console.error('Category mismatch during reordering', {
-          expectedCategory: category,
-          sourceCategory: sourceTransaction.category,
-          targetCategory: targetTransaction.category
-        });
-        return;
-      }
-      
-      // Create a new array with the reordered transactions
-      const reordered = [...categoryTransactions];
-      
-      // Find the local indices within the category-filtered array
-      const localSourceIndex = reordered.findIndex(t => t === sourceTransaction);
-      const localTargetIndex = reordered.findIndex(t => t === targetTransaction);
-      
-      if (localSourceIndex === -1 || localTargetIndex === -1) {
-        console.error('Could not find local indices for reordering', {
-          localSourceIndex,
-          localTargetIndex,
-          category
-        });
-        return;
-      }
-      
-      // Perform the reordering
-      const [movedItem] = reordered.splice(localSourceIndex, 1);
-      reordered.splice(localTargetIndex, 0, movedItem);
-      
-      // Get the IDs in the new order
-      const orderedIds = reordered.map(t => t.id).filter(id => id !== undefined) as string[];
-      
-      if (orderedIds.length !== reordered.length) {
-        console.warn(`Some transactions don't have IDs`, {
-          totalTransactions: reordered.length,
-          idsFound: orderedIds.length
-        });
-      }
-      
-      // Log the new order for debugging
-      console.log(`New order for ${category}:`, {
-        orderedIds,
-        transactions: reordered.map(t => ({
-          id: t.id,
-          description: t.description,
-          order: t.order
-        }))
-      });
-      
-      // Update the order in the database
-      reorderTransactions(category, orderedIds);
-    } catch (error) {
-      console.error('Error during reordering:', error);
+    const sourceTransaction = transactions[sourceIndex];
+    const targetTransaction = transactions[targetIndex];
+    
+    if (!sourceTransaction || !targetTransaction) {
+      return;
     }
+    
+    if (sourceTransaction.category !== category || targetTransaction.category !== category) {
+      return;
+    }
+    
+    const reordered = [...categoryTransactions];
+    const localSourceIndex = reordered.findIndex(t => t === sourceTransaction);
+    const localTargetIndex = reordered.findIndex(t => t === targetTransaction);
+    
+    if (localSourceIndex === -1 || localTargetIndex === -1) {
+      return;
+    }
+    
+    const [movedItem] = reordered.splice(localSourceIndex, 1);
+    reordered.splice(localTargetIndex, 0, movedItem);
+    
+    const orderedIds = reordered.map(t => t.id).filter(id => id !== undefined) as string[];
+    reorderTransactions(category, orderedIds);
   }, [transactions, reorderTransactions]);
   
   // Clear any drag/drop/animation states when mouse leaves a draggable area
-  const handleDragLeave = useCallback(() => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
     setDragOverCategory(null);
   }, []);
   
   // Handle drag end
-  const handleDragEnd = useCallback(() => {
-    // Remove the dragging class
-    document.body.classList.remove('dragging-active');
-    
-    // Reset drag state
-    setDraggedTransaction(null);
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
     setDragOverCategory(null);
+    setDraggedTransaction(null);
+    document.body.classList.remove('dragging-active');
   }, []);
 
   // Auto-dismiss alert messages after 3 seconds
@@ -1453,7 +1306,7 @@ const BudgetAppContent: React.FC = () => {
         overflow: 'hidden',
         zIndex: 0,
       }}>
-        {/* Background Video */}
+        {/* Background */}
         <Box
           sx={{
             position: 'absolute',
@@ -1463,8 +1316,8 @@ const BudgetAppContent: React.FC = () => {
             height: '100%',
             zIndex: -1,
             overflow: 'hidden',
-            // Animated background gradient with more blue tones
-            background: 'linear-gradient(135deg, #0A1931, #185ADB, #1E3A8A)',
+            // Light background with subtle gradient
+            background: 'linear-gradient(135deg, #ffffff, #f8fafc, #f1f5f9)',
             backgroundSize: '400% 400%',
             animation: 'gradientAnimation 15s ease infinite',
             '&::before': {
@@ -1474,10 +1327,10 @@ const BudgetAppContent: React.FC = () => {
               left: 0,
               width: '100%',
               height: '100%',
-              background: 'radial-gradient(circle at center, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.7) 100%)',
+              background: 'radial-gradient(circle at center, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 100%)',
               zIndex: 2,
             },
-            // Add floating financial elements for visual interest
+            // Update pattern color to be very subtle
             '&::after': {
               content: '""',
               position: 'absolute',
@@ -1517,7 +1370,7 @@ const BudgetAppContent: React.FC = () => {
             width: '100%',
             maxWidth: 500, 
             textAlign: 'center',
-            mb: 4,
+            mb: 0,
             zIndex: 2,
             color: 'white',
           }}
@@ -1528,72 +1381,33 @@ const BudgetAppContent: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'center',
               gap: 2,
-              mb: 3
+              mb: 0
             }}
           >
             <Box 
               sx={{ 
-                bgcolor: 'primary.main', 
-                color: 'white', 
-                p: 1, 
-                borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 0 4px rgba(37,99,235,0.2)'
+                width: '100%',
+                maxWidth: '1200px'
               }}
             >
-              <svg 
-                width="32" 
-                height="32" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-              </svg>
+              <img 
+                src="/logo/friendlybudgetslogo.svg" 
+                alt="Friendly Budgets Logo" 
+                style={{
+                  width: '100%',
+                  height: 'auto',
+                  maxWidth: '900px',
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                  marginBottom: '1rem'
+                }}
+              />
             </Box>
-            <Typography 
-              variant="h3" 
-              component="h1" 
-              sx={{ 
-                fontWeight: 800,
-                letterSpacing: '-0.02em',
-                color: 'white',
-                fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                textShadow: '0 2px 10px rgba(0,0,0,0.3)',
-              }}
-            >
-              Friendly Budgets
-            </Typography>
           </Box>
-          <Typography 
-            variant="h5" 
-            sx={{ 
-              mb: 2, 
-              fontWeight: 600,
-              color: 'white',
-              textShadow: '0 2px 10px rgba(0,0,0,0.3)',
-            }}
-          >
-            Take control of your finances
-          </Typography>
-          <Typography 
-            variant="body1" 
-            sx={{ 
-              mb: 4, 
-              color: 'rgba(255,255,255,0.9)',
-              fontSize: '1.1rem',
-              maxWidth: 450,
-              mx: 'auto',
-              textShadow: '0 1px 3px rgba(0,0,0,0.3)',
-            }}
-          >
-            Sign in to access your personalized budget dashboard. Track spending, set goals, and make smarter financial decisions.
-          </Typography>
+       
+
         </Box>
         
         <Paper
@@ -1603,25 +1417,62 @@ const BudgetAppContent: React.FC = () => {
             borderRadius: 3,
             width: '100%',
             maxWidth: 450,
-            background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+            background: '#ffffff',
+            color: 'black',
             border: '1px solid',
             borderColor: 'divider',
             mb: 4,
             zIndex: 2,
             boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+            position: 'relative',
+            overflow: 'hidden',
+            '& .MuiTextField-root': {
+              '& .MuiInputBase-root': {
+                backgroundColor: '#ffffff !important',
+                '&:hover': {
+                  backgroundColor: '#ffffff !important'
+                },
+                '&.Mui-focused': {
+                  backgroundColor: '#ffffff !important'
+                },
+                '& .MuiFilledInput-input': {
+                  backgroundColor: '#ffffff !important'
+                },
+                '& .MuiOutlinedInput-input': {
+                  backgroundColor: '#ffffff !important'
+                },
+                '& .MuiInput-input': {
+                  backgroundColor: '#ffffff !important'
+                }
+              }
+            }
           }}
         >
-          {/* Auth forms directly integrated into the login page */}
           <Box sx={{ width: '100%' }}>
             <Tabs 
               value={activeAuthTab} 
               onChange={(e, newValue) => setActiveAuthTab(newValue)} 
               variant="fullWidth"
               sx={{
-                mb: 3,
+                mb: 4,
                 '& .MuiTab-root': {
                   fontWeight: 600,
-                  fontSize: '1rem',
+                  fontSize: '1.1rem',
+                  textTransform: 'none',
+                  minHeight: '48px',
+                  color: '#4a5568',
+                  transition: 'color 0.2s ease',
+                  '&:hover': {
+                    color: '#2563eb',  // Blue color on hover
+                  },
+                  '&.Mui-selected': {
+                    color: '#22c55e',  // Green color for active tab
+                  }
+                },
+                '& .MuiTabs-indicator': {
+                  height: '3px',
+                  borderRadius: '3px 3px 0 0',
+                  backgroundColor: '#22c55e',  // Green color for indicator
                 }
               }}
             >
@@ -1630,18 +1481,35 @@ const BudgetAppContent: React.FC = () => {
             </Tabs>
 
             {error && (
-              <Alert severity="error" sx={{ mb: 2 }}>
+              <Alert 
+                severity="error" 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 2,
+                  '& .MuiAlert-message': {
+                    fontWeight: 500
+                  }
+                }}
+              >
                 {error}
               </Alert>
             )}
 
             {activeAuthTab === 0 ? (
               // Login Form
-              <Box component="form" onSubmit={handleLoginSubmit} noValidate>
+              <Box 
+                component="form" 
+                onSubmit={handleLoginSubmit} 
+                noValidate
+                sx={{
+                  '& .MuiTextField-root': {
+                    mb: 2.5
+                  }
+                }}
+              >
                 <TextField
                   label="Email Address"
                   fullWidth
-                  margin="normal"
                   variant="outlined"
                   autoComplete="email"
                   value={loginEmail}
@@ -1650,11 +1518,47 @@ const BudgetAppContent: React.FC = () => {
                   helperText={formErrors.loginEmail}
                   disabled={authLoading}
                   required
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: '#ffffff !important',
+                      '& fieldset': {
+                        borderColor: '#424242',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#2c2c2c',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#1a365d',
+                      },
+                      '&:hover': {
+                        backgroundColor: '#ffffff !important',
+                      },
+                      '&.Mui-focused': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    },
+                    '& .MuiOutlinedInput-input': {
+                      color: '#1a365d',
+                      backgroundColor: '#ffffff !important',
+                      '&:hover, &:focus': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#1a365d',
+                    },
+                    '& .MuiFilledInput-root': {
+                      backgroundColor: '#ffffff !important',
+                      '&:hover, &:focus': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    }
+                  }}
                 />
                 <TextField
                   label="Password"
                   fullWidth
-                  margin="normal"
                   variant="outlined"
                   type="password"
                   autoComplete="current-password"
@@ -1664,46 +1568,112 @@ const BudgetAppContent: React.FC = () => {
                   helperText={formErrors.loginPassword}
                   disabled={authLoading}
                   required
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: '#ffffff !important',
+                      '& fieldset': {
+                        borderColor: '#424242',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#2c2c2c',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#1a365d',
+                      },
+                      '&:hover': {
+                        backgroundColor: '#ffffff !important',
+                      },
+                      '&.Mui-focused': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    },
+                    '& .MuiOutlinedInput-input': {
+                      color: '#1a365d',
+                      backgroundColor: '#ffffff !important',
+                      '&:hover, &:focus': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#1a365d',
+                    },
+                    '& .MuiFilledInput-root': {
+                      backgroundColor: '#ffffff !important',
+                      '&:hover, &:focus': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    }
+                  }}
                 />
                 <Button
                   type="submit"
                   fullWidth
                   variant="contained"
-                  color="primary"
                   sx={{ 
-                    mt: 3, 
-                    mb: 2, 
+                    mt: 2, 
+                    mb: 3, 
                     py: 1.5, 
                     fontWeight: 600, 
                     borderRadius: 2,
-                    background: 'linear-gradient(90deg, rgba(37,99,235,1) 0%, rgba(59,130,246,1) 100%)',
+                    fontSize: '1rem',
+                    textTransform: 'none',
+                    background: 'linear-gradient(90deg, #2563eb, #3b82f6)',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)',
                     '&:hover': {
-                      background: 'linear-gradient(90deg, rgba(29,78,216,1) 0%, rgba(37,99,235,1) 100%)',
+                      background: 'linear-gradient(90deg, #1d4ed8, #2563eb)',
+                      boxShadow: '0 6px 16px rgba(37, 99, 235, 0.3)',
                     }
                   }}
                   disabled={authLoading}
                 >
-                  {authLoading ? <CircularProgress size={24} color="inherit" /> : 'Log In'}
+                  {authLoading ? (
+                    <CircularProgress size={24} sx={{ color: 'white' }} />
+                  ) : (
+                    'Log In'
+                  )}
                 </Button>
-                <Typography variant="body2" align="center" color="textSecondary">
-                  Don't have an account?{' '}
-                  <Button 
-                    color="primary" 
-                    size="small" 
-                    onClick={() => setActiveAuthTab(1)}
-                    sx={{ fontWeight: 600, p: 0, minWidth: 'auto' }}
-                  >
+                <Typography 
+                  variant="body2" 
+                  align="center" 
+                  sx={{
+                    color: '#4a5568',  // Darker gray color
+                    '& .MuiButton-root': {
+                      fontWeight: 600,
+                      color: 'primary.main',
+                      p: 0,
+                      minWidth: 'auto',
+                      textTransform: 'none',
+                      fontSize: 'inherit',
+                      ml: 0.5,
+                      '&:hover': {
+                        background: 'none',
+                        color: 'primary.dark',
+                      }
+                    }
+                  }}
+                >
+                  Don't have an account?
+                  <Button onClick={() => setActiveAuthTab(1)}>
                     Sign up now
                   </Button>
                 </Typography>
               </Box>
             ) : (
               // Signup Form
-              <Box component="form" onSubmit={handleSignupSubmit} noValidate>
+              <Box 
+                component="form" 
+                onSubmit={handleSignupSubmit} 
+                noValidate
+                sx={{
+                  '& .MuiTextField-root': {
+                    mb: 2.5
+                  }
+                }}
+              >
                 <TextField
                   label="Full Name"
                   fullWidth
-                  margin="normal"
                   variant="outlined"
                   autoComplete="name"
                   value={signupName}
@@ -1712,11 +1682,47 @@ const BudgetAppContent: React.FC = () => {
                   helperText={formErrors.signupName}
                   disabled={authLoading}
                   required
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: '#ffffff !important',
+                      '& fieldset': {
+                        borderColor: '#424242',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#2c2c2c',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#1a365d',
+                      },
+                      '&:hover': {
+                        backgroundColor: '#ffffff !important',
+                      },
+                      '&.Mui-focused': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    },
+                    '& .MuiOutlinedInput-input': {
+                      color: '#1a365d',
+                      backgroundColor: '#ffffff !important',
+                      '&:hover, &:focus': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#1a365d',
+                    },
+                    '& .MuiFilledInput-root': {
+                      backgroundColor: '#ffffff !important',
+                      '&:hover, &:focus': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    }
+                  }}
                 />
                 <TextField
                   label="Email Address"
                   fullWidth
-                  margin="normal"
                   variant="outlined"
                   autoComplete="email"
                   value={signupEmail}
@@ -1725,11 +1731,47 @@ const BudgetAppContent: React.FC = () => {
                   helperText={formErrors.signupEmail}
                   disabled={authLoading}
                   required
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: '#ffffff !important',
+                      '& fieldset': {
+                        borderColor: '#424242',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#2c2c2c',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#1a365d',
+                      },
+                      '&:hover': {
+                        backgroundColor: '#ffffff !important',
+                      },
+                      '&.Mui-focused': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    },
+                    '& .MuiOutlinedInput-input': {
+                      color: '#1a365d',
+                      backgroundColor: '#ffffff !important',
+                      '&:hover, &:focus': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#1a365d',
+                    },
+                    '& .MuiFilledInput-root': {
+                      backgroundColor: '#ffffff !important',
+                      '&:hover, &:focus': {
+                        backgroundColor: '#ffffff !important',
+                      }
+                    }
+                  }}
                 />
                 <TextField
                   label="Password"
                   fullWidth
-                  margin="normal"
                   variant="outlined"
                   type="password"
                   autoComplete="new-password"
@@ -1739,11 +1781,32 @@ const BudgetAppContent: React.FC = () => {
                   helperText={formErrors.signupPassword}
                   disabled={authLoading}
                   required
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: '#ffffff !important',
+                      '& fieldset': {
+                        borderColor: '#424242',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#2c2c2c',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#1a365d',
+                      }
+                    },
+                    '& .MuiOutlinedInput-input': {
+                      color: '#1a365d',
+                      backgroundColor: 'white',
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#1a365d',
+                    }
+                  }}
                 />
                 <TextField
                   label="Confirm Password"
                   fullWidth
-                  margin="normal"
                   variant="outlined"
                   type="password"
                   autoComplete="new-password"
@@ -1753,35 +1816,79 @@ const BudgetAppContent: React.FC = () => {
                   helperText={formErrors.signupConfirmPassword}
                   disabled={authLoading}
                   required
+                  sx={{
+                    backgroundColor: 'white',
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      backgroundColor: 'white',
+                      '& fieldset': {
+                        borderColor: '#424242',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#2c2c2c',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#1a365d',
+                      }
+                    },
+                    '& .MuiOutlinedInput-input': {
+                      color: '#1a365d',
+                      backgroundColor: 'white',
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#1a365d',
+                    }
+                  }}
                 />
                 <Button
                   type="submit"
                   fullWidth
                   variant="contained"
-                  color="primary"
                   sx={{ 
-                    mt: 3, 
-                    mb: 2, 
+                    mt: 2, 
+                    mb: 3, 
                     py: 1.5, 
                     fontWeight: 600, 
                     borderRadius: 2,
-                    background: 'linear-gradient(90deg, rgba(37,99,235,1) 0%, rgba(59,130,246,1) 100%)',
+                    fontSize: '1rem',
+                    textTransform: 'none',
+                    background: 'linear-gradient(90deg, #2563eb, #3b82f6)',
+                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)',
                     '&:hover': {
-                      background: 'linear-gradient(90deg, rgba(29,78,216,1) 0%, rgba(37,99,235,1) 100%)',
+                      background: 'linear-gradient(90deg, #1d4ed8, #2563eb)',
+                      boxShadow: '0 6px 16px rgba(37, 99, 235, 0.3)',
                     }
                   }}
                   disabled={authLoading}
                 >
-                  {authLoading ? <CircularProgress size={24} color="inherit" /> : 'Create Account'}
+                  {authLoading ? (
+                    <CircularProgress size={24} sx={{ color: 'white' }} />
+                  ) : (
+                    'Create Account'
+                  )}
                 </Button>
-                <Typography variant="body2" align="center" color="textSecondary">
-                  Already have an account?{' '}
-                  <Button 
-                    color="primary" 
-                    size="small" 
-                    onClick={() => setActiveAuthTab(0)}
-                    sx={{ fontWeight: 600, p: 0, minWidth: 'auto' }}
-                  >
+                <Typography 
+                  variant="body2" 
+                  align="center"
+                  sx={{
+                    color: '#4a5568',  // Darker gray color
+                    '& .MuiButton-root': {
+                      fontWeight: 600,
+                      color: 'primary.main',
+                      p: 0,
+                      minWidth: 'auto',
+                      textTransform: 'none',
+                      fontSize: 'inherit',
+                      ml: 0.5,
+                      '&:hover': {
+                        background: 'none',
+                        color: 'primary.dark',
+                      }
+                    }
+                  }}
+                >
+                  Already have an account?
+                  <Button onClick={() => setActiveAuthTab(0)}>
                     Log in
                   </Button>
                 </Typography>
@@ -1837,16 +1944,21 @@ const BudgetAppContent: React.FC = () => {
               sx={{
                 p: 3,
                 borderRadius: 2,
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 textAlign: 'center',
                 border: '1px solid',
-                borderColor: 'divider',
-                background: 'rgba(255, 255, 255, 0.95)',
+                borderColor: 'rgba(0, 0, 0, 0.06)',
+                background: 'rgba(255, 255, 255, 0.9)',
                 backdropFilter: 'blur(10px)',
+                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 6px 24px rgba(0, 0, 0, 0.12)',
+                }
               }}
             >
               <Box 
@@ -1855,15 +1967,19 @@ const BudgetAppContent: React.FC = () => {
                   backgroundColor: 'primary.light',
                   p: 1.5,
                   borderRadius: '50%',
-                  mb: 2
+                  mb: 2,
+                  transition: 'transform 0.2s ease',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                  }
                 }}
               >
                 {feature.icon}
               </Box>
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: '#334155' }}>
                 {feature.title}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" sx={{ color: '#64748b' }}>
                 {feature.description}
               </Typography>
             </Paper>
@@ -1958,12 +2074,11 @@ const BudgetAppContent: React.FC = () => {
               src="/logo/friendlybudgetslogo.svg" 
               alt="Friendly Budgets Logo" 
               style={{
-                width: 500,
-                height: 200,
+                width: 600,
+                height: 240,
                 filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-                borderRadius: '12px',
-                objectFit: 'cover',
-                objectPosition: '0% 42.5%'
+                objectFit: 'contain',
+                marginBottom: '1rem'
               }}
             />
           </Box>
@@ -1971,14 +2086,14 @@ const BudgetAppContent: React.FC = () => {
         <Typography 
           variant="subtitle1" 
           sx={{ 
-            mt: 1, 
+            mt: 0,
             mb: 2,
-            opacity: 1, 
+            opacity: 0.9, 
             fontWeight: 500,
             textAlign: 'center',
             maxWidth: '600px',
             fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-            fontSize: '1.1rem',
+            fontSize: '1rem',
             letterSpacing: '0.01em',
             color: '#424242',
             zIndex: 2
