@@ -2007,7 +2007,7 @@ const BudgetAppContent: React.FC = () => {
         </Typography>
 
         {/* Add Navigation Tabs */}
-        <Box sx={{ mt: 3, width: '100%', maxWidth: 400 }}>
+        <Box sx={{ mt: 3, width: '100%', maxWidth: 600 }}>
           <Tabs 
             value={activeStep} 
             onChange={(e, newValue) => setActiveStep(newValue)}
@@ -2018,6 +2018,8 @@ const BudgetAppContent: React.FC = () => {
                 '&.Mui-selected': {
                   color: 'white',
                 },
+                whiteSpace: 'nowrap',
+                minWidth: 160
               },
               '& .MuiTabs-indicator': {
                 backgroundColor: 'white',
@@ -2025,7 +2027,7 @@ const BudgetAppContent: React.FC = () => {
             }}
           >
             <Tab 
-              label="Transactions" 
+              label="Budgets" 
               sx={{ 
                 fontWeight: 600,
                 textTransform: 'none',
@@ -2033,7 +2035,7 @@ const BudgetAppContent: React.FC = () => {
               }} 
             />
             <Tab 
-              label="Budget Plan" 
+              label="Insights and Planning" 
               sx={{ 
                 fontWeight: 600,
                 textTransform: 'none',
@@ -2188,7 +2190,7 @@ const BudgetAppContent: React.FC = () => {
                     No Income Recorded
                   </Typography>
                   <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                    Please add income transactions in order to see the budget plan for this budget.
+                    Please add income transactions in order to see the insights and planning for this budget.
                   </Typography>
                   <Button
                     variant="contained"
