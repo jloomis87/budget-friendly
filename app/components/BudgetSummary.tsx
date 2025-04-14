@@ -1142,7 +1142,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
           totalIncome={categoryTotals.income}
         />
       )}
-      
+
       {/* Investment Simulator Tab */}
       {activeTab === 2 && (
         <Box>

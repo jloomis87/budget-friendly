@@ -1883,41 +1883,27 @@ const BudgetAppContent: React.FC = () => {
     }}>
       <Box 
         sx={{ 
-          p: 2,
-          mb: 3,
-          background: theme => theme.palette.mode === 'dark' 
-            ? 'linear-gradient(90deg, rgba(30,58,138,1) 0%, rgba(37,99,235,1) 100%)' 
-            : 'linear-gradient(90deg, rgba(37,99,235,1) 0%, rgba(59,130,246,1) 100%)',
-          borderRadius: { xs: 0, sm: '0 0 1rem 1rem' },
-          boxShadow: theme => theme.palette.mode === 'dark'
-            ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.24)'
-            : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          p: { xs: 2, sm: 3 },
+          py: { md: 2 },
+          background: '#ffffff',
+          borderRadius: { xs: 0, sm: '0 0 1.5rem 1.5rem' },
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          color: 'white',
+          color: '#1a1a1a',
           position: 'relative',
           overflow: 'hidden',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%)',
-            pointerEvents: 'none',
-          },
+          mb: 0
         }}
       >
-        {/* Add auth actions menu/button to the top right */}
         <Box
           sx={{
             position: 'absolute',
             top: 16,
             right: 24,
-            zIndex: 2,
+            zIndex: 3,
             display: 'flex',
             alignItems: 'center',
             gap: 2,
@@ -1928,13 +1914,14 @@ const BudgetAppContent: React.FC = () => {
           ) : (
             <Button
               variant="outlined"
-              color="inherit"
+              color="primary"
               onClick={handleOpenAuthModal}
               sx={{
-                borderColor: 'rgba(255,255,255,0.5)',
+                borderColor: 'primary.main',
+                color: 'primary.main',
                 '&:hover': {
-                  borderColor: 'white',
-                  backgroundColor: 'rgba(255,255,255,0.1)',
+                  borderColor: 'primary.dark',
+                  backgroundColor: 'rgba(0,0,0,0.04)',
                 },
                 fontWeight: 600,
                 borderRadius: 2,
@@ -1949,101 +1936,116 @@ const BudgetAppContent: React.FC = () => {
           sx={{ 
             display: 'flex', 
             alignItems: 'center',
-            gap: 2,
-            transition: 'transform 0.3s ease',
-            '&:hover': { transform: 'translateY(-2px)' },
+            justifyContent: 'center',
+            width: '100%',
+            maxWidth: '700px',
+            mx: 'auto',
+            px: { xs: 2, md: 0 },
+            position: 'relative',
+            my: 1,
+            zIndex: 2
           }}
         >
           <Box 
             sx={{ 
-              bgcolor: 'white', 
-              color: 'primary.main', 
-              p: 1, 
-              borderRadius: '50%',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 0 4px rgba(255,255,255,0.2)'
+              justifyContent: 'center'
             }}
           >
-            <svg 
-              width="24" 
-              height="24" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
+            <img 
+              src="/logo/friendlybudgetslogo.svg" 
+              alt="Friendly Budgets Logo" 
+              style={{
+                width: 500,
+                height: 200,
+                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                borderRadius: '12px',
+                objectFit: 'cover',
+                objectPosition: '0% 42.5%'
+              }}
+            />
           </Box>
-          <Typography 
-            variant="h4" 
-            component="h1" 
-            sx={{ 
-              fontWeight: 800,
-              textShadow: '0px 2px 4px rgba(0,0,0,0.2)',
-              letterSpacing: '0.02em',
-              fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-            }}
-          >
-            Friendly Budgets
-          </Typography>
         </Box>
         <Typography 
           variant="subtitle1" 
           sx={{ 
             mt: 1, 
-            opacity: 0.9, 
-            fontWeight: 400,
+            mb: 2,
+            opacity: 1, 
+            fontWeight: 500,
             textAlign: 'center',
             maxWidth: '600px',
             fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+            fontSize: '1.1rem',
+            letterSpacing: '0.01em',
+            color: '#424242',
+            zIndex: 2
           }}
         >
           Simplify your finances, track your spending, and achieve your money goals
         </Typography>
+      </Box>
 
-        {/* Add Navigation Tabs */}
-        <Box sx={{ mt: 3, width: '100%', maxWidth: 600 }}>
-          <Tabs 
-            value={activeStep} 
-            onChange={(e, newValue) => setActiveStep(newValue)}
-            variant="fullWidth"
-            sx={{
-              '& .MuiTab-root': {
-                color: 'rgba(255, 255, 255, 0.7)',
-                '&.Mui-selected': {
-                  color: 'white',
-                },
-                whiteSpace: 'nowrap',
-                minWidth: 160
+      {/* Tabs moved outside the header box */}
+      <Box sx={{ 
+        width: '100%', 
+        maxWidth: 500, 
+        mx: 'auto',
+        mt: 2,
+        mb: 3
+      }}>
+        <Tabs 
+          value={activeStep} 
+          onChange={(e, newValue) => setActiveStep(newValue)}
+          variant="fullWidth"
+          sx={{
+            '& .MuiTab-root': {
+              color: 'text.secondary',
+              transition: 'all 0.2s ease',
+              '&.Mui-selected': {
+                color: 'success.main',
+                fontWeight: 700,
               },
-              '& .MuiTabs-indicator': {
-                backgroundColor: 'white',
+              '&:not(.Mui-selected):hover': {
+                color: 'primary.main',
+                backgroundColor: (theme) => 
+                  theme.palette.mode === 'dark' 
+                    ? 'rgba(25, 118, 210, 0.08)' 
+                    : 'rgba(25, 118, 210, 0.04)',
               },
-            }}
-          >
-            <Tab 
-              label="Budgets" 
-              sx={{ 
-                fontWeight: 600,
-                textTransform: 'none',
-                fontSize: '1rem',
-              }} 
-            />
-            <Tab 
-              label="Insights and Planning" 
-              sx={{ 
-                fontWeight: 600,
-                textTransform: 'none',
-                fontSize: '1rem',
-              }} 
-            />
-          </Tabs>
-        </Box>
+              whiteSpace: 'nowrap',
+              minWidth: 160,
+              minHeight: '48px',
+              py: 1,
+              borderRadius: 1
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: 'success.main',
+              height: '3px',
+              borderRadius: '3px 3px 0 0',
+              transition: 'all 0.2s ease'
+            },
+          }}
+        >
+          <Tab 
+            label="Budgets" 
+            sx={{ 
+              fontWeight: 600,
+              textTransform: 'none',
+              fontSize: '0.95rem',
+            }} 
+          />
+          <Tab 
+            label="Insights and Planning" 
+            sx={{ 
+              fontWeight: 600,
+              textTransform: 'none',
+              fontSize: '0.95rem',
+            }} 
+          />
+        </Tabs>
       </Box>
       
       {/* Auth Modal */}
