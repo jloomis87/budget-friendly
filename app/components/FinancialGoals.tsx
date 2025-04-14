@@ -17,7 +17,8 @@ import {
   Chip,
   Stack,
   Tooltip,
-  Alert
+  Alert,
+  Badge
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -25,7 +26,8 @@ import {
   Delete as DeleteIcon, 
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  TrendingUp as TrendingUpIcon
+  TrendingUp as TrendingUpIcon,
+  UpdateOutlined as UpdateIcon
 } from '@mui/icons-material';
 import type { Transaction } from '../services/fileParser';
 import type { FinancialGoal } from '../services/goalService';
@@ -75,8 +77,106 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
     includeInterest: false,
     loanTerm: 36 // Default to 36 months (3 years)
   });
+  const [updatedDebts, setUpdatedDebts] = useState<{[goalId: string]: number}>({});
   
   const { user } = useAuth();
+  
+  // Function to calculate updated debt balance with compound interest
+  const calculateUpdatedDebtBalance = (goal: FinancialGoal): number => {
+    if (goal.category !== 'Debt' || !goal.interestRate || goal.interestRate <= 0) {
+      return goal.currentAmount; // No interest to calculate
+    }
+    
+    const lastUpdated = goal.lastUpdated ? new Date(goal.lastUpdated) : new Date(goal.createdAt);
+    const now = new Date();
+    
+    // Check if it's been less than a day since last update
+    const timeDiff = now.getTime() - lastUpdated.getTime();
+    if (timeDiff < 24 * 60 * 60 * 1000) {
+      return goal.currentAmount; // Less than a day, no need to recalculate
+    }
+    
+    // Calculate months elapsed (considering partial months)
+    const daysElapsed = timeDiff / (24 * 60 * 60 * 1000);
+    const monthsElapsed = daysElapsed / 30; // Approximate months
+    
+    // Calculate monthly interest rate
+    const monthlyInterestRate = goal.interestRate / 100 / 12;
+    
+    // Assume no payments were made, so interest compounds on the full balance
+    // P * (1 + r)^n where P is principal, r is monthly rate, n is number of months
+    const updatedBalance = goal.currentAmount * Math.pow(1 + monthlyInterestRate, monthsElapsed);
+    
+    // Round to 2 decimal places
+    return Math.round(updatedBalance * 100) / 100;
+  };
+  
+  // Automatically update debt balances when goals load or on a regular interval
+  useEffect(() => {
+    const updateDebtBalances = async () => {
+      if (!user?.id || !goals.length) return;
+      
+      let hasUpdates = false;
+      const updatedGoals = [...goals];
+      const newlyUpdatedDebts: {[goalId: string]: number} = {};
+      
+      // Check each debt goal to see if it needs an interest update
+      for (let i = 0; i < updatedGoals.length; i++) {
+        const goal = updatedGoals[i];
+        if (goal.category === 'Debt' && goal.interestRate && goal.interestRate > 0) {
+          const newBalance = calculateUpdatedDebtBalance(goal);
+          
+          // Update if the balance has changed
+          if (newBalance !== goal.currentAmount) {
+            console.log(`[FinancialGoals] Updating debt balance for ${goal.name} from ${goal.currentAmount} to ${newBalance}`);
+            
+            // Calculate the amount of interest added
+            const interestAdded = newBalance - goal.currentAmount;
+            newlyUpdatedDebts[goal.id] = interestAdded;
+            
+            // Update the goal in state
+            updatedGoals[i] = {
+              ...goal,
+              currentAmount: newBalance,
+              lastUpdated: new Date().toISOString()
+            };
+            hasUpdates = true;
+            
+            // Update the goal in Firestore
+            try {
+              await updateGoal(user.id, goal.id, {
+                currentAmount: newBalance,
+                lastUpdated: new Date().toISOString()
+              });
+            } catch (error) {
+              console.error('Error updating debt balance:', error);
+            }
+          }
+        }
+      }
+      
+      // Update state only if changes were made
+      if (hasUpdates) {
+        setGoals(updatedGoals);
+        setUpdatedDebts(newlyUpdatedDebts);
+        
+        // After 30 seconds, clear the updated debts notifications
+        setTimeout(() => {
+          setUpdatedDebts({});
+        }, 30000);
+      }
+    };
+    
+    // Run the update when goals first load
+    updateDebtBalances();
+    
+    // Set up a daily interval to check for updates 
+    // Only updates will happen when needed (based on time elapsed)
+    const intervalId = setInterval(updateDebtBalances, 24 * 60 * 60 * 1000);
+    
+    // Clean up interval on unmount
+    return () => clearInterval(intervalId);
+  }, [goals, user?.id]);
   
   // Load goals from Firebase when component mounts
   useEffect(() => {
@@ -323,6 +423,12 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
   const handleUpdateProgress = (goal: FinancialGoal, newAmount: number) => {
     if (!user?.id) return;
     
+    // Validate the amount
+    if (goal.category === 'Debt' && (newAmount < 0 || newAmount > goal.targetAmount)) {
+      alert(`Please enter a valid remaining balance between $0 and $${goal.targetAmount.toFixed(2)}.`);
+      return;
+    }
+    
     const updatedGoal = {
       ...goal,
       currentAmount: newAmount,
@@ -336,6 +442,39 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
       .catch(error => {
         console.error('Error updating goal progress:', error);
       });
+  };
+
+  // Function to show debt repayment update dialog
+  const handleDebtPaymentUpdate = (goal: FinancialGoal) => {
+    // Get the current balance
+    const currentBalance = goal.currentAmount;
+    
+    // Calculate suggested payment amount (use the monthly payment or a reasonable default)
+    const suggestedPayment = calculateExactPayment(goal) || (currentBalance * 0.05);
+    
+    // Round the suggested payment to 2
+    const roundedSuggestion = Math.round(suggestedPayment * 100) / 100;
+    
+    // Prompt the user for the payment amount with the suggestion
+    const paymentInput = prompt(
+      `Enter payment amount for ${goal.name}:\n\nCurrent balance: ${formatCurrency(currentBalance)}\nSuggested payment: ${formatCurrency(roundedSuggestion)}`, 
+      roundedSuggestion.toString()
+    );
+    
+    if (paymentInput === null) return; // User canceled
+    
+    const paymentAmount = parseFloat(paymentInput);
+    
+    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+      alert('Please enter a valid payment amount greater than zero.');
+      return;
+    }
+    
+    // Calculate the new balance after payment
+    const newBalance = Math.max(0, currentBalance - paymentAmount);
+    
+    // Update the goal with the new balance
+    handleUpdateProgress(goal, newBalance);
   };
 
   // Get remaining time until deadline
@@ -420,6 +559,7 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
   
   return (
     <Box>
+      <style>{keyframeStyle}</style>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h5" fontWeight="bold">
           Financial Goals
@@ -445,6 +585,10 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
                 <Typography variant="h4">
                   {goals.length}
                 </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {goals.filter(g => g.category === 'Debt').length} debt,{' '}
+                  {goals.filter(g => g.category !== 'Debt').length} savings/other
+                </Typography>
               </Grid>
               <Grid item xs={12} sm={4}>
                 <Typography variant="subtitle2" color="text.secondary">
@@ -459,11 +603,32 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
               </Grid>
               <Grid item xs={12} sm={4}>
                 <Typography variant="subtitle2" color="text.secondary">
-                  Total Saved
+                  {goals.some(g => g.category === 'Debt') ? 'Financial Summary' : 'Total Saved'}
                 </Typography>
-                <Typography variant="h4">
-                  {formatCurrency(goals.reduce((sum, goal) => sum + goal.currentAmount, 0))}
-                </Typography>
+                {goals.some(g => g.category === 'Debt') ? (
+                  <>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                      <Typography component="span" variant="h6" color="success.main">
+                        {formatCurrency(goals.filter(g => g.category !== 'Debt').reduce((sum, goal) => sum + goal.currentAmount, 0))}
+                      </Typography>
+                      <Typography component="span" variant="caption" fontWeight="light">
+                        saved
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                      <Typography component="span" variant="h6" color="error.main">
+                        {formatCurrency(goals.filter(g => g.category === 'Debt').reduce((sum, goal) => sum + goal.currentAmount, 0))}
+                      </Typography>
+                      <Typography component="span" variant="caption" fontWeight="light">
+                        debt remaining
+                      </Typography>
+                    </Box>
+                  </>
+                ) : (
+                  <Typography variant="h4">
+                    {formatCurrency(goals.reduce((sum, goal) => sum + goal.currentAmount, 0))}
+                  </Typography>
+                )}
                 <Typography variant="caption" color="text.secondary">
                   across all goals
                 </Typography>
@@ -485,11 +650,20 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
             const pastDeadline = new Date(goal.deadline) < new Date();
             const monthsRemaining = goal.category === 'Debt' ? calculateMonthsRemaining(goal) : null;
             const monthlyPayment = goal.category === 'Debt' ? calculateExactPayment(goal) : null;
+            const interestApplied = goal.category === 'Debt' && updatedDebts[goal.id];
             
             return (
               <Grid item xs={12} sm={6} md={4} key={goal.id}>
-                <Card sx={{ height: '100%', position: 'relative' }}>
-                  {/* Status indicator */}
+                <Card sx={{ 
+                  height: '100%', 
+                  position: 'relative',
+                  ...(goal.category === 'Debt' && {
+                    background: `linear-gradient(to bottom, rgba(211, 47, 47, 0.05) 0%, rgba(211, 47, 47, 0) 100%)`,
+                    borderLeft: '4px solid',
+                    borderLeftColor: 'error.main',
+                  })
+                }}>
+                  {/* Status indicators */}
                   <Box 
                     sx={{ 
                       position: 'absolute', 
@@ -500,7 +674,13 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
                       gap: 1
                     }}
                   >
-                    {progress >= 100 ? (
+                    {interestApplied ? (
+                      <Tooltip title={`Interest of ${formatCurrency(updatedDebts[goal.id])} was just applied to this debt`}>
+                        <Badge color="error" variant="dot" sx={{ '& .MuiBadge-badge': { animation: 'pulse 1.5s infinite' } }}>
+                          <UpdateIcon color="warning" />
+                        </Badge>
+                      </Tooltip>
+                    ) : progress >= 100 ? (
                       <Tooltip title="Goal achieved">
                         <CheckCircleIcon color="success" />
                       </Tooltip>
@@ -520,6 +700,21 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
                   </Box>
                   
                   <CardContent>
+                    {/* Interest information alert */}
+                    {interestApplied && (
+                      <Alert 
+                        severity="info" 
+                        sx={{ 
+                          mb: 2, 
+                          fontSize: '0.75rem', 
+                          '& .MuiAlert-message': { padding: '0px 8px' },
+                          animation: 'fadeIn 0.5s'
+                        }}
+                      >
+                        Interest of {formatCurrency(updatedDebts[goal.id])} applied
+                      </Alert>
+                    )}
+                    
                     <Box sx={{ mb: 3 }}>
                       <Box sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
                         <Chip 
@@ -562,29 +757,89 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
                         variant="determinate" 
                         value={Math.min(progress, 100)} 
                         color={progress >= 100 ? 'success' : pastDeadline ? 'error' : onTrack ? 'success' : 'warning'}
-                        sx={{ height: 8, borderRadius: 4, mb: 1 }}
+                        sx={{ 
+                          height: 8, 
+                          borderRadius: 4, 
+                          mb: 1,
+                          ...(goal.category === 'Debt' && {
+                            height: 10,
+                            '& .MuiLinearProgress-bar': {
+                              transition: 'transform 1s ease-in-out'
+                            }
+                          })
+                        }}
                       />
                       
                       {goal.category === 'Debt' && monthsRemaining !== null && (
-                        <>
-                          <Typography variant="caption" display="block" textAlign="right" color="text.secondary">
-                            {monthsRemaining} month{monthsRemaining !== 1 ? 's' : ''} until payoff
-                          </Typography>
-                          {monthlyPayment !== null && (
-                            <Typography variant="caption" display="block" textAlign="right" color="text.secondary">
-                              Monthly payment: {formatCurrency(monthlyPayment)}
+                        <Box sx={{ 
+                          mt: 2, 
+                          p: 1.5, 
+                          borderRadius: 2, 
+                          bgcolor: 'background.paper',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          fontSize: '0.75rem',
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: 1.5
+                        }}>
+                          {/* Left column */}
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                              Remaining:
                             </Typography>
-                          )}
-                          <Typography variant="caption" display="block" textAlign="right" color="text.secondary">
-                            {formatCurrency(goal.targetAmount - goal.currentAmount)} paid off so far
-                          </Typography>
-                          {goal.interestRate && goal.interestRate > 0 && (
-                            <Typography variant="caption" display="block" textAlign="right" color="text.secondary">
-                              {goal.interestRate}% interest
-                              {goal.loanTerm ? `, ${goal.loanTerm} month term` : ', monthly compounding'}
+                            <Typography variant="body2" fontWeight="600" fontSize="0.95rem">
+                              {formatCurrency(goal.currentAmount)}
                             </Typography>
-                          )}
-                        </>
+                            
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5, mb: 0.5 }}>
+                              Paid so far:
+                            </Typography>
+                            <Typography variant="body2" color="success.main" fontWeight="600" fontSize="0.95rem">
+                              {formatCurrency(goal.targetAmount - goal.currentAmount)}
+                            </Typography>
+                          </Box>
+                          
+                          {/* Right column */}
+                          <Box>
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                              Monthly payment:
+                            </Typography>
+                            <Typography variant="body2" fontWeight="600" fontSize="0.95rem">
+                              {monthlyPayment !== null ? formatCurrency(monthlyPayment) : '-'}
+                            </Typography>
+                            
+                            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5, mb: 0.5 }}>
+                              Time to payoff:
+                            </Typography>
+                            <Typography variant="body2" fontWeight="600" fontSize="0.95rem">
+                              {monthsRemaining} month{monthsRemaining !== 1 ? 's' : ''}
+                            </Typography>
+                          </Box>
+                          
+                          {/* Bottom row with interest rate and term */}
+                          <Box sx={{ 
+                            gridColumn: '1 / -1', 
+                            mt: 0.5, 
+                            pt: 1,
+                            borderTop: '1px dashed',
+                            borderColor: 'divider',
+                            display: 'flex', 
+                            justifyContent: 'space-between' 
+                          }}>
+                            {goal.interestRate && goal.interestRate > 0 && (
+                              <Typography variant="caption" color="text.secondary">
+                                {goal.interestRate}% interest rate
+                              </Typography>
+                            )}
+                            {goal.loanTerm && (
+                              <Typography variant="caption" color="text.secondary">
+                                {Math.floor(goal.loanTerm / 12)} year{Math.floor(goal.loanTerm / 12) !== 1 ? 's' : ''} term
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
                       )}
                       
                       {!pastDeadline && progress < 100 && goal.category !== 'Debt' && (
@@ -597,21 +852,26 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                       <Button 
                         size="small" 
-                        variant="outlined"
+                        variant={goal.category === 'Debt' ? "contained" : "outlined"}
+                        color={goal.category === 'Debt' ? "error" : "primary"}
                         onClick={() => {
-                          const newAmount = prompt(
-                            `Update ${goal.category === 'Debt' ? 'remaining balance' : 'current amount'} for ${goal.name}:`, 
-                            goal.currentAmount.toString()
-                          );
-                          if (newAmount !== null) {
-                            const amount = parseFloat(newAmount);
-                            if (!isNaN(amount)) {
-                              handleUpdateProgress(goal, amount);
+                          if (goal.category === 'Debt') {
+                            handleDebtPaymentUpdate(goal);
+                          } else {
+                            const newAmount = prompt(
+                              `Update current amount for ${goal.name}:`, 
+                              goal.currentAmount.toString()
+                            );
+                            if (newAmount !== null) {
+                              const amount = parseFloat(newAmount);
+                              if (!isNaN(amount)) {
+                                handleUpdateProgress(goal, amount);
+                              }
                             }
                           }
                         }}
                       >
-                        Update Progress
+                        {goal.category === 'Debt' ? 'Make Payment' : 'Update Progress'}
                       </Button>
                       <IconButton size="small" onClick={() => handleOpenGoalDialog(goal)}>
                         <EditIcon fontSize="small" />
@@ -665,6 +925,7 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
               value={goalData.name}
               onChange={(e) => setGoalData({ ...goalData, name: e.target.value })}
               placeholder={goalData.category === 'Debt' ? "e.g. Car Loan, Credit Card, Student Loan" : "e.g. Emergency Fund, Vacation, New Car"}
+              autoFocus
             />
             
             <TextField
@@ -682,7 +943,9 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
                   // Automatically set compoundingFrequency to monthly for Debt category
                   compoundingFrequency: newCategory === 'Debt' ? 'monthly' : goalData.compoundingFrequency,
                   // Reset loan term to default if switching to/from debt
-                  loanTerm: newCategory === 'Debt' ? 36 : goalData.loanTerm
+                  loanTerm: newCategory === 'Debt' ? 36 : goalData.loanTerm,
+                  // Set default interest rate for debt
+                  interestRate: newCategory === 'Debt' ? 5.0 : goalData.interestRate
                 });
               }}
             >
@@ -694,15 +957,18 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
             
             {goalData.category === 'Debt' && (
               <Box sx={{ 
-                bgcolor: 'primary.light', 
-                color: 'primary.contrastText', 
+                bgcolor: 'error.light', 
+                color: 'error.contrastText', 
                 borderRadius: 1, 
                 p: 1.5, 
                 fontSize: '0.875rem' 
               }}>
-                For debt repayment goals, enter the total loan value (initial amount borrowed), 
-                the current remaining balance, the interest rate, and select a loan term. 
-                This will determine your monthly payment.
+                <Typography variant="subtitle2" gutterBottom>Debt Repayment Goal</Typography>
+                <Typography variant="body2">
+                  Enter the total loan value (initial amount borrowed), 
+                  the current remaining balance, the interest rate, and select a loan term. 
+                  This will determine your monthly payment.
+                </Typography>
               </Box>
             )}
             
@@ -851,4 +1117,35 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
       </Dialog>
     </Box>
   );
-} 
+}
+
+// Add keyframe animation CSS at the end of component before closing bracket
+const keyframeStyle = `
+  @keyframes pulse {
+    0% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7);
+    }
+    
+    70% {
+      transform: scale(1);
+      box-shadow: 0 0 0 6px rgba(211, 47, 47, 0);
+    }
+    
+    100% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(211, 47, 47, 0);
+    }
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+`; 

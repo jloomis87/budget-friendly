@@ -27,7 +27,6 @@ import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
 import type { BudgetSummary as BudgetSummaryType, BudgetPlan } from '../services/budgetCalculator';
 import type { BudgetPreferences } from './BudgetActions';
 import { FinancialGoals } from './FinancialGoals';
-import { CategoryDeepDive } from './CategoryDeepDive';
 import type { Transaction } from '../services/fileParser';
 import type { FinancialGoal } from '../services/goalService';
 import { Line } from 'react-chartjs-2';
@@ -313,7 +312,6 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
         >
           <Tab label="Overview" />
           <Tab label="Goals" />
-          <Tab label="Deep Dive" />
         </Tabs>
       </Box>
 
@@ -483,14 +481,6 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
           transactions={monthlyTransactions}
           selectedMonths={selectedMonths}
           totalIncome={categoryTotals.income}
-        />
-      )}
-
-      {/* Deep Dive Tab */}
-      {activeTab === 2 && (
-        <CategoryDeepDive
-          transactions={monthlyTransactions}
-          selectedMonths={selectedMonths}
         />
       )}
     </Box>
