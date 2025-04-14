@@ -100,9 +100,6 @@ export const TransactionTableContent: React.FC = () => {
     dragLeaveTimeout
   } = dragState;
   
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  
   // Load sort preference from Firebase
   useEffect(() => {
     const loadSortPreference = async () => {
@@ -556,7 +553,7 @@ export const TransactionTableContent: React.FC = () => {
   const hasCustomDarkColor = hasCustomColor && isColorDark(getCategoryBackgroundColor() || '');
 
   return (
-    <Box sx={{ position: 'relative', mb: 4 }}>
+    <Box sx={{ position: 'relative', mb: 2, padding:0}}>
       {/* Drag mode indicator */}
       <DragIndicator 
         isDragging={isDragging} 

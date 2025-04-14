@@ -1386,6 +1386,7 @@ const BudgetAppContent: React.FC = () => {
       <Box sx={{ 
         mt: 4,
         mb: 6,
+        px: { xs: 1, sm: 2, md: 3 },
         position: 'relative',
         '&::before': {
           content: '""',
@@ -2057,146 +2058,150 @@ const BudgetAppContent: React.FC = () => {
       )}
       
       {/* Main Content */}
-      <Box sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
+      <Box sx={{ px: 0 }}>
         {/* Budget Selector - Always shown */}
-        <BudgetSelector 
-          setCurrentBudgetId={setCurrentBudgetId} 
-          setAlertMessage={setAlertMessage}
-        />
+        <Box sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
+          <BudgetSelector 
+            setCurrentBudgetId={setCurrentBudgetId} 
+            setAlertMessage={setAlertMessage}
+          />
 
-        {activeStep === 0 ? (
-          <>
-            {/* Month Selector - Only shown on Transactions page */}
-            <Box sx={{ mb: '10px' }}>
-              <MonthSelector 
-                selectedMonths={selectedMonths}
-                onChange={setSelectedMonths}
-              />
-            </Box>
+          {activeStep === 0 && (
+            <>
+              {/* Month Selector - Only shown on Transactions page */}
+              <Box sx={{ mb: '10px' }}>
+                <MonthSelector 
+                  selectedMonths={selectedMonths}
+                  onChange={setSelectedMonths}
+                />
+              </Box>
 
-            {/* Getting Started - Only show for first-time users */}
-            {!hasSeenGettingStarted && transactions.length === 0 && (
-              <Paper sx={{ p: 3, borderRadius: 2, mb: 3, backgroundColor: 'background.paper' }}>
-                <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
-                  Getting Started
-                </Typography>
-                <Typography variant="body1" paragraph>
-                  Welcome to BudgetFriendly! Let's set up your finances to create your personalized budget plan.
-                </Typography>
-                
-                <Box sx={{ 
-                  p: 2, 
-                  borderRadius: 1, 
-                  bgcolor: 'primary.light', 
-                  color: 'primary.contrastText',
-                  mb: 3
-                }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 500, mb: 1 }}>
-                    Step 1: Add your income sources
+              {/* Getting Started - Only show for first-time users */}
+              {!hasSeenGettingStarted && transactions.length === 0 && (
+                <Paper sx={{ p: 3, borderRadius: 2, mb: 3, backgroundColor: 'background.paper' }}>
+                  <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
+                    Getting Started
+                  </Typography>
+                  <Typography variant="body1" paragraph>
+                    Welcome to BudgetFriendly! Let's set up your finances to create your personalized budget plan.
+                  </Typography>
+                  
+                  <Box sx={{ 
+                    p: 2, 
+                    borderRadius: 1, 
+                    bgcolor: 'primary.light', 
+                    color: 'primary.contrastText',
+                    mb: 3
+                  }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 500, mb: 1 }}>
+                      Step 1: Add your income sources
+                    </Typography>
+                    <Typography variant="body2">
+                      Start by adding your income sources like salary, freelance work, or other earnings.
+                      This will help calculate your available funds for budgeting.
+                    </Typography>
+                  </Box>
+                  
+                  {/* Include a simplified Income form */}
+                  <Box sx={{ mb: 3 }}>
+                    <TransactionTable 
+                      category="Income"
+                      transactions={transactions.filter(t => t.category === 'Income')}
+                      allTransactions={transactions}
+                      onUpdateTransaction={updateTransaction}
+                      onDeleteTransaction={deleteTransaction}
+                      onAddTransaction={addTransaction}
+                      month={currentMonth}
+                      isDark={isColorDark(tableColors['Income'])}
+                      selectedMonths={selectedMonths}
+                      onTransactionsChange={(newTransactions) => {
+                        // Handle transaction changes
+                        newTransactions.forEach((transaction, index) => {
+                          const existingTransaction = transactions.find(t => t.id === transaction.id);
+                          if (existingTransaction) {
+                            const globalIndex = transactions.findIndex(t => t.id === transaction.id);
+                            if (globalIndex !== -1) {
+                              updateTransaction(globalIndex, transaction);
+                            }
+                          }
+                        });
+                      }}
+                    />
+                  </Box>
+                  
+                  <Typography variant="subtitle1" sx={{ fontWeight: 500, mt: 3 }}>
+                    What's Next?
                   </Typography>
                   <Typography variant="body2">
-                    Start by adding your income sources like salary, freelance work, or other earnings.
-                    This will help calculate your available funds for budgeting.
+                    After adding your income, you'll be able to:
                   </Typography>
-                </Box>
-                
-                {/* Include a simplified Income form */}
-                <Box sx={{ mb: 3 }}>
-                  <TransactionTable 
-                    category="Income"
-                    transactions={transactions.filter(t => t.category === 'Income')}
-                    allTransactions={transactions}
-                    onUpdateTransaction={updateTransaction}
-                    onDeleteTransaction={deleteTransaction}
-                    onAddTransaction={addTransaction}
-                    month={currentMonth}
-                    isDark={isColorDark(tableColors['Income'])}
-                    selectedMonths={selectedMonths}
-                    onTransactionsChange={(newTransactions) => {
-                      // Handle transaction changes
-                      newTransactions.forEach((transaction, index) => {
-                        const existingTransaction = transactions.find(t => t.id === transaction.id);
-                        if (existingTransaction) {
-                          const globalIndex = transactions.findIndex(t => t.id === transaction.id);
-                          if (globalIndex !== -1) {
-                            updateTransaction(globalIndex, transaction);
-                          }
-                        }
-                      });
-                    }}
-                  />
-                </Box>
-                
-                <Typography variant="subtitle1" sx={{ fontWeight: 500, mt: 3 }}>
-                  What's Next?
-                </Typography>
-                <Typography variant="body2">
-                  After adding your income, you'll be able to:
-                </Typography>
-                <List dense>
-                  <ListItem>
-                    <ListItemIcon sx={{ minWidth: '30px' }}>
-                      <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
-                    </ListItemIcon>
-                    <ListItemText primary="Add your expenses in different categories" />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon sx={{ minWidth: '30px' }}>
-                      <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
-                    </ListItemIcon>
-                    <ListItemText primary="See a breakdown of your spending" />
-                  </ListItem>
-                  <ListItem>
-                    <ListItemIcon sx={{ minWidth: '30px' }}>
-                      <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
-                    </ListItemIcon>
-                    <ListItemText primary="Get personalized budget recommendations" />
-                  </ListItem>
-                </List>
-              </Paper>
-            )}
-            
-            {/* Display transactions */}
-            {transactionTables}
-          </>
-        ) : (
-          <>
-            {/* Budget Plan Page */}
-            {transactions.some(t => t.category === 'Income') ? (
-              budgetSummaryComponent
-            ) : (
-              <Paper 
-                sx={{ 
-                  p: 4, 
-                  mt: 4, 
-                  textAlign: 'center',
-                  borderRadius: 2,
-                  bgcolor: 'background.paper',
-                  border: '1px solid',
-                  borderColor: 'divider'
-                }}
-              >
-                <Typography variant="h6" gutterBottom sx={{ color: 'text.primary', fontWeight: 600 }}>
-                  No Income Recorded
-                </Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                  Please add income transactions in order to see the budget plan for this budget.
-                </Typography>
-                <Button
-                  variant="contained"
-                  onClick={() => setActiveStep(0)}
-                  sx={{
+                  <List dense>
+                    <ListItem>
+                      <ListItemIcon sx={{ minWidth: '30px' }}>
+                        <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
+                      </ListItemIcon>
+                      <ListItemText primary="Add your expenses in different categories" />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon sx={{ minWidth: '30px' }}>
+                        <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
+                      </ListItemIcon>
+                      <ListItemText primary="See a breakdown of your spending" />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon sx={{ minWidth: '30px' }}>
+                        <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
+                      </ListItemIcon>
+                      <ListItemText primary="Get personalized budget recommendations" />
+                    </ListItem>
+                  </List>
+                </Paper>
+              )}
+              
+              {/* Display transactions */}
+              {transactionTables}
+            </>
+          )}
+
+          {activeStep === 1 && (
+            <>
+              {/* Budget Plan Page */}
+              {transactions.some(t => t.category === 'Income') ? (
+                budgetSummaryComponent
+              ) : (
+                <Paper 
+                  sx={{ 
+                    p: 4, 
+                    mt: 4, 
+                    textAlign: 'center',
                     borderRadius: 2,
-                    textTransform: 'none',
-                    fontWeight: 600
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: 'divider'
                   }}
                 >
-                  Add Income
-                </Button>
-              </Paper>
-            )}
-          </>
-        )}
+                  <Typography variant="h6" gutterBottom sx={{ color: 'text.primary', fontWeight: 600 }}>
+                    No Income Recorded
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                    Please add income transactions in order to see the budget plan for this budget.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={() => setActiveStep(0)}
+                    sx={{
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      fontWeight: 600
+                    }}
+                  >
+                    Add Income
+                  </Button>
+                </Paper>
+              )}
+            </>
+          )}
+        </Box>
 
         {/* Color Picker Popover for Transaction Tables */}
         <Popover
