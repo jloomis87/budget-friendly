@@ -1360,6 +1360,11 @@ const BudgetAppContent: React.FC = () => {
               '0%': { backgroundPosition: '0px 0px' },
               '100%': { backgroundPosition: '1000px 1000px' }
             },
+            'input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus': {
+              '-webkit-box-shadow': '0 0 0 1000px white inset !important',
+              '-webkit-text-fill-color': '#000000 !important',
+              'transition': 'background-color 5000s ease-in-out 0s'
+            },
             'html, body': { 
             }
           }}
@@ -1427,25 +1432,18 @@ const BudgetAppContent: React.FC = () => {
             position: 'relative',
             overflow: 'hidden',
             '& .MuiTextField-root': {
-              '& .MuiInputBase-root': {
+              '& .MuiOutlinedInput-root': {
                 backgroundColor: 'white',
                 '& input': {
+                  backgroundColor: 'white',
+                  '&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus': {
+                    '-webkit-box-shadow': '0 0 0 30px white inset !important',
+                    '-webkit-text-fill-color': 'inherit !important',
+                    'transition': 'background-color 5000s ease-in-out 0s'
+                  }
+                },
+                '&:hover, &.Mui-focused': {
                   backgroundColor: 'white'
-                },
-                '& fieldset': {
-                  backgroundColor: 'transparent'
-                },
-                '&:hover': {
-                  backgroundColor: 'white',
-                  '& fieldset': {
-                    backgroundColor: 'transparent'
-                  }
-                },
-                '&.Mui-focused': {
-                  backgroundColor: 'white',
-                  '& fieldset': {
-                    backgroundColor: 'transparent'
-                  }
                 }
               }
             }
@@ -1513,7 +1511,7 @@ const BudgetAppContent: React.FC = () => {
                 <TextField
                   label="Email Address"
                   fullWidth
-                  variant="filled"
+                  variant="standard"
                   autoComplete="email"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
@@ -1521,11 +1519,34 @@ const BudgetAppContent: React.FC = () => {
                   helperText={formErrors.loginEmail}
                   disabled={authLoading}
                   required
+                  sx={{
+                    '& .MuiInputBase-input': {
+                      color: '#1a1a1a',
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#666666',
+                      '&.Mui-focused': {
+                        color: '#22c55e'
+                      }
+                    },
+                    '& .MuiInput-underline:before': {
+                      borderBottom: 'none',
+                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:hover:before': {
+                      borderBottom: '2px solid #bbf7d0',
+                      transform: 'scaleX(1)',
+                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:after': {
+                      borderBottomColor: '#22c55e'
+                    }
+                  }}
                 />
                 <TextField
                   label="Password"
                   fullWidth
-                  variant="filled"
+                  variant="standard"
                   type="password"
                   autoComplete="current-password"
                   value={loginPassword}
@@ -1535,11 +1556,26 @@ const BudgetAppContent: React.FC = () => {
                   disabled={authLoading}
                   required
                   sx={{
-                    '& .MuiInputBase-root': {
-                      backgroundColor: 'blue',
-                      '& input': {
-                        backgroundColor: 'blue'
+                    '& .MuiInputBase-input': {
+                      color: '#1a1a1a',
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#666666',
+                      '&.Mui-focused': {
+                        color: '#22c55e'
                       }
+                    },
+                    '& .MuiInput-underline:before': {
+                      borderBottom: 'none',
+                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:hover:before': {
+                      borderBottom: '2px solid #bbf7d0',
+                      transform: 'scaleX(1)',
+                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:after': {
+                      borderBottomColor: '#22c55e'
                     }
                   }}
                 />
@@ -1611,7 +1647,7 @@ const BudgetAppContent: React.FC = () => {
                 <TextField
                   label="Full Name"
                   fullWidth
-                  variant="outlined"
+                  variant="standard"
                   autoComplete="name"
                   value={signupName}
                   onChange={(e) => setSignupName(e.target.value)}
@@ -1619,11 +1655,34 @@ const BudgetAppContent: React.FC = () => {
                   helperText={formErrors.signupName}
                   disabled={authLoading}
                   required
+                  sx={{
+                    '& .MuiInputBase-input': {
+                      color: '#1a1a1a',
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#666666',
+                      '&.Mui-focused': {
+                        color: '#22c55e'
+                      }
+                    },
+                    '& .MuiInput-underline:before': {
+                      borderBottom: 'none',
+                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:hover:before': {
+                      borderBottom: '2px solid #bbf7d0',
+                      transform: 'scaleX(1)',
+                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:after': {
+                      borderBottomColor: '#22c55e'
+                    }
+                  }}
                 />
                 <TextField
                   label="Email Address"
                   fullWidth
-                  variant="outlined"
+                  variant="standard"
                   autoComplete="email"
                   value={signupEmail}
                   onChange={(e) => setSignupEmail(e.target.value)}
@@ -1631,11 +1690,34 @@ const BudgetAppContent: React.FC = () => {
                   helperText={formErrors.signupEmail}
                   disabled={authLoading}
                   required
+                  sx={{
+                    '& .MuiInputBase-input': {
+                      color: '#1a1a1a',
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#666666',
+                      '&.Mui-focused': {
+                        color: '#22c55e'
+                      }
+                    },
+                    '& .MuiInput-underline:before': {
+                      borderBottom: 'none',
+                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:hover:before': {
+                      borderBottom: '2px solid #bbf7d0',
+                      transform: 'scaleX(1)',
+                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:after': {
+                      borderBottomColor: '#22c55e'
+                    }
+                  }}
                 />
                 <TextField
                   label="Password"
                   fullWidth
-                  variant="outlined"
+                  variant="standard"
                   type="password"
                   autoComplete="new-password"
                   value={signupPassword}
@@ -1644,11 +1726,34 @@ const BudgetAppContent: React.FC = () => {
                   helperText={formErrors.signupPassword}
                   disabled={authLoading}
                   required
+                  sx={{
+                    '& .MuiInputBase-input': {
+                      color: '#1a1a1a',
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#666666',
+                      '&.Mui-focused': {
+                        color: '#22c55e'
+                      }
+                    },
+                    '& .MuiInput-underline:before': {
+                      borderBottom: 'none',
+                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:hover:before': {
+                      borderBottom: '2px solid #bbf7d0',
+                      transform: 'scaleX(1)',
+                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:after': {
+                      borderBottomColor: '#22c55e'
+                    }
+                  }}
                 />
                 <TextField
                   label="Confirm Password"
                   fullWidth
-                  variant="outlined"
+                  variant="standard"
                   type="password"
                   autoComplete="new-password"
                   value={signupConfirmPassword}
@@ -1657,6 +1762,29 @@ const BudgetAppContent: React.FC = () => {
                   helperText={formErrors.signupConfirmPassword}
                   disabled={authLoading}
                   required
+                  sx={{
+                    '& .MuiInputBase-input': {
+                      color: '#1a1a1a',
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#666666',
+                      '&.Mui-focused': {
+                        color: '#22c55e'
+                      }
+                    },
+                    '& .MuiInput-underline:before': {
+                      borderBottom: 'none',
+                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:hover:before': {
+                      borderBottom: '2px solid #bbf7d0',
+                      transform: 'scaleX(1)',
+                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
+                    },
+                    '& .MuiInput-underline:after': {
+                      borderBottomColor: '#22c55e'
+                    }
+                  }}
                 />
                 <Button
                   type="submit"
