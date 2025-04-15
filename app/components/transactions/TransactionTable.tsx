@@ -141,6 +141,23 @@ export const TransactionTableContent: React.FC = () => {
 
   const backgroundStyles = getUpdatedBackgroundStyles();
   
+  // Get the current category data to pass to the header
+  const categoryData = categories.find(c => c.name === category);
+  
+  // Calculate total budget across all non-income categories
+  const calculateTotalBudget = () => {
+    // Filter out income transactions
+    const nonIncomeTransactions = props.allTransactions.filter(t => {
+      const transactionCategory = categories.find(c => c.name === t.category);
+      return transactionCategory && !transactionCategory.isIncome;
+    });
+    
+    // Sum the absolute amounts
+    return nonIncomeTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  };
+  
+  const totalBudget = calculateTotalBudget();
+  
   // Load sort preference from Firebase
   useEffect(() => {
     const loadSortPreference = async () => {
@@ -608,12 +625,14 @@ export const TransactionTableContent: React.FC = () => {
         <TransactionTableHeader 
           category={props.category}
           totalAmount={filteredTransactions.reduce((sum, t) => sum + t.amount, 0)}
+          totalBudget={totalBudget}
           isDark={isDark}
           hasCustomColor={hasCustomColor}
           hasCustomDarkColor={hasCustomDarkColor}
           tableColors={tableColors}
           sortOption={sortOption}
           onSortChange={handleSortChange}
+          categoryData={categoryData}
         />
         
         {/* Instructions for dragging - show even if no transactions */}

@@ -33,7 +33,7 @@ import {
   ToggleButton,
   CircularProgress
 } from '@mui/material';
-import { useTheme as useCustomTheme } from '../contexts/ThemeContext';
+import { useTheme as useAppTheme } from '../contexts/ThemeContext';
 import type { BudgetSummary as BudgetSummaryType, BudgetPlan } from '../services/budgetCalculator';
 import type { BudgetPreferences } from './BudgetActions';
 import { FinancialGoals } from './FinancialGoals';
@@ -118,7 +118,7 @@ interface BudgetSummaryProps {
 
 export function BudgetSummary({ summary, plan, suggestions, preferences, transactions, selectedMonths, showActualAmounts, showPercentages, showDifferences, showProgressBars }: BudgetSummaryProps) {
   const theme = useMuiTheme();
-  const { mode } = useCustomTheme();
+  const { mode } = useAppTheme();
   const { user } = useAuth();
   const [isBrowser, setIsBrowser] = useState(false);
   const [activeTab, setActiveTab] = useState(0);

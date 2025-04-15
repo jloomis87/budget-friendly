@@ -1,37 +1,90 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Container, Box, Typography, Stepper, Step, StepLabel, Paper, Button, CircularProgress, Alert, List, ListItem, ListItemText, ListItemIcon, Grid, TextField, FormControl, InputLabel, Select, MenuItem, Table, TableHead, TableBody, TableRow, TableCell, IconButton, Popover, Tooltip, Tabs, Tab, Chip, Menu, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
-// Import Global styles component from MUI
-import { GlobalStyles } from '@mui/material';
-// Import custom icon components to avoid the directory import issue
-import { EditOutlinedIcon, SaveIcon, CloseIcon, DragIndicatorIcon, PaletteIcon, DeleteIcon } from '../utils/materialIcons';
-import { HexColorPicker } from 'react-colorful';
-import { BudgetSummary } from './BudgetSummary';
-import type { Transaction } from '../services/fileParser';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { 
+  Box, 
+  Typography, 
+  Paper, 
+  Grid, 
+  Button, 
+  CircularProgress, 
+  Stepper, 
+  Step, 
+  StepLabel, 
+  Dialog, 
+  DialogTitle, 
+  DialogContent, 
+  DialogContentText,
+  DialogActions, 
+  TextField,
+  useTheme as useMuiTheme,
+  useMediaQuery,
+  IconButton,
+  GlobalStyles,
+  Tooltip,
+  Tabs,
+  Tab,
+  Alert,
+  Collapse,
+  Fade,
+  Link as MuiLink,
+  Menu,
+  MenuItem,
+  Popover,
+  InputAdornment,
+  FormHelperText,
+  Chip,
+  Avatar,
+  Checkbox,
+  ListItemText,
+  ListItemIcon,
+  FormControlLabel,
+  Badge,
+  Snackbar,
+  AppBar,
+  Toolbar
+} from '@mui/material';
 import {
-  calculateBudgetSummary,
-  create503020Plan,
-  getBudgetSuggestions,
-  type BudgetSummary as BudgetSummaryType,
-  type BudgetPlan
-} from '../services/budgetCalculator';
+  ArrowBack as ArrowBackIcon,
+  ArrowForward as ArrowForwardIcon,
+  DragIndicator as DragIndicatorIcon,
+  Menu as MenuIcon,
+  Close as CloseIcon,
+  Add as AddIcon,
+  Person as PersonIcon,
+  Help as HelpIcon,
+  Settings as SettingsIcon,
+  Logout as LogoutIcon,
+  ColorLens as ColorLensIcon,
+  HelpOutline as HelpOutlineIcon,
+  MoreVert as MoreVertIcon,
+  Edit as EditIcon,
+  EditOutlined as EditOutlinedIcon,
+  Delete as DeleteIcon,
+  Palette as PaletteIcon,
+  AddCircle as AddCircleIcon,
+  Login as LoginIcon,
+  AccountCircle as AccountCircleIcon,
+  Save as SaveIcon
+} from '@mui/icons-material';
 import { TransactionTable } from './transactions/TransactionTable';
-import { BudgetActions } from './BudgetActions';
-import { useTransactions } from '../hooks/useTransactions';
-import { AuthProvider, useAuth } from '../contexts/AuthContext';
-import UserMenu from './auth/UserMenu';
-import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
-import { ThemeProvider } from '../contexts/ThemeContext';
 import { MonthSelector } from './MonthSelector';
-import { saveUserPreferences, getUserPreferences } from '../firebase/firebaseConfig';
-import { doc, getDoc, updateDoc, collection, addDoc, getDocs, deleteDoc, setDoc, writeBatch } from 'firebase/firestore';
-import { db } from '../firebase/firebaseConfig';
+import { BudgetSummary } from './BudgetSummary';
+import { BudgetActions } from './BudgetActions';
 import type { BudgetPreferences } from './BudgetActions';
-import { useTheme } from '@mui/material/styles';
-import type { Theme } from '@mui/material/styles';
-import { SavingsProvider } from '../contexts/SavingsContext';
 import { SmartInsights } from './SmartInsights';
-import { CategoryProvider, useCategories } from '../contexts/CategoryContext';
+import { CategoryColorPicker } from './CategoryColorPicker';
 import { AddCategoryButton } from './AddCategoryButton';
+import type { Transaction } from '../services/fileParser';
+import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { SavingsProvider } from '../contexts/SavingsContext';
+import { CategoryProvider, useCategories } from '../contexts/CategoryContext';
+import { useTransactions } from '../hooks/useTransactions';
+import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
+import { HexColorPicker } from 'react-colorful';
+import { collection, doc, getDoc, getDocs, updateDoc, addDoc, query, orderBy, limit, writeBatch } from 'firebase/firestore';
+import { db } from '../firebase/firebaseConfig';
+import type { Theme } from '@mui/material/styles';
+import UserMenu from './auth/UserMenu';
 
 // Add this interface for alert messages
 interface AlertMessage {
@@ -710,7 +763,7 @@ const LEGACY_PREFERENCES_KEY = 'budgetFriendly_preferences';
 
 // Main App Component
 const BudgetAppContent: React.FC = () => {
-  const theme = useTheme();
+  const theme = useMuiTheme();
   const { categories } = useCategories(); // Add this line to fix the missing categories reference
   const [activeStep, setActiveStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -769,9 +822,6 @@ const BudgetAppContent: React.FC = () => {
   // Load user preferences from Firebase when component mounts or user changes
   const { user } = useAuth();
   
-  // Add state for tracking if user has seen getting started
-  const [hasSeenGettingStarted, setHasSeenGettingStarted] = useState(false);
-  
   // State to keep track of the current budget ID
   const [initialBudgetId, setInitialBudgetId] = useState<string | undefined>(undefined);
   
@@ -820,7 +870,6 @@ const BudgetAppContent: React.FC = () => {
         if (userDoc.exists()) {
           const preferences = userDoc.data()?.preferences || {};
           setSelectedMonths(preferences.selectedMonths || [currentMonth]);
-          setHasSeenGettingStarted(preferences.hasSeenGettingStarted || false);
         }
       }
     };
@@ -839,11 +888,9 @@ const BudgetAppContent: React.FC = () => {
           preferences: {
             ...existingPreferences,
             selectedMonths,
-            hasSeenGettingStarted: true, // Always set to true once they've seen it
             updatedAt: new Date().toISOString()
           }
         });
-        setHasSeenGettingStarted(true);
       }
     };
     savePreferences();
@@ -869,6 +916,17 @@ const BudgetAppContent: React.FC = () => {
     currentBudgetId,
     setCurrentBudgetId
   } = useTransactions(initialBudgetId);
+  
+  // Get the categories context to update the current budget ID
+  const { setCurrentBudgetId: setCategoriesBudgetId } = useCategories();
+  
+  // Sync the current budget ID between transactions and categories
+  useEffect(() => {
+    if (currentBudgetId) {
+      // Update the CategoryContext with the current budget ID
+      setCategoriesBudgetId(currentBudgetId);
+    }
+  }, [currentBudgetId, setCategoriesBudgetId]);
   
   // Color picker state - use useLocalStorage hook directly for this
   const [tableColors, setTableColors] = useState<{ [key: string]: string }>({
@@ -1342,9 +1400,9 @@ const BudgetAppContent: React.FC = () => {
               '100%': { backgroundPosition: '1000px 1000px' }
             },
             'input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus': {
-              '-webkit-box-shadow': '0 0 0 1000px white inset !important',
-              '-webkit-text-fill-color': '#000000 !important',
-              'transition': 'background-color 5000s ease-in-out 0s'
+              WebkitBoxShadow: '0 0 0 1000px white inset !important',
+              WebkitTextFillColor: '#000000 !important',
+              transition: 'background-color 5000s ease-in-out 0s'
             },
             'html, body': { 
             }
@@ -1418,8 +1476,8 @@ const BudgetAppContent: React.FC = () => {
                 '& input': {
                   backgroundColor: 'white',
                   '&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus': {
-                    '-webkit-box-shadow': '0 0 0 30px white inset !important',
-                    '-webkit-text-fill-color': 'inherit !important',
+                    WebkitBoxShadow: '0 0 0 30px white inset !important',
+                    WebkitTextFillColor: 'inherit !important',
                     'transition': 'background-color 5000s ease-in-out 0s'
                   }
                 },
@@ -2249,7 +2307,9 @@ export default function BudgetApp() {
           }}
         />
         <SavingsProvider>
-          <BudgetAppContent />
+          <CategoryProvider>
+            <BudgetAppContent />
+          </CategoryProvider>
         </SavingsProvider>
       </ThemeProvider>
     </AuthProvider>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -40,13 +40,61 @@ const CategoryManager: React.FC = () => {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState('#1976d2');
   const [newCategoryIcon, setNewCategoryIcon] = useState('📊');
+  const [newCategoryPercentage, setNewCategoryPercentage] = useState(0);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
+
+  // Validate category percentages
+  const validatePercentages = useCallback(() => {
+    // Skip validation if editing an income category
+    if (editingCategory?.isIncome) return true;
+
+    // Get all non-income categories
+    const nonIncomeCategories = categories.filter(cat => !cat.isIncome);
+    
+    // Calculate the total of all other categories except the one being edited
+    let totalPercentage = 0;
+    if (editingCategory) {
+      // If editing, exclude the current category from the calculation
+      nonIncomeCategories.forEach(cat => {
+        if (cat.id !== editingCategory.id && cat.percentage !== undefined) {
+          totalPercentage += cat.percentage;
+        }
+      });
+      // Add the new percentage being set
+      totalPercentage += newCategoryPercentage;
+    } else {
+      // If adding a new category, include all existing categories
+      nonIncomeCategories.forEach(cat => {
+        if (cat.percentage !== undefined) {
+          totalPercentage += cat.percentage;
+        }
+      });
+      // Add the new category percentage
+      totalPercentage += newCategoryPercentage;
+    }
+
+    // Check if the total exceeds 100%
+    if (totalPercentage > 100) {
+      setNotification({ 
+        message: 'Total category allocations cannot exceed 100%', 
+        type: 'error' 
+      });
+      return false;
+    }
+
+    return true;
+  }, [categories, editingCategory, newCategoryPercentage]);
 
   // Handle adding a new category
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
       setNotification({ message: 'Category name cannot be empty', type: 'error' });
+      return;
+    }
+
+    // Validate percentages if not an income category
+    if (!validatePercentages()) {
       return;
     }
 
@@ -56,6 +104,7 @@ const CategoryManager: React.FC = () => {
         color: newCategoryColor,
         icon: newCategoryIcon,
         isDefault: false,
+        percentage: newCategoryPercentage,
       });
       setNotification({ message: 'Category added successfully', type: 'success' });
       handleCloseDialog();
@@ -75,11 +124,17 @@ const CategoryManager: React.FC = () => {
       return;
     }
 
+    // Validate percentages if not an income category
+    if (!editingCategory.isIncome && !validatePercentages()) {
+      return;
+    }
+
     try {
       await updateCategory(editingCategory.id, {
         name: newCategoryName.trim(),
         color: newCategoryColor,
         icon: newCategoryIcon,
+        percentage: newCategoryPercentage,
       });
       setNotification({ message: 'Category updated successfully', type: 'success' });
       handleCloseDialog();
@@ -115,6 +170,7 @@ const CategoryManager: React.FC = () => {
     setNewCategoryName('');
     setNewCategoryColor('#1976d2');
     setNewCategoryIcon('📊');
+    setNewCategoryPercentage(0);
     setOpenDialog(true);
   };
 
@@ -124,6 +180,7 @@ const CategoryManager: React.FC = () => {
     setNewCategoryName(category.name);
     setNewCategoryColor(category.color);
     setNewCategoryIcon(category.icon);
+    setNewCategoryPercentage(category.percentage || 0);
     setOpenDialog(true);
   };
 
@@ -196,6 +253,11 @@ const CategoryManager: React.FC = () => {
                   <Typography variant="h6">
                     {category.name} {category.isDefault && <Typography component="span" variant="caption">(Default)</Typography>}
                   </Typography>
+                  {category.percentage !== undefined && !category.isIncome && (
+                    <Typography variant="body2" sx={{ ml: 2, color: 'text.secondary' }}>
+                      {category.percentage}% of budget
+                    </Typography>
+                  )}
                   <Box sx={{ ml: 'auto' }}>
                     <Tooltip title="Edit Category">
                       <IconButton onClick={() => handleOpenEditDialog(category)}>
@@ -308,7 +370,91 @@ const CategoryManager: React.FC = () => {
               value={newCategoryIcon}
               onChange={(e) => setNewCategoryIcon(e.target.value)}
               size="small"
+              sx={{ mb: 3 }}
             />
+            
+            {/* Only show percentage field for non-income categories */}
+            {(!editingCategory || !editingCategory.isIncome) && (
+              <>
+                <Typography variant="subtitle1" gutterBottom>
+                  Budget Allocation Percentage
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Box sx={{ width: '100%', mr: 2 }}>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={newCategoryPercentage}
+                      onChange={(e) => setNewCategoryPercentage(Number(e.target.value))}
+                      style={{ width: '100%' }}
+                    />
+                  </Box>
+                  <TextField
+                    value={newCategoryPercentage}
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      if (!isNaN(value) && value >= 0 && value <= 100) {
+                        setNewCategoryPercentage(value);
+                      }
+                    }}
+                    type="number"
+                    size="small"
+                    InputProps={{
+                      inputProps: { min: 0, max: 100 },
+                      endAdornment: <Typography variant="body2">%</Typography>
+                    }}
+                    sx={{ width: 100 }}
+                  />
+                </Box>
+                
+                {/* Total allocation indicator */}
+                {(() => {
+                  // Calculate total allocation
+                  let totalAllocation = 0;
+                  const nonIncomeCategories = categories.filter(cat => !cat.isIncome);
+                  
+                  if (editingCategory) {
+                    // If editing, exclude current category
+                    nonIncomeCategories.forEach(cat => {
+                      if (cat.id !== editingCategory.id && cat.percentage !== undefined) {
+                        totalAllocation += cat.percentage;
+                      }
+                    });
+                    totalAllocation += newCategoryPercentage;
+                  } else {
+                    // If adding new, include all existing
+                    nonIncomeCategories.forEach(cat => {
+                      if (cat.percentage !== undefined) {
+                        totalAllocation += cat.percentage;
+                      }
+                    });
+                    totalAllocation += newCategoryPercentage;
+                  }
+                  
+                  // Determine status color
+                  let statusColor = 'success.main';
+                  if (totalAllocation > 100) {
+                    statusColor = 'error.main';
+                  } else if (totalAllocation < 100) {
+                    statusColor = 'warning.main';
+                  }
+                  
+                  return (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Total allocation:
+                      </Typography>
+                      <Typography variant="body2" fontWeight="bold" color={statusColor}>
+                        {totalAllocation}% {totalAllocation === 100 ? '✓' : ''}
+                        {totalAllocation > 100 ? ' (Exceeds 100%)' : ''}
+                        {totalAllocation < 100 ? ` (${100 - totalAllocation}% unallocated)` : ''}
+                      </Typography>
+                    </Box>
+                  );
+                })()}
+              </>
+            )}
           </Box>
         </DialogContent>
         <DialogActions>

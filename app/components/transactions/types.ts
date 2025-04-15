@@ -223,6 +223,11 @@ export interface TransactionTableHeaderProps {
   tableColors: Record<string, string>;
   sortOption: SortOption;
   onSortChange: (option: SortOption) => void;
+  totalBudget?: number;
+  categoryData?: {
+    percentage?: number;
+    isIncome?: boolean;
+  };
 }
 
 export interface TransactionTableContextProps {

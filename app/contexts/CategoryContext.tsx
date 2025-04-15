@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { useAuth } from './AuthContext';
 
@@ -10,6 +10,8 @@ export interface Category {
   icon: string; // Emoji or icon identifier
   isDefault: boolean; // Whether this is a default category (can be renamed but not deleted)
   isIncome?: boolean; // Special flag for income category
+  percentage?: number; // Allocation percentage of budget/income
+  budgetId?: string; // The budget this category belongs to
 }
 
 interface CategoryContextType {
@@ -21,29 +23,34 @@ interface CategoryContextType {
   getCategoryByName: (name: string) => Category | undefined;
   isLoading: boolean;
   error: string | null;
+  setCurrentBudgetId: (budgetId: string) => void;
+  currentBudgetId: string | null;
 }
 
-const defaultCategories: Category[] = [
+const defaultCategories: Omit<Category, 'budgetId'>[] = [
   { 
     id: 'essentials', 
     name: 'Essentials', 
     color: '#2196f3', 
     icon: '🏠', 
-    isDefault: true 
+    isDefault: true,
+    percentage: 50
   },
   { 
     id: 'wants', 
     name: 'Wants', 
     color: '#ff9800', 
     icon: '🛍️', 
-    isDefault: true 
+    isDefault: true,
+    percentage: 30
   },
   { 
     id: 'savings', 
     name: 'Savings', 
     color: '#4caf50', 
     icon: '💰', 
-    isDefault: true 
+    isDefault: true,
+    percentage: 20
   },
   { 
     id: 'income', 
@@ -51,7 +58,8 @@ const defaultCategories: Category[] = [
     color: '#4caf50', 
     icon: '💵', 
     isDefault: true,
-    isIncome: true
+    isIncome: true,
+    percentage: 0
   }
 ];
 
@@ -66,16 +74,18 @@ export const useCategories = () => {
 };
 
 export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [categories, setCategories] = useState<Category[]>(defaultCategories);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentBudgetId, setCurrentBudgetId] = useState<string | null>(null);
   const { user } = useAuth();
 
-  // Load categories from Firestore
+  // Load categories from Firestore when currentBudgetId changes
   useEffect(() => {
     const loadCategories = async () => {
-      if (!user) {
-        setCategories(defaultCategories);
+      if (!user || !currentBudgetId) {
+        // If no user or budget is selected, use defaults (without saving to database)
+        setCategories(defaultCategories.map(cat => ({ ...cat, budgetId: currentBudgetId || 'default' })));
         return;
       }
 
@@ -83,47 +93,64 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setError(null);
 
       try {
-        const userDocRef = doc(db, 'users', user.id);
-        const userDoc = await getDoc(userDocRef);
-
-        if (userDoc.exists() && userDoc.data()?.categories) {
-          // Make sure we always have the default categories
-          let loadedCategories = userDoc.data().categories as Category[];
+        // Look for categories specific to this budget
+        const budgetCategoriesRef = doc(db, 'users', user.id, 'budgets', currentBudgetId);
+        const budgetDoc = await getDoc(budgetCategoriesRef);
+        
+        if (budgetDoc.exists() && budgetDoc.data()?.categories) {
+          // Budget has its own categories
+          const loadedCategories = budgetDoc.data().categories as Category[];
           
           // Ensure all default categories exist
+          const mergedCategories = [...loadedCategories];
           defaultCategories.forEach(defaultCat => {
-            if (!loadedCategories.some(cat => cat.id === defaultCat.id)) {
-              loadedCategories.push(defaultCat);
+            if (!mergedCategories.some(cat => cat.id === defaultCat.id)) {
+              mergedCategories.push({
+                ...defaultCat,
+                budgetId: currentBudgetId
+              });
             }
           });
           
-          setCategories(loadedCategories);
+          setCategories(mergedCategories);
         } else {
-          // If no categories found, use defaults
-          await updateDoc(userDocRef, {
-            categories: defaultCategories
+          // No categories found for this budget, create defaults
+          const categoriesWithBudgetId = defaultCategories.map(cat => ({
+            ...cat,
+            budgetId: currentBudgetId
+          }));
+          
+          // Save defaults to this budget
+          await updateDoc(budgetCategoriesRef, {
+            categories: categoriesWithBudgetId
           });
-          setCategories(defaultCategories);
+          
+          setCategories(categoriesWithBudgetId);
         }
       } catch (error) {
         console.error('Error loading categories:', error);
         setError('Failed to load categories');
-        setCategories(defaultCategories);
+        
+        // Use defaults as fallback
+        setCategories(defaultCategories.map(cat => ({
+          ...cat,
+          budgetId: currentBudgetId
+        })));
       } finally {
         setIsLoading(false);
       }
     };
 
     loadCategories();
-  }, [user]);
+  }, [user, currentBudgetId]);
 
-  // Save categories to Firestore
+  // Save categories to Firestore - now saving to the budget's document
   const saveCategories = useCallback(async (newCategories: Category[]) => {
-    if (!user) return;
+    if (!user || !currentBudgetId) return;
 
     try {
-      const userDocRef = doc(db, 'users', user.id);
-      await updateDoc(userDocRef, {
+      const budgetCategoriesRef = doc(db, 'users', user.id, 'budgets', currentBudgetId);
+      await updateDoc(budgetCategoriesRef, {
         categories: newCategories
       });
     } catch (error) {
@@ -131,10 +158,14 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setError('Failed to save categories');
       throw error;
     }
-  }, [user]);
+  }, [user, currentBudgetId]);
 
-  // Add a new category
+  // Add a new category to the current budget
   const addCategory = useCallback(async (category: Omit<Category, 'id'>) => {
+    if (!currentBudgetId) {
+      throw new Error('No active budget to add category to');
+    }
+    
     setIsLoading(true);
     setError(null);
 
@@ -145,11 +176,12 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ...category,
         id,
         isDefault: false,
+        budgetId: currentBudgetId
       };
 
       // Check if category with this name already exists
       if (categories.some(c => c.name.toLowerCase() === category.name.toLowerCase())) {
-        throw new Error(`Category "${category.name}" already exists`);
+        throw new Error(`Category "${category.name}" already exists in this budget`);
       }
 
       const newCategories = [...categories, newCategory];
@@ -162,33 +194,38 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } finally {
       setIsLoading(false);
     }
-  }, [categories, saveCategories]);
+  }, [categories, saveCategories, currentBudgetId]);
 
-  // Update a category
+  // Update a category in the current budget
   const updateCategory = useCallback(async (
     id: string, 
     updates: Partial<Omit<Category, 'id' | 'isDefault' | 'isIncome'>>
   ) => {
+    if (!currentBudgetId) {
+      throw new Error('No active budget to update category in');
+    }
+    
     setIsLoading(true);
     setError(null);
 
     try {
       const categoryIndex = categories.findIndex(cat => cat.id === id);
       if (categoryIndex === -1) {
-        throw new Error(`Category with ID "${id}" not found`);
+        throw new Error(`Category with ID "${id}" not found in this budget`);
       }
 
       // Check if name is being updated and if it already exists
       if (updates.name && 
           updates.name !== categories[categoryIndex].name && 
           categories.some(c => c.name.toLowerCase() === updates.name?.toLowerCase())) {
-        throw new Error(`Category "${updates.name}" already exists`);
+        throw new Error(`Category "${updates.name}" already exists in this budget`);
       }
 
       const updatedCategories = [...categories];
       updatedCategories[categoryIndex] = {
         ...updatedCategories[categoryIndex],
-        ...updates
+        ...updates,
+        budgetId: currentBudgetId // Ensure budgetId remains correct
       };
 
       setCategories(updatedCategories);
@@ -200,17 +237,21 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } finally {
       setIsLoading(false);
     }
-  }, [categories, saveCategories]);
+  }, [categories, saveCategories, currentBudgetId]);
 
-  // Delete a category
+  // Delete a category from the current budget
   const deleteCategory = useCallback(async (id: string) => {
+    if (!currentBudgetId) {
+      throw new Error('No active budget to delete category from');
+    }
+    
     setIsLoading(true);
     setError(null);
 
     try {
       const categoryToDelete = categories.find(cat => cat.id === id);
       if (!categoryToDelete) {
-        throw new Error(`Category with ID "${id}" not found`);
+        throw new Error(`Category with ID "${id}" not found in this budget`);
       }
 
       if (categoryToDelete.isDefault) {
@@ -227,14 +268,14 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } finally {
       setIsLoading(false);
     }
-  }, [categories, saveCategories]);
+  }, [categories, saveCategories, currentBudgetId]);
 
-  // Get a category by ID
+  // Get a category by ID (from current budget only)
   const getCategoryById = useCallback((id: string) => {
     return categories.find(cat => cat.id === id);
   }, [categories]);
 
-  // Get a category by name (case insensitive)
+  // Get a category by name (case insensitive, from current budget only)
   const getCategoryByName = useCallback((name: string) => {
     return categories.find(cat => cat.name.toLowerCase() === name.toLowerCase());
   }, [categories]);
@@ -247,7 +288,9 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     getCategoryById,
     getCategoryByName,
     isLoading,
-    error
+    error,
+    setCurrentBudgetId,
+    currentBudgetId
   };
 
   return (
