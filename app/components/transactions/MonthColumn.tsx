@@ -4,6 +4,7 @@ import { Add as AddIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-mater
 import { TransactionCard } from './TransactionCard';
 import type { MonthColumnProps } from './types';
 import type { Transaction } from '../../services/fileParser';
+import { isColorDark } from '../../utils/colorUtils';
 
 export const MonthColumn: React.FC<MonthColumnProps> = ({
   month,
@@ -37,6 +38,21 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
   tableColors = {}
 }) => {
   const [isCopyModeState, setIsCopyMode] = React.useState(isCopyMode);
+  
+  // Get the background color for this category
+  const bgColor = (() => {
+    if (tableColors && tableColors[category]) {
+      return tableColors[category];
+    }
+    return getCardBackgroundColor();
+  })();
+  
+  // Determine if the background is dark or light to set text color
+  const bgIsDark = isColorDark(bgColor);
+  
+  // Text colors based on background darkness
+  const textColor = bgIsDark ? '#ffffff' : '#000000';
+  const textColorWithOpacity = bgIsDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)';
 
   const getUpdatedCardBackgroundColor = (isHover?: boolean) => {
     if (tableColors && tableColors[category]) {
@@ -157,7 +173,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           variant="subtitle1"
           sx={{
             fontWeight: 500,
-            color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.9)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.9)' : (isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)')),
+            color: textColor,
           }}
         >
           {month}
@@ -167,9 +183,9 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
             size="small"
             onClick={() => handleCopyMonthClick(month, monthTransactions as Transaction[])}
             sx={{
-              color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.7)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.54)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.54)')),
+              color: textColorWithOpacity,
               '&:hover': {
-                color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.9)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.87)')),
+                color: textColor,
                 backgroundColor: 'rgba(0, 0, 0, 0.04)'
               }
             }}
@@ -185,7 +201,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
             sm: '0.75rem',
             md: '0.85rem'
           },
-          color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.85)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)')),
+          color: textColor,
           mb: 1
         }}
       >
@@ -210,10 +226,10 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
             backgroundColor: 'rgba(0,0,0,0.05)',
           },
           '&::-webkit-scrollbar-thumb': {
-            backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : (category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
+            backgroundColor: bgIsDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
             borderRadius: '3px',
             '&:hover': {
-              backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : (category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
+              backgroundColor: bgIsDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.3)',
             }
           }
         }}
@@ -298,9 +314,9 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
                   lg: '1.125rem',
                   xl: '1.5rem',
                 },
-                color: getTextColor(),
+                color: isColorDark(getUpdatedCardBackgroundColor()) ? '#ffffff' : '#000000',
                 '&:hover': {
-                  color: getTextColor(true)
+                  color: isColorDark(getUpdatedCardBackgroundColor(true)) ? '#ffffff' : '#000000'
                 }
               }} 
             />
@@ -346,6 +362,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
               justifyContent: 'center',
               alignItems: 'center',
               bgcolor: getUpdatedCardBackgroundColor(),
+              color: isColorDark(getUpdatedCardBackgroundColor()) ? '#ffffff' : '#000000',
               border: 'none',
               borderRadius: 1,
               cursor: 'pointer',
@@ -354,7 +371,8 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
               '&:hover': {
                 boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
                 transform: 'translateY(-2px)',
-                bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getUpdatedCardBackgroundColor(true)
+                bgcolor: getUpdatedCardBackgroundColor(true),
+                color: isColorDark(getUpdatedCardBackgroundColor(true)) ? '#ffffff' : '#000000',
               }
             }}
           >
@@ -367,10 +385,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
                   lg: '1.125rem',
                   xl: '1.5rem',
                 },
-                color: getTextColor(),
-                '&:hover': {
-                  color: getTextColor(true)
-                }
+                color: 'inherit',
               }} 
             />
           </Card>

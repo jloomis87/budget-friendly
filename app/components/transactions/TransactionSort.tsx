@@ -1,6 +1,9 @@
 import React from 'react';
 import { Box, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
 import type { SortOption } from './types';
+import { isColorDark } from '../../utils/colorUtils';
+import { useCategories } from '../../contexts/CategoryContext';
+import { useTableColors } from '../../hooks/useTableColors';
 
 interface TransactionSortProps {
   sortOption: SortOption;
@@ -17,18 +20,47 @@ export const TransactionSort: React.FC<TransactionSortProps> = ({
   isDark,
   category
 }) => {
+  const { categories } = useCategories();
+  const [tableColors] = useTableColors();
+
+  // Get the background color
+  const getCategoryColor = () => {
+    // First check if it's in tableColors
+    if (tableColors && tableColors[category]) {
+      return tableColors[category];
+    }
+    
+    // Then check category data
+    const categoryData = categories.find(c => c.name === category);
+    if (categoryData) {
+      return categoryData.color;
+    }
+    
+    // Fallback
+    return isDark ? '#424242' : '#f5f5f5';
+  };
+  
+  const backgroundColor = getCategoryColor();
+  const bgIsDark = isColorDark(backgroundColor);
+  
+  // Text colors
+  const textColor = bgIsDark ? '#ffffff' : '#000000';
+  const textColorWithOpacity = `${textColor}B3`; // ~70% opacity
+  const borderColorLight = `${textColor}3D`; // ~24% opacity
+  const borderColorDark = `${textColor}80`; // ~50% opacity
+
   return (
     <FormControl 
       size="small" 
       sx={{ 
         minWidth: 120,
         '& .MuiOutlinedInput-root': {
-          color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.7)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.7)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)')),
+          color: textColorWithOpacity,
           '& fieldset': {
-            borderColor: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.23)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.23)' : (isDark ? 'rgba(255, 255, 255, 0.23)' : 'rgba(0, 0, 0, 0.23)'))
+            borderColor: borderColorLight
           },
           '&:hover fieldset': {
-            borderColor: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.5)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.5)' : (isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)'))
+            borderColor: borderColorDark
           }
         }
       }}
@@ -36,7 +68,7 @@ export const TransactionSort: React.FC<TransactionSortProps> = ({
       <InputLabel 
         id="sort-select-label"
         sx={{
-          color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.7)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.7)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)'))
+          color: textColorWithOpacity
         }}
       >
         Sort By

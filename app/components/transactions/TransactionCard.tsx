@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, Typography, Box } from '@mui/material';
 import type { TransactionCardProps } from './types';
+import { isColorDark } from '../../utils/colorUtils';
 
 export const TransactionCard: React.FC<TransactionCardProps> = ({
   transaction,
@@ -26,6 +27,16 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
   handleDragEnd,
   handleOpenMobileEdit
 }) => {
+  // Get the background color of this card
+  const cardBgColor = getCardBackgroundColor();
+  
+  // Determine if the background is dark or light to set text color
+  const cardIsDark = isColorDark(cardBgColor);
+  
+  // Use black text on light backgrounds, white text on dark backgrounds
+  const textColor = cardIsDark ? '#ffffff' : '#000000';
+  const textColorWithOpacity = cardIsDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)';
+
   return (
     <Card
       key={transaction.id}
@@ -43,7 +54,8 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        bgcolor: getCardBackgroundColor(),
+        bgcolor: cardBgColor,
+        color: textColor,
         border: 'none',
         borderRadius: 1,
         transition: 'all 0.2s ease-in-out',
@@ -118,9 +130,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
       <Typography 
         variant="subtitle1"
         sx={{ 
-          color: hasCustomDarkColor || (!hasCustomColor && category === 'Income')
-            ? 'rgba(255, 255, 255, 0.85)' 
-            : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)')),
+          color: textColor,
           fontWeight: 500,
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -151,9 +161,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
         <Typography 
           variant="body2"
           sx={{ 
-            color: hasCustomDarkColor || (!hasCustomColor && category === 'Income') 
-              ? 'rgba(255, 255, 255, 0.7)' 
-              : (category === 'Income' ? 'rgba(0, 0, 0, 0.7)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)')),
+            color: textColorWithOpacity,
             fontSize: {
               xs: '0.56rem', // 75% of 0.75rem
               sm: '0.56rem',
@@ -173,9 +181,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
         <Typography 
           variant="body2"
           sx={{ 
-            color: hasCustomDarkColor || (!hasCustomColor && category === 'Income')
-              ? 'rgba(255, 255, 255, 0.85)' 
-              : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.87)')),
+            color: textColor,
             fontSize: {
               xs: '0.56rem', // 75% of 0.75rem
               sm: '0.56rem',

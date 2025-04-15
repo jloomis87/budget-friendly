@@ -124,6 +124,12 @@ export const TransactionTableContent: React.FC = () => {
   const hasCustomColor = getCategoryBackgroundColor() !== (isDark ? '#424242' : '#f5f5f5');
   const hasCustomDarkColor = hasCustomColor && isColorDark(getCategoryBackgroundColor() || '');
 
+  // Update this function to handle light Essentials colors correctly
+  const getTextColorForBackground = (backgroundColor: string) => {
+    // If the background color is light (not dark), text should be black
+    return isColorDark(backgroundColor) ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)';
+  };
+
   // Now define getUpdatedBackgroundStyles using the variables we've already defined
   const getUpdatedBackgroundStyles = () => {
     const baseStyles = getBackgroundStyles();
@@ -133,7 +139,7 @@ export const TransactionTableContent: React.FC = () => {
         ...baseStyles,
         backgroundColor: bgColor,
         // Adjust text colors based on background darkness
-        color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)',
+        color: getTextColorForBackground(bgColor || ''),
       };
     }
     return baseStyles;
@@ -144,6 +150,19 @@ export const TransactionTableContent: React.FC = () => {
   // Get the current category data to pass to the header
   const categoryData = categories.find(c => c.name === category);
   
+  // Function to determine if the Essentials category is using a light background 
+  // that requires black text for better visibility
+  const needsDarkText = () => {
+    // For Essentials category, check if it's using a light background
+    if (category === 'Essentials') {
+      const bgColor = getCategoryBackgroundColor();
+      if (bgColor && !isColorDark(bgColor)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   // Calculate total budget across all non-income categories
   const calculateTotalBudget = () => {
     // Filter out income transactions
@@ -643,7 +662,9 @@ export const TransactionTableContent: React.FC = () => {
             textAlign: 'center',
             mb: 1,
             mt: -3,
-            color: props.category === 'Income' ? 'rgba(0, 0, 0, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
+            color: hasCustomColor ? 
+              (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)') : 
+              (props.category === 'Income' ? 'rgba(0, 0, 0, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)')),
           }}
         >
           {filteredTransactions.length > 0 
@@ -667,10 +688,14 @@ export const TransactionTableContent: React.FC = () => {
               backgroundColor: 'rgba(0,0,0,0.05)',
             },
             '&::-webkit-scrollbar-thumb': {
-              backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : (props.category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
+              backgroundColor: hasCustomColor ? 
+                (hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)') : 
+                (props.category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
               borderRadius: '4px',
               '&:hover': {
-                backgroundColor: hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : (props.category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
+                backgroundColor: hasCustomColor ? 
+                  (hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)') : 
+                  (props.category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
               }
             }
           }}
