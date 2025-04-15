@@ -27,12 +27,15 @@ export function CopyMonthConfirmationDialog({
   category,
   transactionCount,
 }: CopyMonthConfirmationDialogProps) {
+  // Ensure category is a string before using toLowerCase
+  const categoryName = category ? (typeof category === 'string' ? category : String(category)) : 'transactions';
+  
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Copy {sourceMonth} {category} to {targetMonth}?</DialogTitle>
+      <DialogTitle>Copy {sourceMonth} {categoryName} to {targetMonth}?</DialogTitle>
       <DialogContent>
         <Typography>
-          Are you sure you want to copy all {transactionCount} {category.toLowerCase()} 
+          Are you sure you want to copy all {transactionCount} {categoryName.toLowerCase()} 
           from {sourceMonth} to {targetMonth}? The day of each transaction will remain 
           the same, but the month will be updated to {targetMonth}.
         </Typography>

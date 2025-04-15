@@ -5,6 +5,7 @@ import type { DragDropState, TransactionTableContextProps } from './types';
 import { useTransactionUtils } from './useTransactionUtils';
 import { useTableColors } from '../../hooks/useTableColors';
 import { isColorDark } from '../../utils/colorUtils';
+import { useCategories } from '../../contexts/CategoryContext';
 
 // Create the context
 const TransactionTableContext = createContext<{
@@ -200,12 +201,18 @@ export const TransactionTableProvider = ({
   children: React.ReactNode; 
   value: TransactionTableContextProps; 
 }) => {
-  const utils = useTransactionUtils();
-  const isIncome = value.category === 'Income';
+  // Get the categories from the CategoryContext
+  const { categories } = useCategories();
   
-  // Get table colors from the hook
-  const [tableColors, setTableColors] = useTableColors();
-  const hasCustomColor = value.category && tableColors[value.category] !== '#f5f5f5';
+  // Get utils for transaction operations
+  const utils = useTransactionUtils();
+  
+  // Get color schemes for each category
+  const { getTableColor } = useTableColors();
+  
+  // Extract props
+  const props = value;
+  const { category, transactions, allTransactions, isDark } = props;
   
   // State for drag and drop
   const [draggedTransaction, setDraggedTransaction] = useState<Transaction | null>(null);
@@ -255,15 +262,15 @@ export const TransactionTableProvider = ({
   }, []);
   
   // Calculate total amount
-  const totalAmount = value.transactions.reduce((sum, t) => sum + t.amount, 0);
+  const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
   
   // Filter transactions by selected months
   const filteredTransactions = React.useMemo(() => {
-    if (!value.selectedMonths?.length) {
-      return value.transactions;
+    if (!props.selectedMonths?.length) {
+      return transactions;
     }
     
-    const filtered = value.transactions.filter(transaction => {
+    const filtered = transactions.filter(transaction => {
       // Ensure transaction.date is properly handled
       let transactionDate: Date;
       
@@ -279,11 +286,11 @@ export const TransactionTableProvider = ({
       }
       
       const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
-      return value.selectedMonths?.includes(transactionMonth);
+      return props.selectedMonths?.includes(transactionMonth);
     });
     
     return filtered;
-  }, [value.transactions, value.selectedMonths, value.category, refreshCounter]);
+  }, [transactions, props.selectedMonths, props.category, refreshCounter]);
   
   // Handler functions
   const handleEditingChange = useCallback((field: string, value: string) => {
@@ -302,14 +309,14 @@ export const TransactionTableProvider = ({
       const updatedTransaction: Partial<Transaction> = {
         description: editingRow.description,
         date: new Date(year, month - 1, day),
-        amount: parseFloat(editingRow.amount) * (isIncome ? 1 : -1)
+        amount: parseFloat(editingRow.amount) * (props.category === 'Income' ? 1 : -1)
       };
       
-      const globalIndex = utils.findGlobalIndex(mobileEditTransaction.transaction, value.allTransactions);
-      value.onUpdateTransaction(globalIndex, updatedTransaction);
+      const globalIndex = utils.findGlobalIndex(mobileEditTransaction.transaction, allTransactions);
+      props.onUpdateTransaction(globalIndex, updatedTransaction);
       handleCloseMobileEdit();
     }
-  }, [mobileEditTransaction, editingRow, isIncome, utils, value]);
+  }, [mobileEditTransaction, editingRow, props.category, utils, allTransactions]);
   
   const handleAddTransaction = useCallback(() => {
     if (!newDescription.trim() || !newAmount.trim()) return;
@@ -319,18 +326,18 @@ export const TransactionTableProvider = ({
 
     const transaction: Transaction = {
       description: newDescription.trim(),
-      amount: parseFloat(newAmount) * (isIncome ? 1 : -1),
+      amount: parseFloat(newAmount) * (props.category === 'Income' ? 1 : -1),
       date: date,
-      category: value.category as 'Income' | 'Essentials' | 'Wants' | 'Savings',
+      category: props.category as 'Income' | 'Essentials' | 'Wants' | 'Savings',
       id: uuidv4(),
     };
 
-    value.onAddTransaction(transaction);
+    props.onAddTransaction(transaction);
     setNewDescription('');
     setNewAmount('');
     setNewDate(new Date().toISOString().split('T')[0]);
     setMobileAddDialogOpen(false);
-  }, [newDescription, newAmount, newDate, isIncome, value]);
+  }, [newDescription, newAmount, newDate, props.category, props.onAddTransaction]);
   
   const handleDeleteClick = useCallback((e: React.MouseEvent | undefined, transaction: Transaction) => {
     // Only call stopPropagation if e is a valid event object
@@ -338,17 +345,17 @@ export const TransactionTableProvider = ({
       e.stopPropagation();
     }
     
-    const globalIndex = utils.findGlobalIndex(transaction, value.allTransactions);
+    const globalIndex = utils.findGlobalIndex(transaction, allTransactions);
     
     if (globalIndex !== -1) {
       setTransactionToDelete({ transaction, index: globalIndex });
       setDeleteConfirmOpen(true);
     }
-  }, [utils, value.allTransactions]);
+  }, [utils, allTransactions]);
   
   const handleOpenMobileEdit = useCallback((transaction: Transaction, index: number) => {
     const transactionId = utils.getTransactionId(transaction);
-    const globalIndex = utils.findGlobalIndex(transaction, value.allTransactions);
+    const globalIndex = utils.findGlobalIndex(transaction, allTransactions);
     
     setMobileEditTransaction({
       transaction,
@@ -371,7 +378,7 @@ export const TransactionTableProvider = ({
     });
     
     setMobileEditDialogOpen(true);
-  }, [utils, value.allTransactions]);
+  }, [utils, allTransactions]);
   
   const handleCloseMobileEdit = useCallback(() => {
     setMobileEditDialogOpen(false);
@@ -422,10 +429,10 @@ export const TransactionTableProvider = ({
     ];
     const targetMonthIndex = months.indexOf(copyTargetMonth);
 
-    const targetMonthTransactions = value.transactions.filter(t => {
+    const targetMonthTransactions = transactions.filter(t => {
       const date = new Date(t.date);
       const month = date.toLocaleString('default', { month: 'long' });
-      return month === copyTargetMonth && t.category === value.category;
+      return month === copyTargetMonth && t.category === props.category;
     });
 
     let duplicateCount = 0;
@@ -453,11 +460,11 @@ export const TransactionTableProvider = ({
         id: uuidv4(), // Generate new ID for the copy
         date: newDate,
         // Preserve the sign based on category
-        amount: value.category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount)
+        amount: props.category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount)
       };
 
       // Add the new transaction
-      value.onAddTransaction(newTransaction);
+      props.onAddTransaction(newTransaction);
       
       // Force refresh the component
       forceRefresh();
@@ -470,7 +477,7 @@ export const TransactionTableProvider = ({
     }
 
     setCopyMonthDialogOpen(false);
-  }, [copyTargetMonth, copyTransactions, value]);
+  }, [copyTargetMonth, copyTransactions, props.category, props.onAddTransaction]);
   
   // Force a refresh of the component
   const forceRefresh = useCallback(() => {
@@ -529,105 +536,82 @@ export const TransactionTableProvider = ({
     };
   }, [dragLeaveTimeout]);
   
-  // Styling functions
+  // Style functions
   const getBackgroundStyles = useCallback(() => {
-    // Get the background color for the category
-    const tableColor = value.category && tableColors[value.category];
-    const isCustomColor = hasCustomColor && tableColor && tableColor !== '#f5f5f5';
-    const isDarkColor = isCustomColor && isColorDark(tableColor);
+    // First try to get color from categories
+    const categoryObj = categories.find(cat => cat.name === category);
+    let backgroundColor = categoryObj?.color;
     
-    // Return the appropriate styles based on the category and color
-    return {
-      bgcolor: isCustomColor ? tableColor : (value.isDark ? '#424242' : '#f5f5f5'),
-      color: isDarkColor ? 'rgba(255, 255, 255, 0.87)' : (value.isDark ? '#fff' : 'inherit'),
-      boxShadow: '0 4px 20px 0 rgba(0,0,0,0.1)',
-      borderRadius: 2,
-      position: 'relative',
-      // Add a subtle gradient overlay for better text readability on custom colors
-      ...(isCustomColor && {
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: isDarkColor 
-            ? 'linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.2))' 
-            : 'linear-gradient(rgba(255,255,255,0.1), rgba(255,255,255,0.2))',
-          borderRadius: 'inherit',
-          pointerEvents: 'none',
-        }
-      })
-    };
-  }, [value.category, value.isDark, tableColors, hasCustomColor]);
-  
-  const getCategoryBackgroundColor = useCallback(() => {
-    // Get the background color for the category
-    const tableColor = value.category && tableColors[value.category];
-    const isCustomColor = hasCustomColor && tableColor && tableColor !== '#f5f5f5';
-    
-    if (isCustomColor) {
-      return tableColor;
+    // If not found, fall back to the getTableColor function
+    if (!backgroundColor) {
+      backgroundColor = getTableColor(category);
     }
     
-    return value.isDark ? '#424242' : '#f5f5f5';
-  }, [value.category, value.isDark, tableColors, hasCustomColor]);
+    // Apply the background color
+    return {
+      backgroundColor,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+      // Add more styles as needed
+    };
+  }, [category, isDark, categories, getTableColor]);
+  
+  const getCategoryBackgroundColor = useCallback(() => {
+    // First try to get color from categories
+    const categoryObj = categories.find(cat => cat.name === category);
+    if (categoryObj) {
+      return categoryObj.color;
+    }
+    
+    // Fall back to the table color
+    return getTableColor(category);
+  }, [category, categories, getTableColor]);
   
   const getCardBackgroundColor = useCallback((isHover = false) => {
     // Get the background color for the category
-    const tableColor = value.category && tableColors[value.category];
-    const isCustomColor = hasCustomColor && tableColor && tableColor !== '#f5f5f5';
-    const isDarkColor = isCustomColor && isColorDark(tableColor);
+    const baseColor = getCategoryBackgroundColor() || '#f5f5f5';
+    const isCustomColor = baseColor !== '#f5f5f5';
+    const isDarkColor = isCustomColor && isColorDark(baseColor);
     
-    // Apply the same lightening logic for all categories, including Income
-    if (isCustomColor) {
-      // Lighten the color for cards
-      const lightenAmount = isHover ? 0.2 : 0.1;
-      const r = parseInt(tableColor.slice(1, 3), 16);
-      const g = parseInt(tableColor.slice(3, 5), 16);
-      const b = parseInt(tableColor.slice(5, 7), 16);
-      
-      // Lighten the color
-      const newR = Math.min(255, r + (255 - r) * lightenAmount);
-      const newG = Math.min(255, g + (255 - g) * lightenAmount);
-      const newB = Math.min(255, b + (255 - b) * lightenAmount);
-      
-      return `rgb(${Math.round(newR)}, ${Math.round(newG)}, ${Math.round(newB)})`;
+    // Apply hover effect if needed
+    if (isHover) {
+      return isDarkColor 
+        ? adjustColor(baseColor, 20) // Lighten dark colors
+        : adjustColor(baseColor, -10); // Darken light colors
     }
     
-    // Default card colors based on dark mode
-    return value.isDark 
-      ? (isHover ? '#5a5a5a' : '#4a4a4a') 
-      : (isHover ? '#ffffff' : '#f9f9f9');
-  }, [value.category, value.isDark, tableColors, hasCustomColor]);
+    return baseColor;
+  }, [getCategoryBackgroundColor]);
   
+  // Function to adjust color lightness
+  const adjustColor = (hex: string, amount: number) => {
+    let r = parseInt(hex.substring(1, 3), 16);
+    let g = parseInt(hex.substring(3, 5), 16);
+    let b = parseInt(hex.substring(5, 7), 16);
+    
+    r = Math.min(255, Math.max(0, r + amount));
+    g = Math.min(255, Math.max(0, g + amount));
+    b = Math.min(255, Math.max(0, b + amount));
+    
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  };
+  
+  // Get card hover styles
   const getCardHoverStyles = useCallback(() => {
     return {
-      boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
+      backgroundColor: getCardBackgroundColor(true),
       transform: 'translateY(-2px)',
-      bgcolor: getCardBackgroundColor(true)
+      boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
     };
   }, [getCardBackgroundColor]);
   
+  // Get text color based on background
   const getTextColor = useCallback((isHover = false) => {
-    // Get the background color for the category
-    const tableColor = value.category && tableColors[value.category];
-    const isCustomColor = hasCustomColor && tableColor && tableColor !== '#f5f5f5';
-    const isDarkColor = isCustomColor && isColorDark(tableColor);
-    
-    // For all categories, determine text color based on background darkness
-    if (isCustomColor && isDarkColor) {
-      return isHover ? 'rgba(255, 255, 255, 1)' : 'rgba(255, 255, 255, 0.87)';
-    }
-    
-    return value.isDark 
-      ? (isHover ? '#ffffff' : 'rgba(255, 255, 255, 0.87)') 
-      : (isHover ? 'rgba(0, 0, 0, 1)' : 'rgba(0, 0, 0, 0.87)');
-  }, [value.category, value.isDark, tableColors, hasCustomColor]);
+    const bgColor = getCardBackgroundColor(isHover);
+    return isColorDark(bgColor) ? '#ffffff' : '#000000';
+  }, [getCardBackgroundColor]);
   
   const contextValue = {
-    props: value,
+    props,
     dragState: {
       isDragging,
       draggedTransaction,
@@ -640,7 +624,6 @@ export const TransactionTableProvider = ({
       dragLeaveTimeout
     },
     utils,
-    // State management functions
     resetDragState,
     setDraggedTransaction,
     setDraggedIndex,
@@ -651,13 +634,10 @@ export const TransactionTableProvider = ({
     setDragLeaveTimeout,
     setDragOverIndex,
     setIsIntraMonthDrag,
-    // Helper functions for transactions
     groupTransactionsByMonth,
     formatDate,
-    // UI state
     totalAmount,
     filteredTransactions,
-    // Dialog state
     dialogState: {
       editingRow,
       deleteConfirmOpen,
@@ -673,7 +653,6 @@ export const TransactionTableProvider = ({
       newAmount,
       newDate
     },
-    // Dialog actions
     setEditingRow,
     setDeleteConfirmOpen,
     setTransactionToDelete,
@@ -687,7 +666,6 @@ export const TransactionTableProvider = ({
     setNewDescription,
     setNewAmount,
     setNewDate,
-    // Action handlers
     handleEditingChange,
     handleSaveEdit,
     handleAddTransaction,
@@ -699,17 +677,14 @@ export const TransactionTableProvider = ({
     getNextMonth,
     handleCopyMonthClick,
     handleCopyMonthConfirm,
-    // Utility functions
     forceRefresh,
     showNotification,
-    // Styling functions
     getBackgroundStyles,
     getCategoryBackgroundColor,
     getCardBackgroundColor,
     getCardHoverStyles,
     getTextColor,
     getMonthOrder,
-    // Utility functions
     isColorDark
   };
   

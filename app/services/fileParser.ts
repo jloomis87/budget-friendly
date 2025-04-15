@@ -10,7 +10,7 @@ export interface Transaction {
   date: Date | number; // Updated to allow day of month as number
   description: string;
   amount: number;
-  category?: 'Essentials' | 'Wants' | 'Savings' | 'Income';
+  category?: string; // Changed from enum to string to allow for custom categories
   type: 'income' | 'expense'; // Add required type field
   order?: number; // Order within the category for sorting
 }
@@ -505,7 +505,7 @@ const parseAmount = (amountStr: string): number => {
 };
 
 // Simple categorization logic based on keywords and amount
-export const categorizeTransaction = (description: string, amount: number): Transaction['category'] => {
+export const categorizeTransaction = (description: string, amount: number): string => {
   // Income is positive
   if (amount > 0) {
     return 'Income';

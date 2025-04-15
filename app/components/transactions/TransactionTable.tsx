@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Box, Paper, Typography, useTheme, useMediaQuery } from '@mui/material';
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
 import { MobileEditDialog } from './MobileEditDialog';
@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCategories } from '../../contexts/CategoryContext';
 
 interface TransactionTableProps {
   category: string;
@@ -45,6 +46,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = (props) => {
 export const TransactionTableContent: React.FC = () => {
   const context = useTransactionTableContext();
   const { user } = useAuth();
+  const { categories } = useCategories();
   const [sortOption, setSortOption] = useState<SortOption>('date');
   
   const { 
@@ -62,8 +64,6 @@ export const TransactionTableContent: React.FC = () => {
     setCopyMonthDialogOpen,
     handleCopyMonthConfirm,
     getBackgroundStyles,
-    getCategoryBackgroundColor,
-    getCardBackgroundColor,
     getTextColor,
     getMonthOrder,
     groupTransactionsByMonth,
@@ -548,6 +548,18 @@ export const TransactionTableContent: React.FC = () => {
   // Get the background styles for the table
   const backgroundStyles = getBackgroundStyles();
   
+  // Get category color from the CategoryContext
+  const getCategoryBackgroundColor = useCallback(() => {
+    const foundCategory = categories.find(c => c.name === category);
+    
+    if (foundCategory) {
+      return foundCategory.color;
+    }
+    
+    // Fallback to default table color for this category
+    return props.isDark ? '#424242' : '#f5f5f5';
+  }, [category, categories, props.isDark]);
+
   // Determine if we have custom colors
   const hasCustomColor = getCategoryBackgroundColor() !== (isDark ? '#424242' : '#f5f5f5');
   const hasCustomDarkColor = hasCustomColor && isColorDark(getCategoryBackgroundColor() || '');
@@ -639,7 +651,7 @@ export const TransactionTableContent: React.FC = () => {
               dragOverIndex={dragOverIndex}
               isIntraMonthDrag={isIntraMonthDrag}
               isCopyMode={isCopyMode}
-              getCardBackgroundColor={getCardBackgroundColor}
+              getCardBackgroundColor={getCategoryBackgroundColor}
               getTextColor={getTextColor}
               handleMonthDragOver={handleMonthDragOver}
               handleMonthDragLeave={handleMonthDragLeave}

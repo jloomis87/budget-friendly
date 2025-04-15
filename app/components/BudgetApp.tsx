@@ -30,6 +30,8 @@ import { useTheme } from '@mui/material/styles';
 import type { Theme } from '@mui/material/styles';
 import { SavingsProvider } from '../contexts/SavingsContext';
 import { SmartInsights } from './SmartInsights';
+import { CategoryProvider, useCategories } from '../contexts/CategoryContext';
+import { AddCategoryButton } from './AddCategoryButton';
 
 // Add this interface for alert messages
 interface AlertMessage {
@@ -709,6 +711,7 @@ const LEGACY_PREFERENCES_KEY = 'budgetFriendly_preferences';
 // Main App Component
 const BudgetAppContent: React.FC = () => {
   const theme = useTheme();
+  const { categories } = useCategories(); // Add this line to fix the missing categories reference
   const [activeStep, setActiveStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
@@ -1111,69 +1114,57 @@ const BudgetAppContent: React.FC = () => {
 
   // Memoize the transaction tables to prevent unnecessary re-renders
   const transactionTables = useMemo(() => {
-    // Get income transactions separately since they're not included in getTransactionsByCategory
+    if (!transactions) return null;
+    
+    // Get all income transactions
     const incomeTransactions = transactions.filter(t => t.category === 'Income');
-    const otherTransactions = transactions.filter(t => t.category !== 'Income');
-
-    console.log('[BudgetAppContent] Rendering transaction tables:', {
-      budgetId: currentBudgetId,
-      totalTransactions: transactions.length,
-      incomeTransactions: incomeTransactions.length,
-      otherTransactions: otherTransactions.length,
-      transactions: transactions.map(t => ({
-        id: t.id,
-        category: t.category,
-        amount: t.amount,
-        description: t.description
-      }))
-    });
-
-    // Define the expense categories we want to show
-    const expenseCategories = ['Essentials', 'Wants', 'Savings'];
-
-    return (
-      <Box sx={{ 
-        mt: 3,
+    
+    // Group expense transactions by category
+    const expenseCategories = getTransactionsByCategory();
+    
+    // Create a transaction table for Income
+    const tables = [
+      <TransactionTable
+        key="Income"
+        category="Income"
+        transactions={incomeTransactions}
+        allTransactions={transactions}
+        onUpdateTransaction={updateTransaction}
+        onDeleteTransaction={deleteTransaction}
+        onAddTransaction={addTransaction}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        dragOverCategory={dragOverCategory}
+        recentlyDropped={recentlyDropped}
+        onReorder={handleReorder}
+        selectedMonths={selectedMonths}
+        month={currentMonth}
+        isDark={isColorDark(tableColors['Income'] || '#e3f2fd')}
+        onTransactionsChange={newTransactions => {
+          // Find and update changed transactions
+          newTransactions.forEach(transaction => {
+            const index = transactions.findIndex(t => t.id === transaction.id);
+            if (index !== -1) {
+              updateTransaction(index, transaction);
+            }
+          });
+        }}
+      />
+    ];
+    
+    // Create transaction tables for all expense categories from the CategoryContext
+    categories
+      .filter(category => category.name !== 'Income' && !category.isIncome)
+      .forEach(category => {
+        // Get transactions for this category
+        const categoryTransactions = expenseCategories[category.name] || [];
         
-        maxWidth: '100%',
-      }}>
-        {/* Always show Income Table */}
-        <TransactionTable
-          key={`Income-${currentBudgetId}-${transactions.length}`}
-          category="Income"
-          transactions={incomeTransactions}
-          allTransactions={transactions}
-          onUpdateTransaction={updateTransaction}
-          onDeleteTransaction={deleteTransaction}
-          onAddTransaction={addTransaction}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          dragOverCategory={dragOverCategory}
-          recentlyDropped={recentlyDropped}
-          onReorder={handleReorder}
-          selectedMonths={selectedMonths}
-          month={currentMonth}
-          isDark={isColorDark(tableColors['Income'])}
-          onTransactionsChange={(newTransactions) => {
-            newTransactions.forEach((transaction, index) => {
-              const existingTransaction = transactions.find(t => t.id === transaction.id);
-              if (existingTransaction) {
-                const globalIndex = transactions.findIndex(t => t.id === transaction.id);
-                if (globalIndex !== -1) {
-                  updateTransaction(globalIndex, transaction);
-                }
-              }
-            });
-          }}
-        />
-
-        {/* Show category tables if there are income transactions */}
-        {incomeTransactions.length > 0 && expenseCategories.map(category => (
+        tables.push(
           <TransactionTable
-            key={`${category}-${currentBudgetId}-${transactions.length}`}
-            category={category}
-            transactions={transactions.filter(t => t.category === category)}
+            key={category.id}
+            category={category.name}
+            transactions={categoryTransactions}
             allTransactions={transactions}
             onUpdateTransaction={updateTransaction}
             onDeleteTransaction={deleteTransaction}
@@ -1186,31 +1177,21 @@ const BudgetAppContent: React.FC = () => {
             onReorder={handleReorder}
             selectedMonths={selectedMonths}
             month={currentMonth}
-            isDark={isColorDark(tableColors[category])}
-            onTransactionsChange={(newTransactions) => {
-              newTransactions.forEach((transaction, index) => {
-                const existingTransaction = transactions.find(t => t.id === transaction.id);
-                if (existingTransaction) {
-                  const globalIndex = transactions.findIndex(t => t.id === transaction.id);
-                  if (globalIndex !== -1) {
-                    updateTransaction(globalIndex, transaction);
-                  }
+            isDark={isColorDark(category.color || '#f5f5f5')}
+            onTransactionsChange={newTransactions => {
+              // Find and update changed transactions
+              newTransactions.forEach(transaction => {
+                const index = transactions.findIndex(t => t.id === transaction.id);
+                if (index !== -1) {
+                  updateTransaction(index, transaction);
                 }
               });
             }}
           />
-        ))}
-
-        {/* Show message when no transactions exist */}
-        {transactions.length === 0 && (
-          <Box sx={{ textAlign: 'center', mt: 3, mb: 3 }}>
-            <Typography variant="body1" color="textSecondary">
-              No transactions found for this budget. Start by adding some income transactions.
-            </Typography>
-          </Box>
-        )}
-      </Box>
-    );
+        );
+      });
+    
+    return tables;
   }, [
     transactions, 
     updateTransaction, 
@@ -1227,7 +1208,8 @@ const BudgetAppContent: React.FC = () => {
     currentMonth,
     isColorDark,
     tableColors,
-    currentBudgetId
+    currentBudgetId,
+    categories
   ]);
 
   // Memoize the budget summary component to prevent unnecessary re-renders
@@ -2145,182 +2127,99 @@ const BudgetAppContent: React.FC = () => {
             />
           </Box>
 
-          {activeStep === 0 && (
-            <>
-              {/* Getting Started - Only show for first-time users */}
-              {!hasSeenGettingStarted && transactions.length === 0 && (
-                <Paper sx={{ p: 3, borderRadius: 2, mb: 3, backgroundColor: 'background.paper' }}>
-                  <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
-                    Getting Started
-                  </Typography>
-                  <Typography variant="body1" paragraph>
-                    Welcome to BudgetFriendly! Let's set up your finances to create your personalized budget plan.
-                  </Typography>
-                  
-                  <Box sx={{ 
-                    p: 2, 
-                    borderRadius: 1, 
-                    bgcolor: 'primary.light', 
-                    color: 'primary.contrastText',
-                    mb: 3
-                  }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 500, mb: 1 }}>
-                      Step 1: Add your income sources
-                    </Typography>
-                    <Typography variant="body2">
-                      Start by adding your income sources like salary, freelance work, or other earnings.
-                      This will help calculate your available funds for budgeting.
-                    </Typography>
-                  </Box>
-                  
-                  {/* Include a simplified Income form */}
-                  <Box sx={{ mb: 3 }}>
-                    <TransactionTable 
-                      category="Income"
-                      transactions={transactions.filter(t => t.category === 'Income')}
-                      allTransactions={transactions}
-                      onUpdateTransaction={updateTransaction}
-                      onDeleteTransaction={deleteTransaction}
-                      onAddTransaction={addTransaction}
-                      month={currentMonth}
-                      isDark={isColorDark(tableColors['Income'])}
-                      selectedMonths={selectedMonths}
-                      onTransactionsChange={(newTransactions) => {
-                        // Handle transaction changes
-                        newTransactions.forEach((transaction, index) => {
-                          const existingTransaction = transactions.find(t => t.id === transaction.id);
-                          if (existingTransaction) {
-                            const globalIndex = transactions.findIndex(t => t.id === transaction.id);
-                            if (globalIndex !== -1) {
-                              updateTransaction(globalIndex, transaction);
-                            }
-                          }
-                        });
-                      }}
-                    />
-                  </Box>
-                  
-                  <Typography variant="subtitle1" sx={{ fontWeight: 500, mt: 3 }}>
-                    What's Next?
-                  </Typography>
-                  <Typography variant="body2">
-                    After adding your income, you'll be able to:
-                  </Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemIcon sx={{ minWidth: '30px' }}>
-                        <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
-                      </ListItemIcon>
-                      <ListItemText primary="Add your expenses in different categories" />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon sx={{ minWidth: '30px' }}>
-                        <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
-                      </ListItemIcon>
-                      <ListItemText primary="See a breakdown of your spending" />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon sx={{ minWidth: '30px' }}>
-                        <Box sx={{ width: 8, height: 8, bgcolor: 'primary.main', borderRadius: '50%' }} />
-                      </ListItemIcon>
-                      <ListItemText primary="Get personalized budget recommendations" />
-                    </ListItem>
-                  </List>
-                </Paper>
-              )}
-              
-              {/* Display transactions */}
-              {transactionTables}
-            </>
-          )}
+          {/* Display transactions */}
+          {activeStep === 0 && transactionTables}
 
-          {activeStep === 1 && (
-            <>
-              {/* Budget Plan Page */}
-              {transactions.some(t => t.category === 'Income') ? (
-                budgetSummaryComponent
-              ) : (
-                <Paper 
-                  sx={{ 
-                    p: 4, 
-                    mt: 4, 
-                    textAlign: 'center',
-                    borderRadius: 2,
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider'
-                  }}
-                >
-                  <Typography variant="h6" gutterBottom sx={{ color: 'text.primary', fontWeight: 600 }}>
-                    No Income Recorded
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                    Please add income transactions in order to see the insights and planning for this budget.
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    onClick={() => setActiveStep(0)}
-                    sx={{
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      fontWeight: 600
-                    }}
-                  >
-                    Add Income
-                  </Button>
-                </Paper>
-              )}
-            </>
-          )}
+          {/* Add Category Button */}
+          {activeStep === 0 && <AddCategoryButton />}
         </Box>
 
-        {/* Color Picker Popover for Transaction Tables */}
-        <Popover
-          open={Boolean(tableColorPickerAnchor)}
-          anchorEl={tableColorPickerAnchor}
-          onClose={handleCloseColorPicker}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'left',
-          }}
-          transformOrigin={{
-            vertical: 'top',
-            horizontal: 'left',
-          }}
-        >
-          <Box sx={{ p: 2, width: 250 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Select table color for {currentCategory}
-            </Typography>
-            <HexColorPicker 
-              color={currentCategory ? tableColors[currentCategory] : '#f5f5f5'} 
-              onChange={handleColorSelect}
-              style={{ width: '100%', height: 200 }}
-            />
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Box 
+        {activeStep === 1 && (
+          <>
+            {/* Budget Plan Page */}
+            {transactions.some(t => t.category === 'Income') ? (
+              budgetSummaryComponent
+            ) : (
+              <Paper 
                 sx={{ 
-                  width: 40, 
-                  height: 40, 
-                  borderRadius: '50%', 
-                  bgcolor: currentCategory ? tableColors[currentCategory] : '#f5f5f5',
-                  border: '1px solid #ccc'
-                }} 
-              />
-              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                {currentCategory ? tableColors[currentCategory] : '#f5f5f5'}
-              </Typography>
-              <Button 
-                size="small" 
-                variant="outlined" 
-                onClick={handleCloseColorPicker}
+                  p: 4, 
+                  mt: 4, 
+                  textAlign: 'center',
+                  borderRadius: 2,
+                  bgcolor: 'background.paper',
+                  border: '1px solid',
+                  borderColor: 'divider'
+                }}
               >
-                Done
-              </Button>
-            </Box>
-          </Box>
-        </Popover>
+                <Typography variant="h6" gutterBottom sx={{ color: 'text.primary', fontWeight: 600 }}>
+                  No Income Recorded
+                </Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                  Please add income transactions in order to see the insights and planning for this budget.
+                </Typography>
+                <Button
+                  variant="contained"
+                  onClick={() => setActiveStep(0)}
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 600
+                  }}
+                >
+                  Add Income
+                </Button>
+              </Paper>
+            )}
+          </>
+        )}
       </Box>
+
+      {/* Color Picker Popover for Transaction Tables */}
+      <Popover
+        open={Boolean(tableColorPickerAnchor)}
+        anchorEl={tableColorPickerAnchor}
+        onClose={handleCloseColorPicker}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <Box sx={{ p: 2, width: 250 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Select table color for {currentCategory}
+          </Typography>
+          <HexColorPicker 
+            color={currentCategory ? tableColors[currentCategory] : '#f5f5f5'} 
+            onChange={handleColorSelect}
+            style={{ width: '100%', height: 200 }}
+          />
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box 
+              sx={{ 
+                width: 40, 
+                height: 40, 
+                borderRadius: '50%', 
+                bgcolor: currentCategory ? tableColors[currentCategory] : '#f5f5f5',
+                border: '1px solid #ccc'
+              }} 
+            />
+            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+              {currentCategory ? tableColors[currentCategory] : '#f5f5f5'}
+            </Typography>
+            <Button 
+              size="small" 
+              variant="outlined" 
+              onClick={handleCloseColorPicker}
+            >
+              Done
+            </Button>
+          </Box>
+        </Box>
+      </Popover>
     </Box>
   );
 };

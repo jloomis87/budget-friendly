@@ -13,6 +13,8 @@ import * as transactionService from '../services/transactionService';
 import { collection, getDocs, writeBatch, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import ReactDOM from 'react-dom';
+import { useCategorizer } from './useCategories';
+import { v4 as uuidv4 } from 'uuid';
 
 export function useTransactions(initialBudgetId?: string) {
   // Get current user from auth context
@@ -30,6 +32,9 @@ export function useTransactions(initialBudgetId?: string) {
   
   // Add a reset flag to trigger transaction reload
   const [shouldReload, setShouldReload] = useState(false);
+
+  // Get the categorizing function
+  const { categorizeTransaction } = useCategorizer();
 
   // Update currentBudgetId when initialBudgetId changes
   useEffect(() => {
@@ -89,17 +94,24 @@ export function useTransactions(initialBudgetId?: string) {
     message: string 
   } | null>(null);
 
-  // Add a transaction with batched updates
+  // Add a transaction
   const addTransaction = useCallback(async (transaction: Transaction) => {
-    console.log('addTransaction called with:', {
-      description: transaction.description,
-      amount: transaction.amount,
-      date: transaction.date,
-      category: transaction.category,
-      id: transaction.id
-    });
-    
     try {
+      // If no category is provided, categorize the transaction
+      if (!transaction.category) {
+        transaction.category = categorizeTransaction(transaction.description, transaction.amount);
+      }
+      
+      // Ensure the transaction has an ID
+      if (!transaction.id) {
+        transaction.id = uuidv4();
+      }
+      
+      // Determine if this is an income or expense
+      if (!transaction.type) {
+        transaction.type = transaction.amount > 0 ? 'income' : 'expense';
+      }
+      
       setIsLoading(true);
       const newTransaction = {
         ...transaction,
@@ -168,7 +180,8 @@ export function useTransactions(initialBudgetId?: string) {
     setLocalBudgetSummary,
     setLocalBudgetPlan,
     setLocalSuggestions,
-    setShouldReload
+    setShouldReload,
+    categorizeTransaction
   ]);
 
   // Load transactions from Firestore when authenticated or when budget changes
@@ -379,11 +392,7 @@ export function useTransactions(initialBudgetId?: string) {
   // Get transactions by category
   const getTransactionsByCategory = useCallback(() => {
     // Create an object to hold transactions by category
-    const categories = {
-      'Essentials': [] as Transaction[],
-      'Wants': [] as Transaction[],
-      'Savings': [] as Transaction[]
-    } as Record<string, Transaction[]>;
+    const categories = {} as Record<string, Transaction[]>;
     
     // Loop through transactions and group by category
     transactions.forEach(transaction => {
