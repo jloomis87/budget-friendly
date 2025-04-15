@@ -353,7 +353,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
     });
     
     // Process all transactions and add to appropriate category totals
-    transactions.forEach(transaction => {
+    filteredTransactions.forEach(transaction => {
       if (transaction.amount > 0) {
         // Income
         totals.income += transaction.amount;
@@ -390,7 +390,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
     
     console.log("Final category totals:", totals);
     return totals;
-  }, [transactions, categories, selectedMonths]);
+  }, [filteredTransactions, categories]);
 
   // Keep track of monthly transactions
   useEffect(() => {
@@ -443,13 +443,13 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
 
   // Calculate monthly trends for chart
   const calculateMonthlyTrends = () => {
-    if (!transactions.length) return { months: [], datasets: [] };
+    if (!filteredTransactions.length) return { months: [], datasets: [] };
     
     // Get all months from transactions
-    const allMonths = [...new Set(transactions.map(t => {
+    const allMonths = Array.from(new Set(filteredTransactions.map(t => {
       const date = new Date(t.date);
       return `${date.getMonth() + 1}/${date.getFullYear()}`;
-    }))];
+    })));
     
     // Sort months chronologically
     allMonths.sort((a, b) => {
@@ -481,7 +481,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
     });
     
     // Calculate total for each category per month
-    transactions.forEach(t => {
+    filteredTransactions.forEach(t => {
       const date = new Date(t.date);
       const month = `${date.getMonth() + 1}/${date.getFullYear()}`;
       
@@ -544,7 +544,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
   };
   
   // Get monthly trend data
-  const monthlyTrendData = useMemo(() => calculateMonthlyTrends(), [transactions, categories]);
+  const monthlyTrendData = useMemo(() => calculateMonthlyTrends(), [filteredTransactions, categories]);
   
   // Format trend chart data
   const trendChartData = {
@@ -1073,34 +1073,34 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
               
               // Get actual spending for this category
               const actual = (() => {
-                // First try to get value from plan.actual which comes from budgetCalculator
-                if (plan?.actual && plan.actual[categoryId]) {
-                  return plan.actual[categoryId];
-                }
-                
-                // If not in plan, try to get from categoryTotals (direct calculation)
-                if (categoryTotals && typeof categoryTotals[categoryId] !== 'undefined') {
-                  return categoryTotals[categoryId];
-                }
-                
-                // If category ID doesn't match, try to find by matching name in transactions
-                if (transactions.length > 0) {
-                  // Calculate total directly from filtered transactions with matching category name
-                  const matchingTransactions = transactions.filter(t => 
-                    t.category?.toLowerCase() === category.name.toLowerCase() || 
-                    t.category?.toLowerCase() === categoryId
-                  );
+                // Calculate actual spending directly from filtered transactions
+                if (filteredTransactions.length > 0) {
+                  // Find all transactions for this category
+                  const matchingTransactions = filteredTransactions.filter(t => {
+                    // Match by either category ID or category name (case-insensitive)
+                    const transactionCategory = t.category?.toLowerCase() || '';
+                    return (
+                      transactionCategory === categoryId || 
+                      transactionCategory === category.name.toLowerCase()
+                    );
+                  });
                   
                   if (matchingTransactions.length > 0) {
+                    // Sum up all the matching transactions
                     const total = matchingTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-                    console.log(`Calculated total for ${category.name} directly from transactions: ${total}`);
+                    console.log(`[BudgetSummary] Category ${category.name}: ${matchingTransactions.length} transactions totaling ${total}`);
                     return total;
                   }
                 }
                 
+                // Use the category totals as a backup (these should already be filtered)
+                if (categoryTotals && typeof categoryTotals[categoryId] !== 'undefined') {
+                  return categoryTotals[categoryId];
+                }
+                
                 // Default to 0 if no amount found
                 return 0;
-              })();
+              })() as number;
               
               // Calculate the percentage of income allocated to this category
               const categoryPercentage = preferences?.ratios ?
