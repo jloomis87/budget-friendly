@@ -1402,9 +1402,9 @@ const BudgetAppContent: React.FC = () => {
                 src="/logo/friendlybudgetslogo.svg" 
                 alt="Friendly Budgets Logo" 
                 style={{
-                  width: '100%',
+                  width: '150%',
                   height: 'auto',
-                  maxWidth: '900px',
+                  maxWidth: '2000px',  // Increased from 900px by 30%
                   filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
                   marginBottom: '1rem'
                 }}
