@@ -472,26 +472,26 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
     labels: monthlyTrends.map(data => data.month),
     datasets: [
       {
-        label: preferences.categoryCustomization.essentials.name,
+        label: preferences?.categoryCustomization?.essentials?.name || 'Essentials',
         data: monthlyTrends.map(data => data.essentials),
-        borderColor: preferences.categoryCustomization.essentials.color,
-        backgroundColor: `${preferences.categoryCustomization.essentials.color}33`,
+        borderColor: preferences?.categoryCustomization?.essentials?.color || '#2196f3',
+        backgroundColor: `${preferences?.categoryCustomization?.essentials?.color || '#2196f3'}33`,
         fill: true,
         tension: 0.4,
       },
       {
-        label: preferences.categoryCustomization.wants.name,
+        label: preferences?.categoryCustomization?.wants?.name || 'Wants',
         data: monthlyTrends.map(data => data.wants),
-        borderColor: preferences.categoryCustomization.wants.color,
-        backgroundColor: `${preferences.categoryCustomization.wants.color}33`,
+        borderColor: preferences?.categoryCustomization?.wants?.color || '#ff9800',
+        backgroundColor: `${preferences?.categoryCustomization?.wants?.color || '#ff9800'}33`,
         fill: true,
         tension: 0.4,
       },
       {
-        label: preferences.categoryCustomization.savings.name,
+        label: preferences?.categoryCustomization?.savings?.name || 'Savings',
         data: monthlyTrends.map(data => data.savings),
-        borderColor: preferences.categoryCustomization.savings.color,
-        backgroundColor: `${preferences.categoryCustomization.savings.color}33`,
+        borderColor: preferences?.categoryCustomization?.savings?.color || '#4caf50',
+        backgroundColor: `${preferences?.categoryCustomization?.savings?.color || '#4caf50'}33`,
         fill: true,
         tension: 0.4,
       },
@@ -1000,9 +1000,16 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
 
           {/* Category Cards */}
           {['essentials', 'wants', 'savings'].map((category) => {
-            const customCategory = preferences.categoryCustomization[category as keyof typeof preferences.categoryCustomization];
-            const actual = categoryTotals[category as keyof typeof categoryTotals];
-            const target = plan.recommended[category as keyof typeof plan.recommended];
+            const defaultCategory = {
+              name: category.charAt(0).toUpperCase() + category.slice(1),
+              color: category === 'essentials' ? '#2196f3' : category === 'wants' ? '#ff9800' : '#4caf50',
+              icon: category === 'essentials' ? '🏠' : category === 'wants' ? '🛍️' : '💰'
+            };
+            const customCategory = preferences && preferences.categoryCustomization ? 
+              preferences.categoryCustomization[category as keyof typeof preferences.categoryCustomization] || defaultCategory : 
+              defaultCategory;
+            const actual = categoryTotals ? categoryTotals[category as keyof typeof categoryTotals] || 0 : 0;
+            const target = plan && plan.recommended ? plan.recommended[category as keyof typeof plan.recommended] || 0 : 0;
             const difference = target - actual;
             const { progress, status } = calculateProgress(actual, target);
 
@@ -1014,21 +1021,21 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <Avatar 
                           sx={{ 
-                            bgcolor: customCategory.color,
+                            bgcolor: customCategory?.color,
                             mr: 1,
                             width: 32,
                             height: 32,
                             fontSize: '0.875rem'
                           }}
                         >
-                          {customCategory.name.charAt(0).toUpperCase()}
+                          {customCategory?.name.charAt(0).toUpperCase()}
                         </Avatar>
                         <Typography variant="h6">
-                          {customCategory.name}
+                          {customCategory?.name}
                         </Typography>
                       </Box>
                       <Chip 
-                        label={formatPercentage((plan.recommended[category as keyof typeof plan.recommended] / plan.income) * 100)} 
+                        label={formatPercentage((plan?.recommended?.[category as keyof typeof plan.recommended] || 0) / (plan?.income || 1) * 100)} 
                         size="small"
                         color="primary"
                         variant="outlined"

@@ -174,6 +174,7 @@ export function useTransactions(initialBudgetId?: string) {
   // Load transactions from Firestore when authenticated or when budget changes
   useEffect(() => {
     const loadTransactions = async () => {
+      // Skip if missing requirements
       if (!isAuthenticated || !user?.id || !currentBudgetId) {
         console.log('[useTransactions] Skipping transaction load due to missing requirements:', {
           isAuthenticated,
@@ -183,7 +184,7 @@ export function useTransactions(initialBudgetId?: string) {
         return;
       }
 
-      // Remove the shouldReload check to ensure we load transactions when needed
+      // Skip if already loading
       if (isLoading) {
         console.log('[useTransactions] Skipping load - already loading');
         return;
@@ -192,8 +193,7 @@ export function useTransactions(initialBudgetId?: string) {
       console.log('[useTransactions] Loading transactions for budget:', {
         userId: user.id,
         currentBudgetId,
-        isAuthenticated,
-        shouldReload
+        isAuthenticated
       });
       
       try {
@@ -219,15 +219,19 @@ export function useTransactions(initialBudgetId?: string) {
           setBudgetSummary(summary);
           setBudgetPlan(plan);
           setSuggestions(budgetSuggestions);
-          setShouldReload(false);
           setIsLoading(false);
+          
+          // Reset shouldReload flag after loading completes
+          if (shouldReload) {
+            setShouldReload(false);
+          }
         });
-        
+       
       } catch (error) {
         console.error('[useTransactions] Error loading transactions:', error);
         ReactDOM.unstable_batchedUpdates(() => {
-          setShouldReload(false);
           setIsLoading(false);
+          setShouldReload(false); // Reset even on error
           setAlertMessage({
             type: 'error',
             message: 'Failed to load transactions. Please try again.'
@@ -236,8 +240,12 @@ export function useTransactions(initialBudgetId?: string) {
       }
     };
     
-    loadTransactions();
-  }, [isAuthenticated, user, currentBudgetId, shouldReload]);
+    // Load transactions immediately when the budget ID is set and we're not already loading
+    // or when shouldReload is true
+    if ((currentBudgetId && !isLoading) || shouldReload) {
+      loadTransactions();
+    }
+  }, [currentBudgetId, isAuthenticated, user?.id, shouldReload]); // Remove isLoading from dependencies to prevent infinite loop
 
   // Update a transaction
   const updateTransaction = useCallback(async (index: number, updatedFields: Partial<Transaction>) => {
