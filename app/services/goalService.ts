@@ -14,15 +14,23 @@ export interface FinancialGoal {
   interestRate?: number;
   compoundingFrequency?: 'monthly' | 'quarterly' | 'annually';
   loanTerm?: number; // Number of months for the loan term
+  budgetId?: string; // Budget ID this goal is associated with
 }
 
 /**
  * Load all financial goals for a user
  */
-export const loadGoals = async (userId: string): Promise<FinancialGoal[]> => {
+export const loadGoals = async (userId: string, budgetId?: string): Promise<FinancialGoal[]> => {
   try {
     const goalsRef = collection(db, 'users', userId, 'goals');
-    const snapshot = await getDocs(goalsRef);
+    let goalsQuery = goalsRef;
+    
+    // If budgetId is provided, filter goals by that budget
+    if (budgetId) {
+      goalsQuery = query(goalsRef, where('budgetId', '==', budgetId));
+    }
+    
+    const snapshot = await getDocs(goalsQuery);
     
     return snapshot.docs.map(doc => ({
       id: doc.id,

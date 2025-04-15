@@ -59,9 +59,10 @@ interface FinancialGoalsProps {
   transactions: Transaction[];
   selectedMonths: string[];
   totalIncome: number;
+  currentBudgetId: string;
 }
 
-export function FinancialGoals({ transactions, selectedMonths, totalIncome }: FinancialGoalsProps) {
+export function FinancialGoals({ transactions, selectedMonths, totalIncome, currentBudgetId }: FinancialGoalsProps) {
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
   const [openGoalDialog, setOpenGoalDialog] = useState(false);
   const [editingGoal, setEditingGoal] = useState<FinancialGoal | null>(null);
@@ -178,12 +179,12 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
     return () => clearInterval(intervalId);
   }, [goals, user?.id]);
   
-  // Load goals from Firebase when component mounts
+  // Load goals from Firebase when component mounts or budget changes
   useEffect(() => {
     const fetchGoals = async () => {
       if (user?.id) {
         try {
-          const loadedGoals = await loadGoals(user.id);
+          const loadedGoals = await loadGoals(user.id, currentBudgetId);
           setGoals(loadedGoals);
         } catch (error) {
           console.error('Error loading goals:', error);
@@ -192,7 +193,7 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
     };
     
     fetchGoals();
-  }, [user?.id]);
+  }, [user?.id, currentBudgetId]);
   
   // Calculate monthly savings rate based on transactions
   const calculateMonthlySavingsRate = () => {
@@ -364,7 +365,8 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome }: Fi
         currentAmount: goalData.currentAmount,
         deadline: new Date(deadline).toISOString(),
         category: goalData.category,
-        notes: goalData.notes
+        notes: goalData.notes,
+        budgetId: currentBudgetId
       };
       
       // Add interest fields only if it's a debt goal

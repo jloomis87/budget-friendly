@@ -121,7 +121,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
   const theme = useMuiTheme();
   const { mode } = useAppTheme();
   const { user } = useAuth();
-  const { categories } = useCategories(); // Add this line to get categories from context
+  const { categories, currentBudgetId } = useCategories(); // Add current budget id from categories context
   const [isBrowser, setIsBrowser] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const isDarkMode = mode === 'dark';
@@ -1149,6 +1149,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
           transactions={monthlyTransactions}
           selectedMonths={selectedMonths}
           totalIncome={categoryTotals.income as number}
+          currentBudgetId={currentBudgetId || ''}
         />
       )}
 
