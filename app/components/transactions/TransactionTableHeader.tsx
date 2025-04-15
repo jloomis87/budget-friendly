@@ -13,9 +13,57 @@ import { useCategories } from '../../contexts/CategoryContext';
 
 // Common emoji options for categories
 const emojiOptions = [
-  '📊', '💰', '🏠', '🛍️', '🍔', '✈️', '🚗', '🏥', '📚', '🎮', '🎬', '🎵', '👕', '💼', 
-  '💻', '📱', '🧾', '🧹', '🎓', '🏋️', '🎭', '🚌', '🌍', '🎁', '🏦', '🥗', '👶', '🐶', 
-  '🎪', '⚽', '🎨', '📷', '💄', '🔧', '📞', '🛒', '🍕', '☕', '🍹', '🥦'
+  // Finance and Money
+  '💰', '💵', '💸', '💳', '🏦', '💹', '📈', '📉', '💎', '👛', '💼', '🧾', '💲', '💱', '🪙',
+  '📊', '🧮', '💴', '💶', '💷', '🏧', '💡', '📋', '📇', '📬', '📭', '📄', '✉️', '📨', '📩',
+  '💌', '💻', '📱', '⌚', '🖥️', '📟', '📠', '🏷️', '🔖', '📑', '☑️', '✅', '✓', '⭐', '🌟',
+  // Shopping and Retail
+  '🛒', '🛍️', '👕', '👗', '👟', '👠', '👜', '🧥', '🕶️', '👑', '💄', '⌚', '💍', '🎒',
+  '👔', '👖', '🧣', '🧤', '👒', '🎩', '🧢', '👞', '🥾', '🥿', '👢', '👚', '👘', '👙', '👝',
+  '🦺', '💼', '👓', '🥽', '🧦', '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🪀', '🎮', '🎲',
+  '🎯', '🎺', '🎸', '🪕', '🎻', '🥁', '🎹', '🪗', '🎨', '📱', '🧸', '📻', '🔌', '🧴', '🧼',
+  // Food and Dining
+  '🍕', '🍔', '🍟', '🌮', '🌯', '🥗', '🍣', '🍱', '🍜', '🍲', '🍛', '🍝', '🥪', '🥙', '🥩',
+  '🍖', '🍗', '🥓', '🧀', '🥚', '🍞', '🥐', '🥨', '🥯', '🥞', '🧇', '🍳', '🥘', '🍿', '🧂',
+  '☕', '🍵', '🧋', '🥤', '🧃', '🥛', '🍷', '🍸', '🍹', '🍺', '🍻', '🥂', '🥃', '🥡',
+  // Home and Living
+  '🏠', '🏡', '🧹', '🧼', '🧺', '🛁', '🚿', '🪠', '🧯', '🛋️', '🪑', '🛏️', '🚪', '🪟', '🪴',
+  '🪞', '🧸', '🔧', '🪛', '🪚', '🧰', '💡', '🔌', '🧲', '🧻', '🪥', '🧴',
+  // Transportation
+  '🚗', '🚙', '🚕', '🛻', '🏎️', '🚌', '🚎', '🚓', '🚑', '🚒', '🚐', '🛺', '🚲', '🛵', '🏍️',
+  '✈️', '🚁', '🚀', '🚂', '🚆', '🚇', '🚊', '🚉', '🚤', '⛴️', '🚢', '🚞', '🚋', '🚝', '🚈',
+  // Entertainment and Leisure
+  '🎬', '🎮', '🎯', '🎲', '🎨', '🎭', '🎪', '🎟️', '🎫', '🎼', '🎵', '🎸', '🎹', '🎺', '🎻',
+  '🎷', '🎧', '📺', '📱', '📷', '🎥', '💻', '🎁', '🎊', '🎉', '🏟️', '🏀', '⚽', '🏈', '⚾',
+  '🎾', '🎱', '🏉', '🏐', '🏓', '🎣', '🎳', '🥌', '⛸️', '🛷', '🎿',
+  // Health and Medical
+  '💊', '💉', '🩹', '🩺', '🔬', '🧪', '🦷', '🧠', '👓', '🧬', '🏥', '⚕️', '🩸', '🩻', '🫀',
+  // Education
+  '📚', '📝', '📎', '✏️', '✒️', '🖋️', '🖊️', '🖌️', '🖍️', '📏', '📐', '📓', '📔', '📒', '📕',
+  '📗', '📘', '📙', '🎓', '🔍', '🔎', '📄', '📑', '📊', '📋', '📌', '📍', '🧮', '📆', '📅',
+  // Technology
+  '💻', '⌨️', '🖥️', '🖱️', '💿', '💾', '📀', '🧮', '🔋', '🔌', '📱', '📲', '☎️', '📞', '📟',
+  '📠', '⏱️', '⏲️', '⏰', '🕰️', '📡', '🔦', '🪫', '💡', '🔍', '🔎', '📡',
+  // Utilities and Services
+  '📦', '📫', '📪', '📬', '📭', '📮', '🗒️', '🗓️', '🔖', '🏷️', '📧', '📨', '📩', '📤', '📥',
+  '📁', '📂', '🗂️', '📰', '🗞️', '📑', '🔒', '🔓', '🔏', '🔐', '🔑', '🗝️', '🔨', '🪓', '⛏️',
+  // Travel and Places
+  '🏔️', '⛰️', '🌋', '🗻', '🏕️', '🏖️', '🏜️', '🏝️', '🏞️', '🌅', '🌄', '🌠', '🏙️', '🌆', '🌇',
+  '🌉', '🏘️', '🏰', '🏯', '🏛️', '⛪', '🕌', '🕍', '⛩️', '🕋', '🛕', '🏛️', '🛬', '🛫', '🚏',
+  // Nature and Weather
+  '🌲', '🌳', '🌴', '🌵', '🌱', '🌿', '☘️', '🍀', '🍃', '🍂', '🌾', '🌷', '🌹', '🌺', '🌸',
+  '🌼', '🌻', '🌞', '🌝', '🌚', '🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘', '🌙', '🌛',
+  '🌜', '⭐', '🌟', '💫', '✨', '☄️', '☀️', '🌤️', '⛅', '🌥️', '☁️', '🌦️', '🌧️', '⛈️',
+  // People and Activities
+  '👪', '👶', '👧', '👦', '👩', '👨', '👩‍🍼', '👨‍🍼', '👩‍🎓', '👨‍🎓', '👩‍⚕️', '👨‍⚕️', '👩‍🔧', '👨‍🔧',
+  '👩‍🚒', '👨‍🚒', '👩‍🏫', '👨‍🏫', '👩‍💻', '👨‍💻', '👩‍🚀', '👨‍🚀', '👩‍⚖️', '👨‍⚖️', '👰', '🤵',
+  '🧑‍🤝‍🧑', '🧗', '🏊', '🚴', '🧘', '🏋️', '🏄', '🏌️', '🧖', '🤾',
+  // Animals and Pets
+  '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🦁', '🐯', '🐮', '🐷', '🐸', '🐵',
+  '🐔', '🐧', '🐦', '🦆', '🦅', '🦉', '🐴', '🦄', '🐝', '🐛', '🦋', '🐌', '🐞', '🐟', '🐠',
+  // Miscellaneous / Special categories
+  '❤️', '💘', '💝', '💖', '💗', '💓', '💞', '💕', '💌', '💯', '✅', '❎', '🏆', '🥇', '🥈',
+  '🥉', '🧿', '🔮', '🧸', '🎵', '🎶', '🎺'
 ];
 
 export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
@@ -182,15 +230,10 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
   const handleEditClick = () => {
     setEditedName(category);
     setIsEditing(true);
-    // Ensure we have the latest icon when editing starts
-    if (categoryInfo?.icon) {
-      setSelectedIcon(categoryInfo.icon);
-    }
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
-    setEmojiPickerAnchor(null);
   };
 
   const handleSaveEdit = async () => {
@@ -201,31 +244,19 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
     const foundCategory = getCategoryByName(category);
     if (foundCategory) {
       try {
-        // Create update object and only include properties that have changed
-        const updates: Record<string, string> = {};
-        
+        // Only update name now, since icon updates are handled separately
         if (editedName !== category) {
-          updates.name = editedName.trim();
-        }
-        
-        if (selectedIcon !== foundCategory.icon) {
-          updates.icon = selectedIcon;
-        }
-        
-        // Only update if we have changes to make
-        if (Object.keys(updates).length > 0) {
-          await updateCategory(foundCategory.id, updates);
+          await updateCategory(foundCategory.id, {
+            name: editedName.trim()
+          });
         }
         
         setIsEditing(false);
-        setEmojiPickerAnchor(null);
       } catch (error) {
         console.error('Error updating category:', error);
-        // Could add error handling UI here
       }
     } else {
       setIsEditing(false);
-      setEmojiPickerAnchor(null);
     }
   };
 
@@ -247,6 +278,12 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
 
   const handleSelectEmoji = (emoji: string) => {
     setSelectedIcon(emoji);
+    
+    // If we're not in edit mode, save the change immediately
+    if (!isEditing) {
+      handleDirectIconUpdate(emoji);
+    }
+    
     setEmojiPickerAnchor(null);
   };
 
@@ -270,6 +307,26 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
     setDeleteDialogOpen(false);
   };
 
+  // Add a new function to handle direct icon updates
+  const handleDirectIconUpdate = async (newIcon?: string) => {
+    if (!categoryInfo) return;
+    
+    try {
+      // Use passed icon or the one from state
+      const iconToUse = newIcon || selectedIcon;
+      
+      // Only update if the icon has changed
+      if (iconToUse !== categoryInfo.icon) {
+        await updateCategory(categoryInfo.id, {
+          icon: iconToUse
+        });
+        console.log('Icon updated successfully to:', iconToUse);
+      }
+    } catch (error) {
+      console.error('Error updating category icon:', error);
+    }
+  };
+
   return (
     <Box sx={{ 
       p: 2, 
@@ -281,26 +338,8 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
     }}>
       {isEditing ? (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            mr: 1, 
-            cursor: 'pointer',
-            bgcolor: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-            p: 0.7,
-            borderRadius: 1,
-            '&:hover': {
-              bgcolor: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)',
-            }
-          }} 
-            onClick={handleOpenEmojiPicker}
-          >
-            <Box sx={{ fontSize: '1.2rem', mr: 0.5 }}>
-              {selectedIcon}
-            </Box>
-            <EmojiEmotionsIcon fontSize="small" sx={{ 
-              color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.5)',
-            }} />
+          <Box sx={{ fontSize: '1.3rem', mr: 1.5, display: 'flex', alignItems: 'center' }}>
+            {categoryInfo?.icon || '📊'}
           </Box>
           <TextField
             value={editedName}
@@ -338,8 +377,35 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
         </Box>
       ) : (
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Box sx={{ fontSize: '1.3rem', mr: 1.5, display: 'flex', alignItems: 'center' }}>
-            {categoryInfo?.icon || '📊'}
+          <Box 
+            sx={{ 
+              fontSize: '1.3rem', 
+              mr: 1.5, 
+              display: 'flex', 
+              alignItems: 'center',
+              cursor: 'pointer',
+              padding: '4px',
+              borderRadius: '50%',
+              transition: 'all 0.2s',
+              '&:hover': {
+                backgroundColor: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.07)',
+                transform: 'scale(1.05)'
+              },
+              '&:active': {
+                transform: 'scale(0.97)'
+              }
+            }}
+            onClick={(e) => {
+              setSelectedIcon(categoryInfo?.icon || '📊');
+              setEditedName(category);
+              setEmojiPickerAnchor(e.currentTarget);
+            }}
+          >
+            <Tooltip title="Click to change icon">
+              <Box component="span">
+                {categoryInfo?.icon || '📊'}
+              </Box>
+            </Tooltip>
           </Box>
           <Typography 
             variant="h6" 
@@ -513,7 +579,10 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
       <Popover
         open={Boolean(emojiPickerAnchor)}
         anchorEl={emojiPickerAnchor}
-        onClose={handleCloseEmojiPicker}
+        onClose={() => {
+          setEmojiPickerAnchor(null);
+          // We no longer need this since we handle updates in handleSelectEmoji
+        }}
         anchorOrigin={{
           vertical: 'bottom',
           horizontal: 'left',
@@ -523,31 +592,298 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
           horizontal: 'left',
         }}
       >
-        <Box sx={{ p: 2, width: 300, maxHeight: 400, overflow: 'auto' }}>
-          <Typography variant="subtitle2" gutterBottom>
+        <Box sx={{ 
+          p: 1.5, 
+          pl: 2, 
+          pr: 2, 
+          width: 750, 
+          maxHeight: 500, 
+          overflowY: 'auto',
+          overflowX: 'hidden'
+        }}>
+          <Typography variant="subtitle1" gutterBottom fontWeight="bold">
             Select an icon for {editedName || category}
+          </Typography>
+          
+          {/* Finance and Money section */}
+          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+            Finance & Money
           </Typography>
           <Box 
             sx={{ 
               display: 'grid', 
-              gridTemplateColumns: 'repeat(8, 1fr)',
-              gap: 1,
-              mt: 1
+              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+              gap: 0.5,
+              mx: 'auto',
+              maxWidth: '100%',
+              justifyContent: 'start'
             }}
           >
-            {emojiOptions.map((emoji) => (
+            {emojiOptions.slice(0, 45).map((emoji) => (
               <Paper
                 key={emoji}
                 elevation={selectedIcon === emoji ? 3 : 1}
                 sx={{
-                  width: 32,
-                  height: 32,
+                  width: 28,
+                  height: 28,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
                   borderRadius: 1,
-                  fontSize: '1.2rem',
+                  fontSize: '0.95rem',
+                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                  }
+                }}
+                onClick={() => handleSelectEmoji(emoji)}
+              >
+                {emoji}
+              </Paper>
+            ))}
+          </Box>
+          
+          {/* Shopping and Retail section */}
+          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+            Shopping & Retail
+          </Typography>
+          <Box 
+            sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+              gap: 0.5,
+              mx: 'auto',
+              maxWidth: '100%',
+              justifyContent: 'start'
+            }}
+          >
+            {emojiOptions.slice(45, 104).map((emoji) => (
+              <Paper
+                key={emoji}
+                elevation={selectedIcon === emoji ? 3 : 1}
+                sx={{
+                  width: 28,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  borderRadius: 1,
+                  fontSize: '0.95rem',
+                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                  }
+                }}
+                onClick={() => handleSelectEmoji(emoji)}
+              >
+                {emoji}
+              </Paper>
+            ))}
+          </Box>
+          
+          {/* Food and Dining section */}
+          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+            Food & Dining
+          </Typography>
+          <Box 
+            sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+              gap: 0.5,
+              mx: 'auto',
+              maxWidth: '100%',
+              justifyContent: 'start'
+            }}
+          >
+            {emojiOptions.slice(104, 154).map((emoji) => (
+              <Paper
+                key={emoji}
+                elevation={selectedIcon === emoji ? 3 : 1}
+                sx={{
+                  width: 28,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  borderRadius: 1,
+                  fontSize: '0.95rem',
+                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                  }
+                }}
+                onClick={() => handleSelectEmoji(emoji)}
+              >
+                {emoji}
+              </Paper>
+            ))}
+          </Box>
+          
+          {/* Home and Living section */}
+          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+            Home & Living
+          </Typography>
+          <Box 
+            sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+              gap: 0.5,
+              mx: 'auto',
+              maxWidth: '100%',
+              justifyContent: 'start'
+            }}
+          >
+            {emojiOptions.slice(154, 181).map((emoji) => (
+              <Paper
+                key={emoji}
+                elevation={selectedIcon === emoji ? 3 : 1}
+                sx={{
+                  width: 28,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  borderRadius: 1,
+                  fontSize: '0.95rem',
+                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                  }
+                }}
+                onClick={() => handleSelectEmoji(emoji)}
+              >
+                {emoji}
+              </Paper>
+            ))}
+          </Box>
+          
+          {/* Transportation section */}
+          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+            Transportation
+          </Typography>
+          <Box 
+            sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+              gap: 0.5,
+              mx: 'auto',
+              maxWidth: '100%',
+              justifyContent: 'start'
+            }}
+          >
+            {emojiOptions.slice(181, 211).map((emoji) => (
+              <Paper
+                key={emoji}
+                elevation={selectedIcon === emoji ? 3 : 1}
+                sx={{
+                  width: 28,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  borderRadius: 1,
+                  fontSize: '0.95rem',
+                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                  }
+                }}
+                onClick={() => handleSelectEmoji(emoji)}
+              >
+                {emoji}
+              </Paper>
+            ))}
+          </Box>
+          
+          {/* Entertainment section */}
+          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+            Entertainment & Leisure
+          </Typography>
+          <Box 
+            sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+              gap: 0.5,
+              mx: 'auto',
+              maxWidth: '100%',
+              justifyContent: 'start'
+            }}
+          >
+            {emojiOptions.slice(211, 261).map((emoji) => (
+              <Paper
+                key={emoji}
+                elevation={selectedIcon === emoji ? 3 : 1}
+                sx={{
+                  width: 28,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  borderRadius: 1,
+                  fontSize: '0.95rem',
+                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'scale(1.1)',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                  }
+                }}
+                onClick={() => handleSelectEmoji(emoji)}
+              >
+                {emoji}
+              </Paper>
+            ))}
+          </Box>
+          
+          {/* Other sections - combined grid for remaining categories */}
+          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+            Other Categories
+          </Typography>
+          <Box 
+            sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+              gap: 0.5,
+              mx: 'auto',
+              maxWidth: '100%',
+              justifyContent: 'start'
+            }}
+          >
+            {emojiOptions.slice(261).map((emoji) => (
+              <Paper
+                key={emoji}
+                elevation={selectedIcon === emoji ? 3 : 1}
+                sx={{
+                  width: 28,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  borderRadius: 1,
+                  fontSize: '0.95rem',
                   bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
                   border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
                   transition: 'all 0.2s ease',
