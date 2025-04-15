@@ -443,7 +443,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
 
   // Calculate monthly trends for chart
   const calculateMonthlyTrends = () => {
-    if (!filteredTransactions.length) return { months: [], datasets: [] };
+    if (!filteredTransactions.length) return { months: [] as string[], datasets: [] as any[] };
     
     // Get all months from transactions
     const allMonths = Array.from(new Set(filteredTransactions.map(t => {
@@ -470,6 +470,14 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
       .filter(cat => !cat.isIncome)
       .map(cat => cat.id.toLowerCase());
     
+    // Create a mapping of category names to IDs for matching transactions
+    const categoryNameToId = new Map<string, string>();
+    categories.forEach(cat => {
+      if (!cat.isIncome) {
+        categoryNameToId.set(cat.name.toLowerCase(), cat.id.toLowerCase());
+      }
+    });
+    
     // Initialize data structure for each month and category
     const monthlyData: Record<string, Record<string, number>> = {};
     
@@ -495,29 +503,18 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
           monthlyData[month][category] += Math.abs(t.amount);
         } else {
           // If no direct ID match, try to find a category with a matching name
-          const matchingCategory = categories.find(
-            cat => cat.name.toLowerCase() === category
-          );
+          const categoryId = categoryNameToId.get(category);
           
-          if (matchingCategory) {
+          if (categoryId) {
             // If found, use the category's ID
-            const categoryId = matchingCategory.id.toLowerCase();
             monthlyData[month][categoryId] += Math.abs(t.amount);
           } else {
-            // If the category doesn't exist in our structure, add it dynamically
-            if (!monthlyData[month][category]) {
-              // Initialize this category for all months if it doesn't exist
-              allMonths.forEach(m => {
-                monthlyData[m][category] = 0;
-              });
-              // Add this category to our tracking list
-              if (!categoryIds.includes(category)) {
-                categoryIds.push(category);
-              }
-            }
-            // Now add the amount
-            monthlyData[month][category] += Math.abs(t.amount);
-            console.log(`Added transaction amount to dynamic category: ${category}`);
+            // If the category doesn't exist in our structure, add to "Other" or similar
+            console.log(`Skipping transaction with deleted category: ${category}`);
+            // Optional: create an "Other" category to capture these amounts
+            // if (categoryIds.includes('other')) {
+            //   monthlyData[month]['other'] += Math.abs(t.amount);
+            // }
           }
         }
       }
@@ -1103,9 +1100,11 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
               })() as number;
               
               // Calculate the percentage of income allocated to this category
-              const categoryPercentage = preferences?.ratios ?
-                preferences.ratios[categoryId as keyof typeof preferences.ratios] || 0 :
-                category.percentage || 0;
+              const categoryPercentage = category.percentage || 
+                (preferences?.ratios ? preferences.ratios[categoryId as keyof typeof preferences.ratios] || 0 : 0);
+              
+              // Log values for debugging
+              console.log(`[BudgetSummary] Category ${category.name}: Firebase percentage=${category.percentage}, Preferences ratio=${preferences?.ratios ? preferences.ratios[categoryId] : 'undefined'}, Using=${categoryPercentage}%`);
               
               // Calculate target directly from income and percentage allocation
               const totalIncome = categoryTotals.income as number || 0;
