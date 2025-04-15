@@ -1129,7 +1129,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
                               fontSize: '0.875rem'
                             }}
                           >
-                            {category.name.charAt(0).toUpperCase()}
+                            {category.icon || category.name.charAt(0).toUpperCase()}
                           </Avatar>
                           <Typography variant="h6">
                             {category.name}

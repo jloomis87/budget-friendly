@@ -16,6 +16,7 @@
 .env.development.local
 .env.test.local
 .env.production.local
+.env
 
 # Logs
 npm-debug.log*
@@ -24,7 +25,9 @@ yarn-error.log*
 
 # Editor directories and files
 .idea
-.vscode
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 *.suo
 *.ntvs*
 *.njsproj
@@ -37,3 +40,11 @@ yarn-error.log*
 # Vercel
 .vercel
 .turbo
+
+# Typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Cache
+.cache/
+.eslintcache
