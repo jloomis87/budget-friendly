@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Box, Typography, IconButton, TextField, Tooltip, Paper, Popover } from '@mui/material';
+import { Box, Typography, IconButton, TextField, Tooltip, Paper, Popover, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
 import { CategoryColorPicker } from '../CategoryColorPicker';
 import { TransactionSort } from './TransactionSort';
 import type { TransactionTableHeaderProps } from './types';
 import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
@@ -29,11 +30,13 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(category);
   const [emojiPickerAnchor, setEmojiPickerAnchor] = useState<null | HTMLElement>(null);
-  const { updateCategory, getCategoryByName, categories } = useCategories();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const { updateCategory, getCategoryByName, categories, deleteCategory } = useCategories();
   
-  // Find the category to get its icon
+  // Find the category to get its icon and check if it's a default category
   const categoryData = categories.find(c => c.name === category);
   const [selectedIcon, setSelectedIcon] = useState(categoryData?.icon || '📊');
+  const isDefaultCategory = categoryData?.isDefault || false;
 
   const handleEditClick = () => {
     setEditedName(category);
@@ -104,6 +107,26 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
   const handleSelectEmoji = (emoji: string) => {
     setSelectedIcon(emoji);
     setEmojiPickerAnchor(null);
+  };
+
+  const handleDeleteClick = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (categoryData && !categoryData.isDefault) {
+      try {
+        await deleteCategory(categoryData.id);
+        // The component will unmount as part of the parent re-render
+      } catch (error) {
+        console.error('Error deleting category:', error);
+      }
+    }
+    setDeleteDialogOpen(false);
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
   };
 
   // Don't allow editing the default Income category
@@ -192,21 +215,41 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
             {category}
           </Typography>
           {!isIncome && (
-            <Tooltip title="Edit category name and icon">
-              <IconButton 
-                onClick={handleEditClick} 
-                size="small"
-                sx={{ 
-                  ml: 1,
-                  color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
-                  '&:hover': {
-                    color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.9)' : (isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)'),
-                  }
-                }}
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Tooltip title="Edit category name and icon">
+                <IconButton 
+                  onClick={handleEditClick} 
+                  size="small"
+                  sx={{ 
+                    ml: 1,
+                    color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
+                    '&:hover': {
+                      color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.9)' : (isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)'),
+                    }
+                  }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              
+              {!isDefaultCategory && (
+                <Tooltip title="Delete category">
+                  <IconButton 
+                    onClick={handleDeleteClick} 
+                    size="small"
+                    sx={{ 
+                      ml: 0.5,
+                      color: hasCustomDarkColor ? 'rgba(255, 80, 80, 0.7)' : 'rgba(211, 47, 47, 0.7)',
+                      '&:hover': {
+                        color: hasCustomDarkColor ? 'rgba(255, 80, 80, 0.9)' : 'rgba(211, 47, 47, 0.9)',
+                      }
+                    }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Box>
           )}
         </Box>
       )}
@@ -287,6 +330,41 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
           </Box>
         </Box>
       </Popover>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleDeleteCancel}
+        aria-labelledby="delete-category-dialog-title"
+      >
+        <DialogTitle id="delete-category-dialog-title">
+          Delete {category} Category?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete the "{category}" category? This will permanently remove this category
+            and may affect transactions associated with it. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} color="primary">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteConfirm} 
+            color="error" 
+            variant="contained"
+            sx={{ 
+              bgcolor: 'error.main',
+              '&:hover': {
+                bgcolor: 'error.dark',
+              }
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }; 

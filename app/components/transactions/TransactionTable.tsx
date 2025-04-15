@@ -15,6 +15,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCategories } from '../../contexts/CategoryContext';
+import { useTableColors } from '../../hooks/useTableColors';
 
 interface TransactionTableProps {
   category: string;
@@ -47,6 +48,7 @@ export const TransactionTableContent: React.FC = () => {
   const context = useTransactionTableContext();
   const { user } = useAuth();
   const { categories } = useCategories();
+  const [tableColors] = useTableColors();
   const [sortOption, setSortOption] = useState<SortOption>('date');
   
   const { 
@@ -99,6 +101,45 @@ export const TransactionTableContent: React.FC = () => {
     isCopyMode,
     dragLeaveTimeout
   } = dragState;
+  
+  // First, define the getCategoryBackgroundColor function
+  const getCategoryBackgroundColor = useCallback(() => {
+    // First check if we have a custom color set via the color picker
+    if (tableColors && tableColors[category]) {
+      return tableColors[category];
+    }
+    
+    // If no custom color is set in tableColors, fallback to category colors
+    const foundCategory = categories.find(c => c.name === category);
+    
+    if (foundCategory) {
+      return foundCategory.color;
+    }
+    
+    // Fallback to default table color for this category
+    return props.isDark ? '#424242' : '#f5f5f5';
+  }, [category, categories, props.isDark, tableColors]);
+
+  // Determine if we have custom colors - define these before using them
+  const hasCustomColor = getCategoryBackgroundColor() !== (isDark ? '#424242' : '#f5f5f5');
+  const hasCustomDarkColor = hasCustomColor && isColorDark(getCategoryBackgroundColor() || '');
+
+  // Now define getUpdatedBackgroundStyles using the variables we've already defined
+  const getUpdatedBackgroundStyles = () => {
+    const baseStyles = getBackgroundStyles();
+    if (hasCustomColor) {
+      const bgColor = getCategoryBackgroundColor();
+      return {
+        ...baseStyles,
+        backgroundColor: bgColor,
+        // Adjust text colors based on background darkness
+        color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)',
+      };
+    }
+    return baseStyles;
+  };
+
+  const backgroundStyles = getUpdatedBackgroundStyles();
   
   // Load sort preference from Firebase
   useEffect(() => {
@@ -544,25 +585,6 @@ export const TransactionTableContent: React.FC = () => {
     // Reset drag state completely
     resetDragState();
   };
-  
-  // Get the background styles for the table
-  const backgroundStyles = getBackgroundStyles();
-  
-  // Get category color from the CategoryContext
-  const getCategoryBackgroundColor = useCallback(() => {
-    const foundCategory = categories.find(c => c.name === category);
-    
-    if (foundCategory) {
-      return foundCategory.color;
-    }
-    
-    // Fallback to default table color for this category
-    return props.isDark ? '#424242' : '#f5f5f5';
-  }, [category, categories, props.isDark]);
-
-  // Determine if we have custom colors
-  const hasCustomColor = getCategoryBackgroundColor() !== (isDark ? '#424242' : '#f5f5f5');
-  const hasCustomDarkColor = hasCustomColor && isColorDark(getCategoryBackgroundColor() || '');
 
   return (
     <Box sx={{ position: 'relative', mb: 2}}>
@@ -589,7 +611,7 @@ export const TransactionTableContent: React.FC = () => {
           isDark={isDark}
           hasCustomColor={hasCustomColor}
           hasCustomDarkColor={hasCustomDarkColor}
-          tableColors={{}}
+          tableColors={tableColors}
           sortOption={sortOption}
           onSortChange={handleSortChange}
         />
@@ -665,6 +687,7 @@ export const TransactionTableContent: React.FC = () => {
               handleCopyMonthClick={handleCopyMonthClick}
               getNextMonth={getNextMonth}
               getMonthOrder={getMonthOrder}
+              tableColors={tableColors}
             />
           ))}
         </Box>

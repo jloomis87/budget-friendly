@@ -202,6 +202,7 @@ export interface MonthColumnProps {
   handleCopyMonthClick: (month: string, transactions: Transaction[]) => void;
   getNextMonth: (currentMonth: string) => string;
   getMonthOrder: (month: string) => number;
+  tableColors?: Record<string, string>;
 }
 
 export interface DragIndicatorProps {

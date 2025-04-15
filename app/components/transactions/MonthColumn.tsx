@@ -33,9 +33,22 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
   handleOpenMobileAdd,
   handleCopyMonthClick,
   getNextMonth,
-  getMonthOrder
+  getMonthOrder,
+  tableColors = {}
 }) => {
   const [isCopyModeState, setIsCopyMode] = React.useState(isCopyMode);
+
+  const getUpdatedCardBackgroundColor = (isHover?: boolean) => {
+    if (tableColors && tableColors[category]) {
+      if (isHover) {
+        const baseColor = tableColors[category];
+        return `${baseColor}CC`;
+      }
+      return tableColors[category];
+    }
+    
+    return getCardBackgroundColor(isHover);
+  };
 
   return (
     <Box 
@@ -67,9 +80,8 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
         px: 0.5,
         display: 'flex',
         flexDirection: 'column',
-        // Add styles for when this month is the drop target
         ...(dragOverMonth === month ? {
-          backgroundColor: 'rgba(33, 150, 243, 0.15)', // Blue for move
+          backgroundColor: 'rgba(33, 150, 243, 0.15)',
           borderRadius: 1,
           transition: 'all 0.3s ease',
           transform: 'scale(1.02)',
@@ -85,12 +97,10 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
         e.preventDefault();
         e.stopPropagation();
 
-        // Check if we have a dragged transaction
         if (!draggedTransaction) {
           return;
         }
 
-        // Check for duplicates in the target month
         const isDuplicate = (monthTransactions as Transaction[]).some(
           transaction => 
             transaction.description === draggedTransaction.description && 
@@ -98,7 +108,6 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
         );
 
         if (isDuplicate) {
-          // If it's a duplicate, don't allow the drag over
           e.dataTransfer.dropEffect = 'none';
           handleMonthDragLeave(e);
           return;
@@ -116,12 +125,10 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
         e.preventDefault();
         e.stopPropagation();
 
-        // Check if we have a dragged transaction
         if (!draggedTransaction) {
           return;
         }
 
-        // Check for duplicates in the target month
         const isDuplicate = (monthTransactions as Transaction[]).some(
           transaction => 
             transaction.description === draggedTransaction.description && 
@@ -129,7 +136,6 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
         );
 
         if (isDuplicate) {
-          // If it's a duplicate, don't allow the drop
           console.log('Duplicate transaction found in month - drop prevented');
           handleMonthDragLeave(e);
           return;
@@ -215,12 +221,10 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           e.preventDefault();
           e.stopPropagation();
           
-          // Check if we have a dragged transaction
           if (!draggedTransaction) {
             return;
           }
 
-          // Check for duplicates in the target month
           const isDuplicate = (monthTransactions as Transaction[]).some(
             transaction => 
               transaction.description === draggedTransaction.description && 
@@ -228,7 +232,6 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           );
 
           if (isDuplicate) {
-            // If it's a duplicate, don't allow the drag over
             e.dataTransfer.dropEffect = 'none';
             handleMonthDragLeave(e);
             return;
@@ -236,7 +239,6 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
 
           e.dataTransfer.dropEffect = 'move';
           
-          // Only update if we're not already over a specific card
           if (dragOverIndex === null || dragOverIndex >= (monthTransactions as Transaction[]).length) {
             handleTransactionDragOver(e, month, (monthTransactions as Transaction[]).length);
           }
@@ -245,12 +247,10 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           e.preventDefault();
           e.stopPropagation();
           
-          // Check if we have a dragged transaction
           if (!draggedTransaction) {
             return;
           }
 
-          // Check for duplicates in the target month
           const isDuplicate = (monthTransactions as Transaction[]).some(
             transaction => 
               transaction.description === draggedTransaction.description && 
@@ -258,17 +258,14 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           );
 
           if (isDuplicate) {
-            // If it's a duplicate, don't allow the drop
             console.log('Duplicate transaction found in stack - drop prevented');
             handleMonthDragLeave(e);
             return;
           }
           
-          // Drop at the end of the list
           handleTransactionDrop(e, month, (monthTransactions as Transaction[]).length);
         }}
       >
-        {/* Add button if there are no transactions */}
         {(monthTransactions as Transaction[]).length === 0 && (
           <Card
             onClick={() => handleOpenMobileAdd(month)}
@@ -279,7 +276,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              bgcolor: getCardBackgroundColor(),
+              bgcolor: getUpdatedCardBackgroundColor(),
               border: 'none',
               borderRadius: 1,
               cursor: 'pointer',
@@ -288,7 +285,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
               '&:hover': {
                 boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
                 transform: 'translateY(-2px)',
-                bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getCardBackgroundColor(true)
+                bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getUpdatedCardBackgroundColor(true)
               }
             }}
           >
@@ -328,7 +325,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
             dragOverIndex={dragOverIndex}
             isIntraMonthDrag={isIntraMonthDrag}
             isCopyMode={isCopyMode}
-            getCardBackgroundColor={getCardBackgroundColor}
+            getCardBackgroundColor={getUpdatedCardBackgroundColor}
             getTextColor={getTextColor}
             handleTransactionDragStart={handleTransactionDragStart}
             handleTransactionDragOver={handleTransactionDragOver}
@@ -338,7 +335,6 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           />
         ))}
 
-        {/* Add button after transactions if there are any */}
         {(monthTransactions as Transaction[]).length > 0 && (
           <Card
             onClick={() => handleOpenMobileAdd(month)}
@@ -349,7 +345,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              bgcolor: getCardBackgroundColor(),
+              bgcolor: getUpdatedCardBackgroundColor(),
               border: 'none',
               borderRadius: 1,
               cursor: 'pointer',
@@ -358,7 +354,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
               '&:hover': {
                 boxShadow: '0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23)',
                 transform: 'translateY(-2px)',
-                bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getCardBackgroundColor(true)
+                bgcolor: category === 'Income' ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.3)' : '#ffffff') : getUpdatedCardBackgroundColor(true)
               }
             }}
           >
