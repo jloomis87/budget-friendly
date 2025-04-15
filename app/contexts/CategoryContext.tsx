@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { doc, getDoc, updateDoc, collection, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { useAuth } from './AuthContext';
+import { deleteTransactionsByCategory } from '../services/transactionService';
 
 export interface Category {
   id: string; // Unique identifier
@@ -275,6 +276,12 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const newCategories = categories.filter(cat => cat.id !== id);
       setCategories(newCategories);
       await saveCategories(newCategories);
+
+      // Delete transactions for the category
+      if (user) {
+        console.log(`[CategoryProvider] Deleting transactions for category: ${id}`);
+        await deleteTransactionsByCategory(user.id, id, currentBudgetId);
+      }
     } catch (error) {
       console.error('Error deleting category:', error);
       setError(error instanceof Error ? error.message : 'Failed to delete category');
@@ -282,7 +289,7 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } finally {
       setIsLoading(false);
     }
-  }, [categories, saveCategories, currentBudgetId]);
+  }, [categories, saveCategories, currentBudgetId, user]);
 
   // Get a category by ID (from current budget only)
   const getCategoryById = useCallback((id: string) => {

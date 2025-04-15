@@ -365,4 +365,83 @@ export const reorderTransactions = async (
     console.error('[transactionService] Error reordering transactions:', error);
     throw error;
   }
+};
+
+// Delete all transactions for a specific category
+export const deleteTransactionsByCategory = async (
+  userId: string,
+  categoryId: string,
+  budgetId?: string
+): Promise<void> => {
+  if (!userId || !categoryId) {
+    throw new Error('User ID and category ID are required to delete category transactions');
+  }
+
+  try {
+    let transactionsRef;
+    
+    if (budgetId) {
+      // If budgetId is provided, use the budget's transactions collection
+      transactionsRef = getBudgetTransactionsRef(userId, budgetId);
+    } else {
+      // Otherwise use the legacy path (for backward compatibility)
+      transactionsRef = getUserTransactionsRef(userId);
+    }
+    
+    // Query for all transactions with the given category
+    // First try matching by ID (lowercase for case-insensitive matching)
+    let categoryQuery = query(
+      transactionsRef,
+      where('category', '==', categoryId.toLowerCase())
+    );
+    
+    let querySnapshot = await getDocs(categoryQuery);
+    
+    // If no results, try matching by category name (for backward compatibility)
+    if (querySnapshot.empty) {
+      // Try with the original case
+      categoryQuery = query(
+        transactionsRef,
+        where('category', '==', categoryId)
+      );
+      
+      querySnapshot = await getDocs(categoryQuery);
+    }
+    
+    if (querySnapshot.empty) {
+      console.log(`[transactionService] No transactions found for category: ${categoryId}`);
+      return;
+    }
+    
+    console.log(`[transactionService] Deleting ${querySnapshot.size} transactions for category: ${categoryId}`);
+    
+    // Delete all transactions in batches (Firestore has a limit of 500 operations per batch)
+    const batchSize = 450; // Keep under the 500 limit for safety
+    let batch = writeBatch(db);
+    let operationCount = 0;
+    
+    for (const document of querySnapshot.docs) {
+      batch.delete(document.ref);
+      operationCount++;
+      
+      // If we've reached the batch limit, commit and start a new batch
+      if (operationCount >= batchSize) {
+        await batch.commit();
+        console.log(`[transactionService] Committed batch of ${operationCount} deletes`);
+        batch = writeBatch(db);
+        operationCount = 0;
+      }
+    }
+    
+    // Commit any remaining deletes
+    if (operationCount > 0) {
+      await batch.commit();
+      console.log(`[transactionService] Committed final batch of ${operationCount} deletes`);
+    }
+    
+    console.log(`[transactionService] Successfully deleted all transactions for category ${categoryId}`);
+  } catch (error) {
+    console.error('[transactionService] Error deleting category transactions:', error);
+    throw error;
+  }
 }; 
