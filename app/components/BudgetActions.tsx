@@ -19,7 +19,9 @@ import {
   FormControlLabel,
   Switch,
   Tooltip,
-  Alert
+  Alert,
+  Divider,
+  Paper
 } from '@mui/material';
 import { Settings as SettingsIcon } from '@mui/icons-material';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
@@ -91,7 +93,7 @@ const defaultPreferences: BudgetPreferences = {
   }
 };
 
-export function BudgetActions({ title = "Your Budget Plan", onPreferencesChange }: BudgetActionsProps) {
+export function BudgetActions({ title = "Insights and Planning", onPreferencesChange }: BudgetActionsProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [preferences, setPreferences] = useState<BudgetPreferences>(defaultPreferences);
@@ -193,15 +195,23 @@ export function BudgetActions({ title = "Your Budget Plan", onPreferencesChange 
 
   return (
     <>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6" gutterBottom>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, mx: 0 }}>
+        <Typography 
+          variant="h4" 
+          gutterBottom 
+          sx={{ 
+            fontWeight: 700,
+            ml: 0,
+            pl: 0,
+            color: '#43a047',
+            textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+            letterSpacing: '0.5px',
+            padding: '0.2rem 0',
+            display: 'inline-block'
+          }}
+        >
           {title}
         </Typography>
-        <Tooltip title="Budget Settings">
-          <IconButton onClick={handleSettingsClick}>
-            <SettingsIcon />
-          </IconButton>
-        </Tooltip>
       </Box>
 
       <Menu

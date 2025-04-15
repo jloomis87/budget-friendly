@@ -92,12 +92,25 @@ export const calculateBudgetSummary = (transactions: Transaction[]): BudgetSumma
       // Categorize expenses - handle dynamically based on category
       if (category && category !== 'Income') {
         const lowerCategory = category.toLowerCase();
+        
+        // Check if this category exists in our summary
         if (lowerCategory in summary.categories) {
           summary.categories[lowerCategory] += expenseAmount;
         } else {
-          // If we encounter a category not already in our summary
-          summary.categories[lowerCategory] = expenseAmount;
-          summary.percentages[lowerCategory] = 0; // Initialize percentage
+          // First check if there's a case mismatch
+          const matchingCategory = Object.keys(summary.categories).find(
+            cat => cat.toLowerCase() === lowerCategory
+          );
+          
+          if (matchingCategory) {
+            // Use the existing category with correct case
+            summary.categories[matchingCategory] += expenseAmount;
+          } else {
+            // Add this new category
+            summary.categories[lowerCategory] = expenseAmount;
+            summary.percentages[lowerCategory] = 0; // Initialize percentage
+            console.log(`Added new category to summary: ${lowerCategory}`);
+          }
         }
       }
     }
@@ -131,11 +144,20 @@ export const create503020Plan = (summary: BudgetSummary, preferences?: { ratios?
   // Initialize the recommended, actual, and differences objects
   const recommended: { [key: string]: number } = {};
   const actual: { [key: string]: number } = {
-    essentials: summary.categories.essentials,
-    wants: summary.categories.wants,
-    savings: summary.categories.savings,
+    essentials: summary.categories.essentials || 0,
+    wants: summary.categories.wants || 0,
+    savings: summary.categories.savings || 0,
   };
   const differences: { [key: string]: number } = {};
+  
+  // First, include all categories from the summary in the actual object
+  Object.keys(summary.categories).forEach(category => {
+    // Skip if it's already one of our standard categories
+    if (!['essentials', 'wants', 'savings'].includes(category)) {
+      actual[category] = summary.categories[category];
+      console.log(`Added dynamic category to budget plan: ${category} - $${summary.categories[category]}`);
+    }
+  });
   
   // Calculate recommended amounts for each category based on ratios
   Object.keys(ratios).forEach(category => {
@@ -151,6 +173,15 @@ export const create503020Plan = (summary: BudgetSummary, preferences?: { ratios?
     
     // Calculate difference
     differences[category] = recommended[category] - actual[category];
+  });
+  
+  // Calculate differences for categories not in ratios
+  Object.keys(actual).forEach(category => {
+    if (!(category in recommended)) {
+      // For categories without specified ratios, set recommended to 0
+      recommended[category] = 0;
+      differences[category] = -actual[category]; // Spending without allocation is considered overspending
+    }
   });
   
   return {

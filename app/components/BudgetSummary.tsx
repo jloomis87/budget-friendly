@@ -341,43 +341,56 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
     });
   }, [transactions, selectedMonths]);
 
-  // Calculate category totals from transactions
+  // Calculate totals for each category directly from transactions
   const categoryTotals = useMemo(() => {
-    const totals: { [key: string]: number } = {
-      income: 0,
-      essentials: 0,
-      wants: 0,
-      savings: 0
-    };
+    console.log("Recalculating category totals from transactions");
+    const totals: Record<string, number> = { income: 0 };
     
-    // First get all category IDs from both context and transactions
-    const categoryIds = new Set<string>();
+    // Initialize all category IDs
     categories.forEach(cat => {
-      categoryIds.add(cat.id.toLowerCase());
+      const categoryId = cat.id.toLowerCase();
+      totals[categoryId] = 0;
     });
     
-    // Initialize all categories with zero
-    categoryIds.forEach(categoryId => {
-      if (!(categoryId in totals)) {
-        totals[categoryId] = 0;
-      }
-    });
-    
-    // Calculate totals for each category
-    filteredTransactions.forEach((transaction) => {
-      if (transaction.category) {
-        const category = transaction.category.toLowerCase();
+    // Process all transactions and add to appropriate category totals
+    transactions.forEach(transaction => {
+      if (transaction.amount > 0) {
+        // Income
+        totals.income += transaction.amount;
+      } else {
+        const transactionCategory = transaction.category?.toLowerCase() || 'uncategorized';
+        const amount = Math.abs(transaction.amount);
         
-        if (category === 'income') {
-          totals.income += transaction.amount;
-        } else if (category in totals) {
-          totals[category] += Math.abs(transaction.amount);
+        // First try direct match by ID
+        if (transactionCategory in totals) {
+          console.log(`Adding ${amount} to ${transactionCategory} (direct match)`);
+          totals[transactionCategory] += amount;
+        } else {
+          // Try to find by name
+          const matchingCategory = categories.find(
+            cat => cat.name.toLowerCase() === transactionCategory
+          );
+          
+          if (matchingCategory) {
+            const categoryId = matchingCategory.id.toLowerCase();
+            console.log(`Adding ${amount} to ${categoryId} (matched ${transactionCategory} by name)`);
+            totals[categoryId] += amount;
+          } else {
+            // No match, create a new category entry
+            if (!(transactionCategory in totals)) {
+              totals[transactionCategory] = 0;
+              console.log(`Created new category total for ${transactionCategory}`);
+            }
+            totals[transactionCategory] += amount;
+            console.log(`Adding ${amount} to ${transactionCategory} (new category)`);
+          }
         }
       }
     });
     
+    console.log("Final category totals:", totals);
     return totals;
-  }, [filteredTransactions, categories]);
+  }, [transactions, categories, selectedMonths]);
 
   // Keep track of monthly transactions
   useEffect(() => {
@@ -436,7 +449,21 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
     const allMonths = [...new Set(transactions.map(t => {
       const date = new Date(t.date);
       return `${date.getMonth() + 1}/${date.getFullYear()}`;
-    }))].sort();
+    }))];
+    
+    // Sort months chronologically
+    allMonths.sort((a, b) => {
+      const [aMonth, aYear] = a.split('/');
+      const [bMonth, bYear] = b.split('/');
+      
+      // Compare years first
+      if (aYear !== bYear) {
+        return parseInt(aYear) - parseInt(bYear);
+      }
+      
+      // If years are the same, compare months
+      return parseInt(aMonth) - parseInt(bMonth);
+    });
     
     // Get all categories from context, excluding income
     const categoryIds = categories
@@ -462,8 +489,36 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
         monthlyData[month].income += t.amount;
       } else {
         const category = t.category?.toLowerCase() || '';
+        
+        // First try to match by category ID
         if (categoryIds.includes(category)) {
           monthlyData[month][category] += Math.abs(t.amount);
+        } else {
+          // If no direct ID match, try to find a category with a matching name
+          const matchingCategory = categories.find(
+            cat => cat.name.toLowerCase() === category
+          );
+          
+          if (matchingCategory) {
+            // If found, use the category's ID
+            const categoryId = matchingCategory.id.toLowerCase();
+            monthlyData[month][categoryId] += Math.abs(t.amount);
+          } else {
+            // If the category doesn't exist in our structure, add it dynamically
+            if (!monthlyData[month][category]) {
+              // Initialize this category for all months if it doesn't exist
+              allMonths.forEach(m => {
+                monthlyData[m][category] = 0;
+              });
+              // Add this category to our tracking list
+              if (!categoryIds.includes(category)) {
+                categoryIds.push(category);
+              }
+            }
+            // Now add the amount
+            monthlyData[month][category] += Math.abs(t.amount);
+            console.log(`Added transaction amount to dynamic category: ${category}`);
+          }
         }
       }
     });
@@ -1017,8 +1072,35 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
               }
               
               // Get actual spending for this category
-              const actual = categoryTotals ? 
-                categoryTotals[categoryId as keyof typeof categoryTotals] || 0 : 0;
+              const actual = (() => {
+                // First try to get value from plan.actual which comes from budgetCalculator
+                if (plan?.actual && plan.actual[categoryId]) {
+                  return plan.actual[categoryId];
+                }
+                
+                // If not in plan, try to get from categoryTotals (direct calculation)
+                if (categoryTotals && typeof categoryTotals[categoryId] !== 'undefined') {
+                  return categoryTotals[categoryId];
+                }
+                
+                // If category ID doesn't match, try to find by matching name in transactions
+                if (transactions.length > 0) {
+                  // Calculate total directly from filtered transactions with matching category name
+                  const matchingTransactions = transactions.filter(t => 
+                    t.category?.toLowerCase() === category.name.toLowerCase() || 
+                    t.category?.toLowerCase() === categoryId
+                  );
+                  
+                  if (matchingTransactions.length > 0) {
+                    const total = matchingTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+                    console.log(`Calculated total for ${category.name} directly from transactions: ${total}`);
+                    return total;
+                  }
+                }
+                
+                // Default to 0 if no amount found
+                return 0;
+              })();
               
               // Calculate the percentage of income allocated to this category
               const categoryPercentage = preferences?.ratios ?

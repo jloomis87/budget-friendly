@@ -46,7 +46,8 @@ import {
   RadioGroup,
   Radio,
   ToggleButtonGroup,
-  ToggleButton
+  ToggleButton,
+  Divider
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -1345,37 +1346,33 @@ const BudgetAppContent: React.FC = () => {
         }
       }}>
         <Box sx={{ 
-          p: { xs: 2, sm: 3 }, 
-          borderRadius: 3, 
-          backgroundColor: 'background.paper',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.08)',
-          border: '1px solid',
-          borderColor: 'divider',
+          mx: { xs: 2, sm: 3 },
           overflow: 'hidden',
           position: 'relative',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: 4,
-            background: 'linear-gradient(90deg, rgba(37,99,235,1) 0%, rgba(59,130,246,1) 100%)',
-          }
         }}>
-          <BudgetActions onPreferencesChange={setPreferences} />
-          <BudgetSummary 
-            summary={budgetSummary} 
-            plan={budgetPlan} 
-            suggestions={suggestions}
-            preferences={preferences}
-            transactions={transactions}
-            selectedMonths={selectedMonths}
-            showActualAmounts={preferences.displayPreferences.showActualAmounts}
-            showPercentages={preferences.displayPreferences.showPercentages}
-            showDifferences={preferences.displayPreferences.showDifferences}
-            showProgressBars={preferences.chartPreferences.showProgressBars}
-          />
+          <Paper 
+            elevation={1}
+            sx={{ 
+              p: 2, 
+              pb: 3,
+              borderRadius: 2,
+              overflow: 'hidden'
+            }}
+          >
+            <BudgetActions onPreferencesChange={setPreferences} />
+            <BudgetSummary 
+              summary={budgetSummary} 
+              plan={budgetPlan} 
+              suggestions={suggestions}
+              preferences={preferences}
+              transactions={transactions}
+              selectedMonths={selectedMonths}
+              showActualAmounts={preferences.displayPreferences.showActualAmounts}
+              showPercentages={preferences.displayPreferences.showPercentages}
+              showDifferences={preferences.displayPreferences.showDifferences}
+              showProgressBars={preferences.chartPreferences.showProgressBars}
+            />
+          </Paper>
         </Box>
       </Box>
     );
