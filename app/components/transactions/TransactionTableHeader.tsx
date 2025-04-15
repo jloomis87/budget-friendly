@@ -392,76 +392,113 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
       )}
       
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        {!isIncome && (
-          <Box sx={{ display: 'flex', alignItems: 'center', mr: 1, borderRight: '1px solid rgba(0,0,0,0.1)', pr: 2 }}>
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.7)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)'),
-                fontWeight: 'medium',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <Box component="span" sx={{ mr: 0.5 }}>Target Allocation:</Box>
-              <Tooltip title="Edit target allocation">
-                <Box 
-                  component="span" 
-                  onClick={handlePercentageDialogOpen}
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 2,
+            backgroundColor: 'rgba(33, 33, 33, 0.9)',
+            color: '#ffffff',
+            p: 1.5,
+            px: 2,
+            borderRadius: 2,
+            boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+            backdropFilter: 'blur(4px)',
+            flexGrow: {
+              xs: 1,
+              sm: 0
+            }
+          }}
+        >
+          {/* For non-Income categories, show allocation information */}
+          {!isIncome ? (
+            <>
+              <Box sx={{ display: 'flex', alignItems: 'center', mr: 2, borderRight: '1px solid rgba(255,255,255,0.3)', pr: 2 }}>
+                <Typography 
+                  variant="body2" 
                   sx={{ 
-                    fontWeight: 'bold', 
-                    cursor: 'pointer',
-                    '&:hover': {
-                      textDecoration: 'underline',
-                    },
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    fontWeight: 'medium',
                     display: 'flex',
                     alignItems: 'center',
                   }}
                 >
-                  {percentage}%
-                </Box>
-              </Tooltip>
-            </Typography>
-          </Box>
-        )}
+                  <Box component="span" sx={{ mr: 0.75 }}>Target Allocation:</Box>
+                  <Tooltip title="Edit target allocation">
+                    <Box 
+                      component="span" 
+                      onClick={handlePercentageDialogOpen}
+                      sx={{ 
+                        fontWeight: 'bold', 
+                        cursor: 'pointer',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                        borderRadius: '4px',
+                        px: 1,
+                        py: 0.25,
+                        border: '1px solid rgba(255, 255, 255, 0.25)',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                          color: '#ffffff',
+                          transform: 'scale(1.03)',
+                        },
+                        '&:active': {
+                          transform: 'scale(0.98)',
+                        }
+                      }}
+                    >
+                      {percentage}% <PercentIcon sx={{ ml: 0.5, fontSize: '1rem', opacity: 0.8 }} />
+                    </Box>
+                  </Tooltip>
+                </Typography>
+              </Box>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', mr: 2, borderRight: '1px solid rgba(255,255,255,0.3)', pr: 2 }}>
+                <Tooltip title="Actual spending percentage based on current transactions">
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      fontWeight: 'medium',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Box component="span" sx={{ mr: 0.75 }}>Current Allocation:</Box>
+                    <Box 
+                      component="span" 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        // Keep the color system for allocations but make it more visible
+                        color: getCurrentAllocationColor(Math.abs(totalAmount), percentage),
+                        filter: 'brightness(1.2)'
+                      }}
+                    >
+                      {getCurrentAllocationPercentage(Math.abs(totalAmount))}%
+                    </Box>
+                  </Typography>
+                </Tooltip>
+              </Box>
+            </>
+          ) : null}
+          
+          {/* For all categories, show the total */}
+          <Typography 
+            component="span" 
+            variant="subtitle1" 
+            sx={{ 
+              fontWeight: 600, 
+              color: '#ffffff',
+              fontSize: '0.95rem'
+            }}
+          >
+            Total: ${Math.abs(totalAmount).toFixed(2)}
+          </Typography>
+        </Box>
         
-        {!isIncome && (
-          <Box sx={{ display: 'flex', alignItems: 'center', mr: 1, borderRight: '1px solid rgba(0,0,0,0.1)', pr: 2 }}>
-            <Tooltip title="Actual spending percentage based on current transactions">
-              <Typography 
-                variant="body2" 
-                sx={{ 
-                  color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.7)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.6)'),
-                  fontWeight: 'medium',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-              >
-                <Box component="span" sx={{ mr: 0.5 }}>Current Allocation:</Box>
-                <Box 
-                  component="span" 
-                  sx={{ 
-                    fontWeight: 'bold',
-                    color: getCurrentAllocationColor(Math.abs(totalAmount), percentage),
-                  }}
-                >
-                  {getCurrentAllocationPercentage(Math.abs(totalAmount))}%
-                </Box>
-              </Typography>
-            </Tooltip>
-          </Box>
-        )}
-        <Typography 
-          component="span" 
-          variant="subtitle1" 
-          sx={{ 
-            fontWeight: 500, 
-            color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.7)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.7)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)')),
-            fontSize: '0.9rem'
-          }}
-        >
-          Total: ${Math.abs(totalAmount).toFixed(2)}
-        </Typography>
         <TransactionSort
           sortOption={sortOption}
           onSortChange={onSortChange}
