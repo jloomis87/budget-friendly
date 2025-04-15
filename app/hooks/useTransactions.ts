@@ -14,6 +14,7 @@ import { collection, getDocs, writeBatch, type QueryDocumentSnapshot, doc, getDo
 import { db } from '../firebase/firebaseConfig';
 import ReactDOM from 'react-dom';
 import { useCategorizer } from './useCategories';
+import { useCategories } from '../contexts/CategoryContext';
 import { v4 as uuidv4 } from 'uuid';
 import type { BudgetPreferences } from '../components/BudgetActions';
 
@@ -31,6 +32,16 @@ export function useTransactions(initialBudgetId?: string) {
   
   // State for current budget ID
   const [currentBudgetId, setCurrentBudgetId] = useState<string | undefined>(initialBudgetId);
+  
+  // Get the setCurrentBudgetId function from CategoryContext
+  const { setCurrentBudgetId: setCategoriesBudgetId } = useCategories();
+  
+  // Set categories budget ID on first load if initialBudgetId is provided
+  useEffect(() => {
+    if (initialBudgetId) {
+      setCategoriesBudgetId(initialBudgetId);
+    }
+  }, [initialBudgetId, setCategoriesBudgetId]);
   
   // Add a reset flag to trigger transaction reload
   const [shouldReload, setShouldReload] = useState(false);

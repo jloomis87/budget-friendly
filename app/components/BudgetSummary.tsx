@@ -129,6 +129,13 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
+  // Log categories and current budget ID for debugging
+  useEffect(() => {
+    console.log('[BudgetSummary] Current budget ID:', currentBudgetId);
+    console.log('[BudgetSummary] Categories count:', categories.length);
+    console.log('[BudgetSummary] Categories:', categories.map(c => c.name));
+  }, [categories, currentBudgetId]);
+
   // Add new state variables for investment simulator
   const [initialInvestment, setInitialInvestment] = useState<number>(1000);
   const [monthlyContribution, setMonthlyContribution] = useState<number>(200);

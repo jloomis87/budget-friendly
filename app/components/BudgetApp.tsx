@@ -831,6 +831,9 @@ const BudgetAppContent: React.FC = () => {
   // Load user preferences from Firebase when component mounts or user changes
   const { user } = useAuth();
   
+  // Get the categories context to update the current budget ID
+  const { setCurrentBudgetId: setCategoriesBudgetId } = useCategories();
+  
   // State to keep track of the current budget ID
   const [initialBudgetId, setInitialBudgetId] = useState<string | undefined>(undefined);
   
@@ -844,10 +847,24 @@ const BudgetAppContent: React.FC = () => {
           const budgetsSnapshot = await getDocs(budgetsCollectionRef);
           
           if (!budgetsSnapshot.empty) {
-            // Use the ID of the first budget as the initial budget ID
-            const firstBudgetId = budgetsSnapshot.docs[0].id;
-            console.log('[BudgetAppContent] Setting initial budget ID to:', firstBudgetId);
-            setInitialBudgetId(firstBudgetId);
+            // Get user preferences for last selected budget
+            const userDocRef = doc(db, 'users', user.id);
+            const userDoc = await getDoc(userDocRef);
+            const lastSelectedBudget = userDoc.exists() ? userDoc.data()?.preferences?.lastSelectedBudget : null;
+            
+            // Use last selected budget if available, otherwise use first budget
+            let budgetId;
+            if (lastSelectedBudget && budgetsSnapshot.docs.some(doc => doc.id === lastSelectedBudget)) {
+              budgetId = lastSelectedBudget;
+            } else {
+              budgetId = budgetsSnapshot.docs[0].id;
+            }
+            
+            console.log('[BudgetAppContent] Setting initial budget ID to:', budgetId);
+            setInitialBudgetId(budgetId);
+            
+            // Initialize category context with budget ID right away
+            setCategoriesBudgetId(budgetId);
           } else {
             // If no budgets exist, create a default one
             console.log('[BudgetAppContent] No budgets found, creating default budget');
@@ -861,6 +878,9 @@ const BudgetAppContent: React.FC = () => {
             );
             console.log('[BudgetAppContent] Created default budget with ID:', docRef.id);
             setInitialBudgetId(docRef.id);
+            
+            // Initialize category context with budget ID right away
+            setCategoriesBudgetId(docRef.id);
           }
         } catch (error) {
           console.error('[BudgetAppContent] Error loading initial budget:', error);
@@ -869,7 +889,7 @@ const BudgetAppContent: React.FC = () => {
     };
     
     loadInitialBudget();
-  }, [user]);
+  }, [user, setCategoriesBudgetId]);
   
   useEffect(() => {
     const loadUserPreferences = async () => {
@@ -925,9 +945,6 @@ const BudgetAppContent: React.FC = () => {
     currentBudgetId,
     setCurrentBudgetId
   } = useTransactions(initialBudgetId);
-  
-  // Get the categories context to update the current budget ID
-  const { setCurrentBudgetId: setCategoriesBudgetId } = useCategories();
   
   // Sync the current budget ID between transactions and categories
   useEffect(() => {
