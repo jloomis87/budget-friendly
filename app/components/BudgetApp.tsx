@@ -2020,8 +2020,11 @@ const BudgetAppContent: React.FC = () => {
               src="/logo/friendlybudgetslogo.svg" 
               alt="Friendly Budgets Logo" 
               style={{
-                width: 600,
-                height: 240,
+                marginTop: '-90px',
+                //crop the top and bottom 50px
+                clipPath: 'inset(50px 0)',
+                width: 800,
+                height: 400,
                 filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
                 objectFit: 'contain',
                 marginBottom: '1rem'
@@ -2032,7 +2035,7 @@ const BudgetAppContent: React.FC = () => {
         <Typography 
           variant="subtitle1" 
           sx={{ 
-            mt: 0,
+            mt: -10,
             mb: 2,
             opacity: 0.9, 
             fontWeight: 500,
