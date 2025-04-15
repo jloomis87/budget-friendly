@@ -163,6 +163,12 @@ export function BudgetActions({ title = "Your Budget Plan", onPreferencesChange 
         onPreferencesChange(tempPreferences);
       }
 
+      // Dispatch a custom event to notify that preferences have changed
+      const event = new CustomEvent('budgetPreferencesChanged', { 
+        detail: { preferences: tempPreferences } 
+      });
+      window.dispatchEvent(event);
+
       setSettingsOpen(false);
       setError(null);
     } catch (error) {

@@ -10,11 +10,12 @@ import {
 import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from './useLocalStorage';
 import { useAuth } from '../contexts/AuthContext';
 import * as transactionService from '../services/transactionService';
-import { collection, getDocs, writeBatch, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, getDocs, writeBatch, type QueryDocumentSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import ReactDOM from 'react-dom';
 import { useCategorizer } from './useCategories';
 import { v4 as uuidv4 } from 'uuid';
+import type { BudgetPreferences } from '../components/BudgetActions';
 
 export function useTransactions(initialBudgetId?: string) {
   // Get current user from auth context
@@ -26,6 +27,7 @@ export function useTransactions(initialBudgetId?: string) {
   const [budgetPlan, setBudgetPlan] = useState<BudgetPlan | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [budgetPreferences, setBudgetPreferences] = useState<BudgetPreferences | null>(null);
   
   // State for current budget ID
   const [currentBudgetId, setCurrentBudgetId] = useState<string | undefined>(initialBudgetId);
@@ -94,6 +96,57 @@ export function useTransactions(initialBudgetId?: string) {
     message: string 
   } | null>(null);
 
+  // Load budget preferences from Firestore
+  useEffect(() => {
+    const loadBudgetPreferences = async () => {
+      if (isAuthenticated && user?.id) {
+        try {
+          const userDocRef = doc(db, 'users', user.id);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists() && userDoc.data()?.budgetPreferences) {
+            const prefs = userDoc.data().budgetPreferences;
+            setBudgetPreferences(prefs);
+          }
+        } catch (error) {
+          console.error('[useTransactions] Error loading budget preferences:', error);
+        }
+      }
+    };
+
+    loadBudgetPreferences();
+  }, [isAuthenticated, user]);
+
+  // Listen for budget preferences changes
+  useEffect(() => {
+    const handlePreferencesChanged = (event: Event) => {
+      // TypeScript type assertion
+      const customEvent = event as CustomEvent<{ preferences: BudgetPreferences }>;
+      const newPreferences = customEvent.detail.preferences;
+      
+      // Update the preferences state
+      setBudgetPreferences(newPreferences);
+      
+      // Recalculate the budget plan if we have a summary
+      if (budgetSummary) {
+        const plan = create503020Plan(budgetSummary, { ratios: newPreferences.ratios });
+        setBudgetPlan(plan);
+        
+        // Also update suggestions based on the new plan
+        const budgetSuggestions = getBudgetSuggestions(plan);
+        setSuggestions(budgetSuggestions);
+      }
+    };
+    
+    // Add event listener
+    window.addEventListener('budgetPreferencesChanged', handlePreferencesChanged as EventListener);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('budgetPreferencesChanged', handlePreferencesChanged as EventListener);
+    };
+  }, [budgetSummary]); // Only re-run if budgetSummary changes
+
   // Add a transaction
   const addTransaction = useCallback(async (transaction: Transaction) => {
     try {
@@ -136,7 +189,7 @@ export function useTransactions(initialBudgetId?: string) {
         
         // Calculate all updates at once
         const summary = calculateBudgetSummary(updatedTransactions);
-        const plan = create503020Plan(summary);
+        const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
         const budgetSuggestions = getBudgetSuggestions(plan);
         
         // Update all states together
@@ -181,7 +234,8 @@ export function useTransactions(initialBudgetId?: string) {
     setLocalBudgetPlan,
     setLocalSuggestions,
     setShouldReload,
-    categorizeTransaction
+    categorizeTransaction,
+    budgetPreferences
   ]);
 
   // Load transactions from Firestore when authenticated or when budget changes
@@ -223,7 +277,7 @@ export function useTransactions(initialBudgetId?: string) {
 
         // Calculate all updates at once
         const summary = calculateBudgetSummary(sortedTransactions);
-        const plan = create503020Plan(summary);
+        const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
         const budgetSuggestions = getBudgetSuggestions(plan);
         
         // Update all states in a single batch
@@ -326,7 +380,7 @@ export function useTransactions(initialBudgetId?: string) {
         }
         
         // Create budget plan
-        const plan = create503020Plan(summary);
+        const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
         setBudgetPlan(plan);
         
         // Save to localStorage if not authenticated
@@ -373,7 +427,8 @@ export function useTransactions(initialBudgetId?: string) {
     setLocalBudgetSummary, 
     setLocalBudgetPlan, 
     setLocalSuggestions,
-    currentBudgetId  // Add currentBudgetId dependency
+    currentBudgetId,  // Add currentBudgetId dependency
+    budgetPreferences
   ]);
 
   // Update transaction by description
@@ -473,7 +528,7 @@ export function useTransactions(initialBudgetId?: string) {
           }
           
           // Create new budget plan
-          const plan = create503020Plan(summary);
+          const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
           setBudgetPlan(plan);
           
           // Save to localStorage if not authenticated
@@ -521,7 +576,8 @@ export function useTransactions(initialBudgetId?: string) {
     setLocalBudgetSummary, 
     setLocalBudgetPlan, 
     setLocalSuggestions,
-    currentBudgetId  // Add currentBudgetId dependency
+    currentBudgetId,  // Add currentBudgetId dependency
+    budgetPreferences
   ]);
 
   // Reset all transactions
@@ -715,6 +771,7 @@ export function useTransactions(initialBudgetId?: string) {
     getTotalIncome,
     resetTransactions,
     moveTransaction,
-    reorderTransactions
+    reorderTransactions,
+    budgetPreferences
   };
 } 

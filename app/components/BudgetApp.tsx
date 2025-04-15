@@ -40,7 +40,13 @@ import {
   Badge,
   Snackbar,
   AppBar,
-  Toolbar
+  Toolbar,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  Radio,
+  ToggleButtonGroup,
+  ToggleButton
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
@@ -63,7 +69,9 @@ import {
   AddCircle as AddCircleIcon,
   Login as LoginIcon,
   AccountCircle as AccountCircleIcon,
-  Save as SaveIcon
+  Save as SaveIcon,
+  FileUpload as FileUploadIcon,
+  Check as CheckIcon
 } from '@mui/icons-material';
 import { TransactionTable } from './transactions/TransactionTable';
 import { MonthSelector } from './MonthSelector';
@@ -81,10 +89,11 @@ import { CategoryProvider, useCategories } from '../contexts/CategoryContext';
 import { useTransactions } from '../hooks/useTransactions';
 import { useLocalStorage, STORAGE_KEYS, LEGACY_STORAGE_KEYS } from '../hooks/useLocalStorage';
 import { HexColorPicker } from 'react-colorful';
-import { collection, doc, getDoc, getDocs, updateDoc, addDoc, query, orderBy, limit, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, updateDoc, addDoc, query, orderBy, limit, writeBatch, deleteDoc, where } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import type { Theme } from '@mui/material/styles';
 import UserMenu from './auth/UserMenu';
+import { create503020Plan } from '../services/budgetCalculator';
 
 // Add this interface for alert messages
 interface AlertMessage {
@@ -1269,6 +1278,32 @@ const BudgetAppContent: React.FC = () => {
     currentBudgetId,
     categories
   ]);
+
+  // Sync budget preferences with the budget plan
+  useEffect(() => {
+    // Only run this effect if we have the necessary data
+    if (budgetSummary && budgetPlan && preferences?.ratios) {
+      // Check if the current budget plan reflects the current preferences
+      const expectedEssentials = budgetSummary.totalIncome * (preferences.ratios.essentials / 100);
+      const expectedWants = budgetSummary.totalIncome * (preferences.ratios.wants / 100);
+      const expectedSavings = budgetSummary.totalIncome * (preferences.ratios.savings / 100);
+      
+      // Check if the current plan is significantly different from what it should be based on preferences
+      const needsUpdate = 
+        Math.abs(budgetPlan.recommended.essentials - expectedEssentials) > 0.01 ||
+        Math.abs(budgetPlan.recommended.wants - expectedWants) > 0.01 ||
+        Math.abs(budgetPlan.recommended.savings - expectedSavings) > 0.01;
+      
+      if (needsUpdate) {
+        console.log('[BudgetApp] Budget plan does not match preferences, triggering update');
+        // Dispatch event to trigger a recalculation
+        const event = new CustomEvent('budgetPreferencesChanged', { 
+          detail: { preferences } 
+        });
+        window.dispatchEvent(event);
+      }
+    }
+  }, [budgetSummary, budgetPlan, preferences]);
 
   // Memoize the budget summary component to prevent unnecessary re-renders
   const budgetSummaryComponent = useMemo(() => {

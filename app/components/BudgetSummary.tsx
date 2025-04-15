@@ -55,6 +55,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+import { useCategories } from '../contexts/CategoryContext';
 
 // Register ChartJS components
 ChartJS.register(
@@ -120,6 +121,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
   const theme = useMuiTheme();
   const { mode } = useAppTheme();
   const { user } = useAuth();
+  const { categories } = useCategories(); // Add this line to get categories from context
   const [isBrowser, setIsBrowser] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const isDarkMode = mode === 'dark';
@@ -332,47 +334,43 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
     });
   }, [transactions, selectedMonths]);
 
-  // Calculate category totals from filtered transactions
+  // Calculate category totals from transactions
   const categoryTotals = useMemo(() => {
-    console.log('Calculating category totals from filtered transactions:', filteredTransactions);
-    
-    const totals = {
+    const totals: { [key: string]: number } = {
+      income: 0,
       essentials: 0,
       wants: 0,
-      savings: 0,
-      income: 0
+      savings: 0
     };
-
-    filteredTransactions.forEach(transaction => {
-      // Handle income
-      if (transaction.amount >= 0) {
-        console.log('Adding income:', transaction.amount);
-        totals.income += transaction.amount;
-        return;
-      }
-
-      // Handle expenses (negative amounts)
-      const amount = Math.abs(transaction.amount);
-      let category = (transaction.category || 'essentials').toLowerCase();
-      console.log('Processing expense:', { amount, category });
-      
-      // Normalize category names
-      if (category.includes('essential')) category = 'essentials';
-      else if (category.includes('want')) category = 'wants';
-      else if (category.includes('saving')) category = 'savings';
-      else category = 'essentials'; // Default to essentials if no match
-
-      console.log('Normalized category:', category);
-
-      if (category in totals) {
-        totals[category as keyof typeof totals] += amount;
-        console.log(`Updated ${category} total:`, totals[category as keyof typeof totals]);
+    
+    // First get all category IDs from both context and transactions
+    const categoryIds = new Set<string>();
+    categories.forEach(cat => {
+      categoryIds.add(cat.id.toLowerCase());
+    });
+    
+    // Initialize all categories with zero
+    categoryIds.forEach(categoryId => {
+      if (!(categoryId in totals)) {
+        totals[categoryId] = 0;
       }
     });
-
-    console.log('Final category totals:', totals);
+    
+    // Calculate totals for each category
+    filteredTransactions.forEach((transaction) => {
+      if (transaction.category) {
+        const category = transaction.category.toLowerCase();
+        
+        if (category === 'income') {
+          totals.income += transaction.amount;
+        } else if (category in totals) {
+          totals[category] += Math.abs(transaction.amount);
+        }
+      }
+    });
+    
     return totals;
-  }, [filteredTransactions]);
+  }, [filteredTransactions, categories]);
 
   // Keep track of monthly transactions
   useEffect(() => {
@@ -423,81 +421,76 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
     return { progress, status };
   };
 
-  // Calculate monthly trends for the chart
+  // Calculate monthly trends for chart
   const calculateMonthlyTrends = () => {
-    const monthlyData: { [key: string]: { month: string; essentials: number; wants: number; savings: number; income: number } } = {};
-
-    // Initialize monthly data for selected months
-    selectedMonths.forEach(month => {
-      monthlyData[month] = {
-        month,
-        essentials: 0,
-        wants: 0,
-        savings: 0,
-        income: 0,
-      };
+    if (!transactions.length) return { months: [], datasets: [] };
+    
+    // Get all months from transactions
+    const allMonths = [...new Set(transactions.map(t => {
+      const date = new Date(t.date);
+      return `${date.getMonth() + 1}/${date.getFullYear()}`;
+    }))].sort();
+    
+    // Get all categories from context, excluding income
+    const categoryIds = categories
+      .filter(cat => !cat.isIncome)
+      .map(cat => cat.id.toLowerCase());
+    
+    // Initialize data structure for each month and category
+    const monthlyData: Record<string, Record<string, number>> = {};
+    
+    allMonths.forEach(month => {
+      monthlyData[month] = { income: 0 };
+      categoryIds.forEach(category => {
+        monthlyData[month][category] = 0;
+      });
     });
-
-    // Aggregate transactions by month and category
-    monthlyTransactions.forEach(transaction => {
-      const month = new Date(transaction.date).toLocaleString('default', { month: 'long' });
-      if (monthlyData[month]) {
-        if (transaction.amount > 0) {
-          monthlyData[month].income += transaction.amount;
-        } else {
-          const amount = Math.abs(transaction.amount);
-          switch (transaction.category) {
-            case 'Essentials':
-              monthlyData[month].essentials += amount;
-              break;
-            case 'Wants':
-              monthlyData[month].wants += amount;
-              break;
-            case 'Savings':
-              monthlyData[month].savings += amount;
-              break;
-          }
+    
+    // Calculate total for each category per month
+    transactions.forEach(t => {
+      const date = new Date(t.date);
+      const month = `${date.getMonth() + 1}/${date.getFullYear()}`;
+      
+      if (t.category === 'Income') {
+        monthlyData[month].income += t.amount;
+      } else {
+        const category = t.category?.toLowerCase() || '';
+        if (categoryIds.includes(category)) {
+          monthlyData[month][category] += Math.abs(t.amount);
         }
       }
     });
-
-    return Object.values(monthlyData);
+    
+    // Create datasets for each category
+    const datasets = categoryIds.map(category => {
+      const categoryObj = categories.find(c => c.id.toLowerCase() === category);
+      
+      return {
+        label: categoryObj?.name || category.charAt(0).toUpperCase() + category.slice(1),
+        data: allMonths.map(month => monthlyData[month][category]),
+        borderColor: categoryObj?.color || '#' + Math.floor(Math.random()*16777215).toString(16),
+        backgroundColor: categoryObj?.color ? `${categoryObj.color}80` : '#' + Math.floor(Math.random()*16777215).toString(16) + '80',
+        fill: false,
+        tension: 0.4
+      };
+    });
+    
+    return {
+      months: allMonths,
+      datasets
+    };
   };
-
-  // Prepare chart data
-  const monthlyTrends = calculateMonthlyTrends();
   
-  // Prepare data for the trends chart
+  // Get monthly trend data
+  const monthlyTrendData = useMemo(() => calculateMonthlyTrends(), [transactions, categories]);
+  
+  // Format trend chart data
   const trendChartData = {
-    labels: monthlyTrends.map(data => data.month),
-    datasets: [
-      {
-        label: preferences?.categoryCustomization?.essentials?.name || 'Essentials',
-        data: monthlyTrends.map(data => data.essentials),
-        borderColor: preferences?.categoryCustomization?.essentials?.color || '#2196f3',
-        backgroundColor: `${preferences?.categoryCustomization?.essentials?.color || '#2196f3'}33`,
-        fill: true,
-        tension: 0.4,
-      },
-      {
-        label: preferences?.categoryCustomization?.wants?.name || 'Wants',
-        data: monthlyTrends.map(data => data.wants),
-        borderColor: preferences?.categoryCustomization?.wants?.color || '#ff9800',
-        backgroundColor: `${preferences?.categoryCustomization?.wants?.color || '#ff9800'}33`,
-        fill: true,
-        tension: 0.4,
-      },
-      {
-        label: preferences?.categoryCustomization?.savings?.name || 'Savings',
-        data: monthlyTrends.map(data => data.savings),
-        borderColor: preferences?.categoryCustomization?.savings?.color || '#4caf50',
-        backgroundColor: `${preferences?.categoryCustomization?.savings?.color || '#4caf50'}33`,
-        fill: true,
-        tension: 0.4,
-      },
-    ],
+    labels: monthlyTrendData.months,
+    datasets: monthlyTrendData.datasets
   };
 
+  // Chart options for trend chart
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -505,25 +498,30 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
       legend: {
         position: 'top' as const,
       },
-      title: {
-        display: false,
-      },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            let label = context.dataset.label || '';
+            if (label) {
+              label += ': ';
+            }
+            if (context.parsed.y !== null) {
+              label += formatCurrency(context.parsed.y);
+            }
+            return label;
+          }
+        }
+      }
     },
     scales: {
       y: {
-        beginAtZero: true,
         ticks: {
-          callback: function(tickValue: number | string) {
-            return new Intl.NumberFormat('en-US', {
-              style: 'currency',
-              currency: 'USD',
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            }).format(Number(tickValue));
-          },
-        },
-      },
-    },
+          callback: function(value: any) {
+            return formatCurrency(value);
+          }
+        }
+      }
+    }
   };
 
   // Update return rate when investment type changes
@@ -982,10 +980,10 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  Monthly Income
+                  Income
                 </Typography>
                 <Typography variant="h4" color="primary" gutterBottom>
-                  {formatCurrency(categoryTotals.income)}
+                  {formatCurrency(categoryTotals.income as number)}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   {selectedMonths.length > 1 
@@ -999,131 +997,135 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
           </Grid>
 
           {/* Category Cards */}
-          {['essentials', 'wants', 'savings'].map((category) => {
-            const defaultCategory = {
-              name: category.charAt(0).toUpperCase() + category.slice(1),
-              color: category === 'essentials' ? '#2196f3' : category === 'wants' ? '#ff9800' : '#4caf50',
-              icon: category === 'essentials' ? '🏠' : category === 'wants' ? '🛍️' : '💰'
-            };
-            const customCategory = preferences && preferences.categoryCustomization ? 
-              preferences.categoryCustomization[category as keyof typeof preferences.categoryCustomization] || defaultCategory : 
-              defaultCategory;
-            const actual = categoryTotals ? categoryTotals[category as keyof typeof categoryTotals] || 0 : 0;
-            const target = plan && plan.recommended ? plan.recommended[category as keyof typeof plan.recommended] || 0 : 0;
-            const difference = target - actual;
-            const { progress, status } = calculateProgress(actual, target);
-
-            return (
-              <Grid item xs={12} md={4} key={category}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar 
-                          sx={{ 
-                            bgcolor: customCategory?.color,
-                            mr: 1,
-                            width: 32,
-                            height: 32,
-                            fontSize: '0.875rem'
-                          }}
-                        >
-                          {customCategory?.name.charAt(0).toUpperCase()}
-                        </Avatar>
-                        <Typography variant="h6">
-                          {customCategory?.name}
-                        </Typography>
-                      </Box>
-                      <Chip 
-                        label={formatPercentage((plan?.recommended?.[category as keyof typeof plan.recommended] || 0) / (plan?.income || 1) * 100)} 
-                        size="small"
-                        color="primary"
-                        variant="outlined"
-                      />
-                    </Box>
-
-                    <Box sx={{ display: 'flex', alignItems: 'baseline', mb: 1 }}>
-                      <Typography variant="h5" component="div">
-                        {formatCurrency(actual)}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                        {showActualAmounts && `of ${formatCurrency(target)}`}
-                      </Typography>
-                    </Box>
-
-                    {showProgressBars && (
-                      <Box sx={{ mb: 2 }}>
-                        <LinearProgress 
-                          variant="determinate" 
-                          value={Math.min(target > 0 ? (actual / target) * 100 : 0, 100)} 
-                          color={status}
-                          sx={{ height: 8, borderRadius: 4 }}
-                        />
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-                          <Typography variant="body2" color="text.secondary">
-                            {target > 0 
-                              ? formatPercentage((actual / target) * 100)
-                              : '0.0%'}
+          {categories
+            .filter(cat => !cat.isIncome) // Filter out income category
+            .map((category) => {
+              // Get category ID to match with preferences and plan
+              const categoryId = category.id.toLowerCase();
+              
+              // Skip if this category has 0% allocation in preferences
+              if (preferences?.ratios && 
+                  preferences.ratios[categoryId as keyof typeof preferences.ratios] === 0) {
+                return null;
+              }
+              
+              // Get actual spending for this category
+              const actual = categoryTotals ? 
+                categoryTotals[categoryId as keyof typeof categoryTotals] || 0 : 0;
+              
+              // Calculate the percentage of income allocated to this category
+              const categoryPercentage = preferences?.ratios ?
+                preferences.ratios[categoryId as keyof typeof preferences.ratios] || 0 :
+                category.percentage || 0;
+              
+              // Calculate target directly from income and percentage allocation
+              const totalIncome = categoryTotals.income as number || 0;
+              const target = totalIncome > 0 ? (categoryPercentage / 100) * totalIncome : 0;
+              
+              const difference = target - actual;
+              const { progress, status } = calculateProgress(actual, target);
+              
+              return (
+                <Grid item xs={12} md={4} key={category.id}>
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Avatar 
+                            sx={{ 
+                              bgcolor: category.color,
+                              mr: 1,
+                              width: 32,
+                              height: 32,
+                              fontSize: '0.875rem'
+                            }}
+                          >
+                            {category.name.charAt(0).toUpperCase()}
+                          </Avatar>
+                          <Typography variant="h6">
+                            {category.name}
                           </Typography>
-                          {showDifferences && (
-                            <Typography 
-                              variant="body2" 
-                              color={difference > 0 ? 'success.main' : difference < 0 ? 'error.main' : 'text.secondary'}
-                            >
-                              {difference > 0 
-                                ? `${formatCurrency(difference)} under` 
-                                : difference < 0 
-                                  ? `${formatCurrency(Math.abs(difference))} over` 
-                                  : 'On target'}
-                            </Typography>
-                          )}
                         </Box>
+                        <Chip 
+                          label={`${categoryPercentage}%`}
+                          size="small"
+                          color="primary"
+                          variant="outlined"
+                        />
                       </Box>
-                    )}
 
-                    {/* Smart tip based on spending pattern */}
-                    {filteredTransactions.length > 0 && (
-                      <Box sx={{ mt: 2, p: 1.5, bgcolor: 'background.default', borderRadius: 1 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          {category === 'essentials' && difference > 100 ? (
-                            "Tip: You're staying under your essentials budget. Consider increasing your savings or fun spending with the extra funds."
-                          ) : category === 'essentials' && difference < -100 ? (
-                            "Tip: Your essential expenses are over budget. Look for ways to reduce recurring bills or necessary expenses."
-                          ) : category === 'wants' && difference > 100 ? (
-                            "Tip: You're spending less than budgeted on wants. This is great if you're saving for a goal, or you could treat yourself a bit more."
-                          ) : category === 'wants' && difference < -100 ? (
-                            "Tip: Consider reducing your discretionary spending to stay within your budget. Try setting spending limits for entertainment and shopping."
-                          ) : category === 'savings' && difference > 100 ? (
-                            "Tip: Great job saving extra! If desired, you could allocate some of this excess towards your 'wants' category as a reward for good financial habits."
-                          ) : category === 'savings' && difference >= -100 ? (
-                            "Tip: You're doing well with your savings. Maintain this habit to build financial security over time."
-                          ) : category === 'savings' && difference < -100 ? (
-                            "Tip: Consider setting up automatic transfers to your savings account when you receive income to make saving easier."
-                          ) : progress > 100 ? (
-                            category === 'essentials'
-                              ? "Tip: Review recurring bills and look for potential savings on utilities, groceries, or insurance."
-                              : "Tip: Consider delaying non-essential purchases until next month or finding less expensive alternatives."
-                          ) : progress > 90 ? (
-                            category === 'essentials'
-                              ? "Tip: Be careful with any additional essential expenses this month to avoid going over budget."
-                              : category === 'wants'
-                                ? "Tip: Be mindful of any additional discretionary spending this month."
-                                : "Tip: Monitor your savings rate closely for the rest of the month."
-                          ) : (
-                            category === 'essentials'
-                              ? "Tip: Keep tracking essential expenses and look for long-term savings through better rates or eliminating unused subscriptions."
-                              : category === 'wants'
-                                ? "Tip: Plan purchases in advance and set spending limits for entertainment and discretionary items."
-                                : "Tip: Consider increasing automatic transfers to savings if you consistently meet your budget goals."
-                          )}
+                      <Box sx={{ display: 'flex', alignItems: 'baseline', mb: 1 }}>
+                        <Typography variant="h5" component="div">
+                          {formatCurrency(actual)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                          {showActualAmounts && `of ${formatCurrency(target)}`}
                         </Typography>
                       </Box>
-                    )}
-                  </CardContent>
-                </Card>
-              </Grid>
-            );
-          })}
+
+                      {showProgressBars && (
+                        <Box sx={{ mb: 2 }}>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={target > 0 ? Math.min((actual / target) * 100, 100) : 0} 
+                            color={status}
+                            sx={{ height: 8, borderRadius: 4 }}
+                          />
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              {target > 0 
+                                ? formatPercentage((actual / target) * 100)
+                                : '0.0%'}
+                            </Typography>
+                            {showDifferences && (
+                              <Typography 
+                                variant="body2" 
+                                color={difference > 0 ? 'success.main' : difference < 0 ? 'error.main' : 'text.secondary'}
+                              >
+                                {target > 0 ? (
+                                  difference > 0 
+                                    ? `${formatCurrency(difference)} under` 
+                                    : difference < 0 
+                                      ? `${formatCurrency(Math.abs(difference))} over` 
+                                      : 'On target'
+                                ) : (
+                                  actual > 0 ? `${formatCurrency(actual)} spent` : 'No target'
+                                )}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Smart tip based on spending pattern */}
+                      {filteredTransactions.length > 0 && (
+                        <Box sx={{ mt: 2, p: 1.5, bgcolor: 'background.default', borderRadius: 1 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            {difference > 100 ? (
+                              categoryId === 'savings' ?
+                                `Tip: Great job saving extra! If desired, you could allocate some of this excess towards other categories as a reward for good financial habits.` :
+                                `Tip: You're staying under your ${category.name.toLowerCase()} budget. Consider increasing your savings with the extra funds.`
+                            ) : difference < -100 ? (
+                              categoryId === 'savings' ?
+                                `Tip: Consider setting up automatic transfers to your savings account when you receive income to make saving easier.` :
+                                `Tip: Your ${category.name.toLowerCase()} expenses are over budget. Look for ways to reduce spending in this category.`
+                            ) : progress > 100 ? (
+                              `Tip: Review your ${category.name.toLowerCase()} spending and look for potential savings.`
+                            ) : progress > 90 ? (
+                              `Tip: Be careful with any additional ${category.name.toLowerCase()} expenses this month to avoid going over budget.`
+                            ) : (
+                              categoryId === 'savings' ?
+                                `Tip: Consider increasing automatic transfers to savings if you consistently meet your budget goals.` :
+                                `Tip: Keep tracking ${category.name.toLowerCase()} expenses and look for long-term savings.`
+                            )}
+                          </Typography>
+                        </Box>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
 
           {/* Monthly Spending Trends Chart */}
           <Grid item xs={12} sx={{ mt: 3 }}>
@@ -1146,7 +1148,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
         <FinancialGoals
           transactions={monthlyTransactions}
           selectedMonths={selectedMonths}
-          totalIncome={categoryTotals.income}
+          totalIncome={categoryTotals.income as number}
         />
       )}
 
