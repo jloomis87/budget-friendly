@@ -214,7 +214,12 @@ export const TransactionTableProvider = ({
   const utils = useTransactionUtils();
   
   // Get color schemes for each category
-  const { getTableColor } = useTableColors();
+  const [tableColors, , handleCategoryRename] = useTableColors();
+  
+  // Helper function to get the table color for a specific category
+  const getTableColor = useCallback((categoryName: string) => {
+    return tableColors[categoryName] || '#f5f5f5'; // Default light gray if no color is set
+  }, [tableColors]);
   
   // Extract props
   const props = value;

@@ -17,6 +17,14 @@ import {
 import { db } from '../firebase/firebaseConfig';
 import type { Transaction } from '../services/fileParser';
 
+// Extend Transaction interface to include budgetId when storing in Firestore
+interface FirestoreTransaction extends Omit<Transaction, 'id'> {
+  budgetId?: string;
+  userId: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 // Get the transactions subcollection for a user
 const getUserTransactionsRef = (userId: string) => {
   if (!userId || typeof userId !== 'string') {
@@ -94,7 +102,7 @@ export const addTransaction = async (
       userId,
       order: nextOrder, // Set the order field
       createdAt: new Date().toISOString()
-    };
+    } as any; // Use type assertion to avoid TypeScript error
 
     // Only add budgetId to the document if it exists
     if (budgetId) {
@@ -450,4 +458,145 @@ export const deleteTransactionsByCategory = async (
     console.error('[transactionService] Error deleting category transactions:', error);
     throw error;
   }
-}; 
+};
+
+// Update all transactions with a specific category name to a new category name
+export const updateCategoryNameForAllTransactions = async (
+  userId: string,
+  oldCategoryName: string,
+  newCategoryName: string,
+  budgetId?: string,
+  categoryId?: string
+): Promise<number> => {
+  if (!userId) {
+    throw new Error('User ID is required to update transactions');
+  }
+  
+  try {
+    let transactionsRef;
+    
+    if (budgetId) {
+      // If budgetId is provided, use the budget's transactions collection
+      console.log(`[transactionService] Using budget transactions collection with budgetId: ${budgetId}`);
+      transactionsRef = getBudgetTransactionsRef(userId, budgetId);
+    } else {
+      // Otherwise use the legacy path (for backward compatibility)
+      console.log(`[transactionService] Using legacy user transactions collection (no budgetId provided)`);
+      transactionsRef = getUserTransactionsRef(userId);
+    }
+    
+    // Try exact match (case-sensitive)
+    console.log(`[transactionService] Updating transactions with category name: ${oldCategoryName} to ${newCategoryName}`);
+    
+    // Query for transactions with the old category name
+    const categoryQuery = query(
+      transactionsRef,
+      where('category', '==', oldCategoryName)
+    );
+    
+    const querySnapshot = await getDocs(categoryQuery);
+    
+    if (querySnapshot.empty) {
+      console.log(`[transactionService] No transactions found with category: ${oldCategoryName}`);
+      return 0;
+    }
+    
+    console.log(`[transactionService] Found ${querySnapshot.size} transactions to update`);
+    
+    // Update all transactions in batches
+    const batch = writeBatch(db);
+    let updatedCount = 0;
+    
+    querySnapshot.docs.forEach(doc => {
+      // Include categoryId in the update if provided
+      const updateData: { 
+        category: string;
+        updatedAt: string;
+        categoryId?: string;
+      } = { 
+        category: newCategoryName,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Add categoryId to update if provided
+      if (categoryId) {
+        console.log(`[transactionService] Including categoryId ${categoryId} in update`);
+        updateData.categoryId = categoryId;
+      }
+      
+      batch.update(doc.ref, updateData);
+      updatedCount++;
+    });
+    
+    await batch.commit();
+    console.log(`[transactionService] Updated ${updatedCount} transactions from ${oldCategoryName} to ${newCategoryName}${categoryId ? ` with categoryId: ${categoryId}` : ''}`);
+    
+    return updatedCount;
+  } catch (error) {
+    console.error(`[transactionService] Error updating category name: ${error}`);
+    throw error;
+  }
+};
+
+// Update all transactions with categoryId based on their category name
+export const updateTransactionsWithCategoryId = async (
+  userId: string,
+  budgetId: string,
+  categoryMap: Record<string, string> // Map of category names to category IDs
+): Promise<number> => {
+  if (!userId || !budgetId) {
+    throw new Error('User ID and budget ID are required to update transactions');
+  }
+  
+  try {
+    // Get the transactions collection for this budget
+    const transactionsRef = getBudgetTransactionsRef(userId, budgetId);
+    
+    // Get all transactions for this budget
+    const transactionsSnapshot = await getDocs(transactionsRef);
+    
+    if (transactionsSnapshot.empty) {
+      console.log(`[transactionService] No transactions found for budget ${budgetId}`);
+      return 0;
+    }
+    
+    console.log(`[transactionService] Found ${transactionsSnapshot.size} transactions to update with categoryId`);
+    
+    // Use a batch to update all transactions
+    const batch = writeBatch(db);
+    let updatedCount = 0;
+    
+    transactionsSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const category = data.category;
+      
+      // Find the corresponding categoryId
+      if (category && categoryMap[category]) {
+        const categoryId = categoryMap[category];
+        
+        // Only update if categoryId is different or doesn't exist
+        if (!data.categoryId || data.categoryId !== categoryId) {
+          batch.update(doc.ref, {
+            categoryId: categoryId,
+            updatedAt: new Date().toISOString()
+          });
+          updatedCount++;
+        }
+      }
+    });
+    
+    if (updatedCount === 0) {
+      console.log(`[transactionService] No transactions need categoryId updates`);
+      return 0;
+    }
+    
+    console.log(`[transactionService] Committing batch with ${updatedCount} updates`);
+    await batch.commit();
+    console.log(`[transactionService] Batch committed successfully - updated ${updatedCount} transactions`);
+    
+    return updatedCount;
+  } catch (error) {
+    console.error('[transactionService] Error updating transactions with categoryId:', error);
+    throw error;
+  }
+};

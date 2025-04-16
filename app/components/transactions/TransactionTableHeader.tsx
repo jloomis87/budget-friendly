@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, IconButton, TextField, Tooltip, Paper, Popover, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Slider } from '@mui/material';
 import { CategoryColorPicker } from '../CategoryColorPicker';
 import { TransactionSort } from './TransactionSort';
-import type { TransactionTableHeaderProps } from './types';
+import type { TransactionTableHeaderProps as ImportedTransactionTableHeaderProps } from './types';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CheckIcon from '@mui/icons-material/Check';
@@ -11,12 +11,37 @@ import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import PercentIcon from '@mui/icons-material/Percent';
 import { useCategories } from '../../contexts/CategoryContext';
 import { EmojiPicker, emojiOptions, emojiKeywords } from '../../components/EmojiPicker';
+import type { Category } from '../../contexts/CategoryContext';
+import { useTableColors } from '../../hooks/useTableColors';
 
-// Extend the Window interface to include our global function
+// Extend the Window interface to include our global functions
 declare global {
   interface Window {
     updateAllTransactionsWithIcon?: (category: string, icon: string) => Promise<void>;
+    updateAllTransactionsWithNewCategory?: (oldCategoryName: string, newCategoryName: string, categoryId: string) => Promise<void>;
   }
+}
+
+// Extend the imported TransactionTableHeaderProps with our additional properties
+interface TransactionTableHeaderProps extends ImportedTransactionTableHeaderProps {
+  onEditCategory?: (category: string) => void;
+  isDark?: boolean;
+  categories: Category[];
+  updateCategory: (id: string, updates: Partial<Omit<Category, 'id'>>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  getCategoryByName: (name: string) => Category | undefined;
+  hasItems: boolean;
+  onSortChange?: (field: string, direction: 'asc' | 'desc') => void;
+  sortField?: string;
+  sortDirection?: 'asc' | 'desc';
+  totalBudget?: number;
+  categoryData?: {
+    allocated?: number;
+    spent?: number;
+    percentage?: number;
+    isIncome?: boolean;
+  };
+  onAlertMessage?: (message: { type: 'error' | 'warning' | 'info' | 'success', message: string }) => void;
 }
 
 export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
@@ -29,7 +54,8 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
   sortOption,
   onSortChange,
   totalBudget,
-  categoryData
+  categoryData,
+  onAlertMessage
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(category);
@@ -40,6 +66,7 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
   const [percentageError, setPercentageError] = useState<string | null>(null);
   const [categoryPercentages, setCategoryPercentages] = useState<Record<string, number>>({});
   const { updateCategory, getCategoryByName, categories, deleteCategory } = useCategories();
+  const [, , handleCategoryRename] = useTableColors();
   
   // Find the category to get its icon and check if it's a default category
   const categoryInfo = categories.find(c => c.name === category);
@@ -197,19 +224,104 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
     const foundCategory = getCategoryByName(category);
     if (foundCategory) {
       try {
-        // Only update name now, since icon updates are handled separately
+        // Only update if the name has actually changed
         if (editedName !== category) {
+          const oldCategoryName = category;
+          const categoryId = foundCategory.id;
+          console.log(`[DEBUG] Saving category edit: ${oldCategoryName} -> ${editedName.trim()}, ID: ${categoryId}`);
+          
+          // Update the category name only, preserving all other properties like color and icon
           await updateCategory(foundCategory.id, {
             name: editedName.trim()
+            // Note: We're explicitly NOT updating other properties like color or icon
+            // This ensures the color remains consistent when renaming a category
           });
+          
+          // Preserve the table color when renaming the category
+          handleCategoryRename(oldCategoryName, editedName.trim());
+          
+          // Wait a moment for the category update to complete
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          // Update all transactions with the new category name
+          if (window.updateAllTransactionsWithNewCategory) {
+            console.log(`[DEBUG] Starting transaction update for category name change`);
+            try {
+              // Pass the old category name, new category name, and category ID
+              await window.updateAllTransactionsWithNewCategory(oldCategoryName, editedName.trim(), categoryId);
+              console.log(`[DEBUG] Transaction update complete`);
+              
+              // Force refresh UI by dispatching a custom event
+              const refreshEvent = new CustomEvent('forceTransactionRefresh', {
+                detail: { 
+                  category: editedName.trim(),
+                  timestamp: Date.now(),
+                  forceUpdate: true
+                }
+              });
+              document.dispatchEvent(refreshEvent);
+              
+              // Force category reload event to ensure the system gets updated
+              const categoryEvent = new CustomEvent('categoryRenamed', {
+                detail: {
+                  oldName: oldCategoryName,
+                  newName: editedName.trim(),
+                  categoryId: foundCategory.id
+                }
+              });
+              document.dispatchEvent(categoryEvent);
+
+              // Show success message
+              if (onAlertMessage) {
+                onAlertMessage({
+                  type: 'success',
+                  message: `Successfully renamed category "${oldCategoryName}" to "${editedName.trim()}"`
+                });
+              }
+              
+            } catch (updateError) {
+              console.error(`[ERROR] Failed to update transactions with new category: ${updateError}`);
+              if (onAlertMessage) {
+                onAlertMessage({
+                  type: 'error',
+                  message: `Failed to update transactions with new category: ${updateError instanceof Error ? updateError.message : 'Unknown error'}`
+                });
+              }
+            }
+          } else {
+            console.warn('No global function found to update transaction categories. Categories will update on page reload.');
+            if (onAlertMessage) {
+              onAlertMessage({
+                type: 'warning',
+                message: 'Category renamed, but transactions may need to be refreshed manually'
+              });
+            }
+          }
+        } else {
+          console.log(`[DEBUG] No change in category name, skipping update`);
         }
         
         setIsEditing(false);
       } catch (error) {
         console.error('Error updating category:', error);
+        // Show an alert to the user
+        if (onAlertMessage) {
+          onAlertMessage({
+            type: 'error',
+            message: `Failed to update category: ${error instanceof Error ? error.message : 'Unknown error'}`
+          });
+        }
       }
     } else {
+      console.warn(`[WARN] Category "${category}" not found during edit`);
       setIsEditing(false);
+      // Show an alert to the user
+      if (onAlertMessage) {
+        onAlertMessage({
+          type: 'warning',
+          message: `Category "${category}" not found during edit`
+        });
+      }
     }
   };
 

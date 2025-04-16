@@ -35,6 +35,7 @@ interface TransactionTableProps {
   month: string;
   isDark: boolean;
   onTransactionsChange: (newTransactions: Transaction[]) => void;
+  onAlertMessage?: (message: { type: 'error' | 'warning' | 'info' | 'success', message: string }) => void;
 }
 
 export const TransactionTable: React.FC<TransactionTableProps> = (props) => {
@@ -685,6 +686,7 @@ export const TransactionTableContent: React.FC = () => {
           sortOption={sortOption}
           onSortChange={handleSortChange}
           categoryData={categoryData}
+          onAlertMessage={props.onAlertMessage}
         />
         
         {/* Instructions for dragging - show even if no transactions */}

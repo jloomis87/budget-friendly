@@ -39,8 +39,6 @@ export function useTableColors() {
     const loadTableColorsFromFirebase = async () => {
       setIsLoading(true);
       try {
-          
-        
         // Get user settings from Firestore
         const settings = await userSettingsService.getUserSettings(user.id);
         
@@ -48,15 +46,11 @@ export function useTableColors() {
         initialLoadDoneRef.current[user.id] = true;
         
         if (settings && settings.tableColors) {
-          
           // Update local storage
           setLocalTableColors(settings.tableColors);
         } else {
-          
-          
           // If user has custom colors in localStorage but not in Firebase, save them to Firebase
           if (JSON.stringify(localTableColors) !== JSON.stringify(DEFAULT_TABLE_COLORS)) {
-            
             await userSettingsService.saveTableColors(user.id, localTableColors);
           }
         }
@@ -68,7 +62,7 @@ export function useTableColors() {
     };
     
     loadTableColorsFromFirebase();
-  }, [user]); // Only depend on user, not on setLocalTableColors or localTableColors
+  }, [user]);
 
   // Function to update table colors both locally and in Firebase
   const setTableColors = useCallback((newColors: Record<string, string> | ((prevColors: Record<string, string>) => Record<string, string>)) => {
@@ -88,5 +82,42 @@ export function useTableColors() {
     }
   }, [user, localTableColors, setLocalTableColors]);
 
-  return [localTableColors, setTableColors, isLoading] as const;
+  // Function to handle category renaming while preserving the color
+  const handleCategoryRename = useCallback((oldCategoryName: string, newCategoryName: string) => {
+    if (oldCategoryName === newCategoryName) return; // No change needed
+
+    setLocalTableColors(prevColors => {
+      // Check if the old category has a custom color
+      if (prevColors[oldCategoryName]) {
+        console.log(`[useTableColors] Preserving color for renamed category: ${oldCategoryName} -> ${newCategoryName}`);
+        
+        // Create new object with the color transferred from old to new category name
+        const updatedColors = {
+          ...prevColors,
+          [newCategoryName]: prevColors[oldCategoryName]
+        };
+        
+        // Remove the old category entry to avoid orphaned colors
+        // (only if it's not one of the default categories)
+        const isDefaultCategory = DEFAULT_TABLE_COLORS.hasOwnProperty(oldCategoryName);
+        if (!isDefaultCategory) {
+          delete updatedColors[oldCategoryName];
+        }
+        
+        // Save to Firebase if user is authenticated
+        if (user) {
+          userSettingsService.saveTableColors(user.id, updatedColors)
+            .catch(error => {
+              console.error('[useTableColors] Error saving updated category colors to Firebase:', error);
+            });
+        }
+        
+        return updatedColors;
+      }
+      
+      return prevColors; // No changes needed
+    });
+  }, [user, setLocalTableColors]);
+
+  return [localTableColors, setTableColors, handleCategoryRename, isLoading] as const;
 } 

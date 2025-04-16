@@ -10,7 +10,8 @@ export interface Transaction {
   date: Date | number; // Updated to allow day of month as number
   description: string;
   amount: number;
-  category?: string; // Changed from enum to string to allow for custom categories
+  category?: string; // Name of the category
+  categoryId?: string; // ID of the category (matches the Category.id in CategoryContext)
   type: 'income' | 'expense'; // Add required type field
   order?: number; // Order within the category for sorting
   icon?: string; // Optional icon (emoji) for the transaction
@@ -97,7 +98,8 @@ export const parseCSV = (file: File): Promise<Transaction[]> => {
                 date,
                 description,
                 amount,
-                category: categorizeTransaction(description, amount)
+                category: categorizeTransaction(description, amount),
+                type: amount >= 0 ? 'income' : 'expense'
               };
             } catch (rowError) {
               console.warn(`Error processing row ${index}:`, rowError);
@@ -261,7 +263,8 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
             date,
             description,
             amount,
-            category: categorizeTransaction(description, amount)
+            category: categorizeTransaction(description, amount),
+            type: amount >= 0 ? 'income' : 'expense'
           });
         } catch (matchError) {
           console.warn('Error processing PDF match:', matchError);
@@ -321,7 +324,8 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
               date,
               description,
               amount,
-              category: categorizeTransaction(description, amount)
+              category: categorizeTransaction(description, amount),
+              type: amount >= 0 ? 'income' : 'expense'
             });
           } catch (genericError) {
             console.warn('Error processing generic PDF match:', genericError);
@@ -362,7 +366,8 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
                 date,
                 description,
                 amount,
-                category: categorizeTransaction(description, amount)
+                category: categorizeTransaction(description, amount),
+                type: amount >= 0 ? 'income' : 'expense'
               });
             } catch (lineError) {
               console.warn('Error processing line:', lineError);
@@ -478,71 +483,85 @@ const parseAmount = (amountStr: string): number => {
   return 0;
 };
 
-// Simple categorization logic based on keywords and amount
+// Map category names to default category IDs
+const defaultCategoryIds: Record<string, string> = {
+  'Income': 'income',
+  'Essentials': 'essentials',
+  'Wants': 'wants',
+  'Savings': 'savings',
+  'Uncategorized': 'uncategorized'
+};
+
 export const categorizeTransaction = (description: string, amount: number): string => {
-  // Income is positive
-  if (amount > 0) {
-    return 'Income';
-  }
-  
   // Convert description to lowercase for case-insensitive matching
-  const desc = description.toLowerCase();
+  const lowerDesc = description.toLowerCase();
   
-  // Essentials: rent, mortgage, utilities, groceries, healthcare
-  if (
-    desc.includes('rent') || 
-    desc.includes('mortgage') || 
-    desc.includes('electric') || 
-    desc.includes('water') || 
-    desc.includes('gas') || 
-    desc.includes('grocery') || 
-    desc.includes('groceries') || 
-    desc.includes('food') || 
-    desc.includes('pharmacy') || 
-    desc.includes('doctor') || 
-    desc.includes('medical') || 
-    desc.includes('insurance') ||
-    desc.includes('bill') ||
-    desc.includes('utility')
-  ) {
-    return 'Essentials';
+  // Income keywords
+  const incomeKeywords = [
+    'salary', 'deposit', 'payroll', 'income', 'direct deposit', 
+    'payment received', 'dividend', 'interest', 'refund', 'tax refund',
+    'cashback', 'reimbursement', 'transfer in'
+  ];
+  
+  // Essentials keywords
+  const essentialsKeywords = [
+    'rent', 'mortgage', 'electricity', 'water', 'gas', 'utility', 'utilities',
+    'grocery', 'groceries', 'supermarket', 'pharmacy', 'medical', 'doctor',
+    'insurance', 'health', 'dental', 'car insurance', 'home insurance',
+    'phone bill', 'internet', 'cell phone', 'mobile phone', 'pharmacy', 'prescription',
+    'fuel', 'gasoline', 'gas station', 'tax', 'taxes', 'property tax', 'school', 'tuition',
+    'student loan', 'loan payment', 'credit card payment', 'debt payment'
+  ];
+  
+  // Wants keywords
+  const wantsKeywords = [
+    'restaurant', 'dining', 'cafe', 'coffee', 'bar', 'pub', 'amazon', 'shopping',
+    'clothing', 'entertainment', 'movie', 'theatre', 'theater', 'concert', 'travel',
+    'hotel', 'vacation', 'flight', 'uber', 'lyft', 'cab', 'taxi', 'subscription',
+    'netflix', 'spotify', 'hulu', 'disney+', 'youtube', 'apple', 'itunes', 'google',
+    'games', 'alcohol', 'streaming', 'gym', 'fitness', 'hobby', 'toys'
+  ];
+  
+  // Savings keywords
+  const savingsKeywords = [
+    'savings', 'investment', 'transfer to savings', 'deposit to savings', 
+    '401k', 'ira', 'roth', 'vanguard', 'fidelity', 'schwab', 'etrade', 'robinhood',
+    'stock', 'bond', 'mutual fund', 'etf', 'crypto', 'bitcoin', 'ethereum',
+    'retirement', 'brokerage', 'capital one', 'amex savings', 'ally bank'
+  ];
+  
+  // Categorize based on amount and keywords
+  if (amount > 0) {
+    for (const keyword of incomeKeywords) {
+      if (lowerDesc.includes(keyword)) {
+        return 'Income';
+      }
+    }
+  } else {
+    // Check for essentials
+    for (const keyword of essentialsKeywords) {
+      if (lowerDesc.includes(keyword)) {
+        return 'Essentials';
+      }
+    }
+    
+    // Check for wants
+    for (const keyword of wantsKeywords) {
+      if (lowerDesc.includes(keyword)) {
+        return 'Wants';
+      }
+    }
+    
+    // Check for savings
+    for (const keyword of savingsKeywords) {
+      if (lowerDesc.includes(keyword)) {
+        return 'Savings';
+      }
+    }
   }
   
-  // Wants: dining, entertainment, shopping, travel
-  if (
-    desc.includes('restaurant') || 
-    desc.includes('cafe') || 
-    desc.includes('coffee') || 
-    desc.includes('cinema') || 
-    desc.includes('movie') || 
-    desc.includes('theater') || 
-    desc.includes('amazon') || 
-    desc.includes('shopping') || 
-    desc.includes('travel') || 
-    desc.includes('hotel') || 
-    desc.includes('flight') ||
-    desc.includes('subscription') ||
-    desc.includes('entertainment')
-  ) {
-    return 'Wants';
-  }
-  
-  // Savings: investments, retirement, savings accounts
-  if (
-    desc.includes('investment') || 
-    desc.includes('401k') || 
-    desc.includes('ira') || 
-    desc.includes('saving') || 
-    desc.includes('deposit') ||
-    desc.includes('transfer to') ||
-    desc.includes('vanguard') ||
-    desc.includes('fidelity')
-  ) {
-    return 'Savings';
-  }
-  
-  // Default to Essentials if no match is found
-  return 'Essentials';
+  // Default categorization based on amount
+  return amount > 0 ? 'Income' : 'Wants';
 };
 
 // Main function to parse any supported file
@@ -626,7 +645,8 @@ const parseChaseStatement = (text: string): Transaction[] => {
         date,
         description,
         amount,
-        category: 'Income'
+        category: 'Income',
+        type: 'income'
       });
     } catch (error) {
       console.warn('Error processing Chase income match:', error);
@@ -671,7 +691,8 @@ const parseChaseStatement = (text: string): Transaction[] => {
           date,
           description,
           amount,
-          category: categorizeTransaction(description, amount)
+          category: categorizeTransaction(description, amount),
+          type: amount >= 0 ? 'income' : 'expense'
         });
       }
     } catch (error) {
@@ -707,7 +728,8 @@ const parseChaseStatement = (text: string): Transaction[] => {
           date,
           description,
           amount,
-          category: categorizeTransaction(description, amount)
+          category: categorizeTransaction(description, amount),
+          type: amount >= 0 ? 'income' : 'expense'
         });
       } catch (error) {
         console.warn('Error processing simple pattern match:', error);
@@ -766,7 +788,8 @@ const parseChaseStatement = (text: string): Transaction[] => {
                 date,
                 description,
                 amount,
-                category: categorizeTransaction(description, amount)
+                category: categorizeTransaction(description, amount),
+                type: amount >= 0 ? 'income' : 'expense'
               });
             } catch (error) {
               console.warn('Error processing line:', error);
@@ -832,4 +855,15 @@ export const testPdfParsing = async (file: File): Promise<string> => {
     console.error('General error in PDF test:', error);
     return `General error testing PDF parsing: ${error}`;
   }
+};
+
+// Return both category name and ID
+export const getCategoryWithId = (description: string, amount: number): { category: string, categoryId: string } => {
+  const categoryName = categorizeTransaction(description, amount);
+  const categoryId = defaultCategoryIds[categoryName] || 'uncategorized';
+  
+  return {
+    category: categoryName,
+    categoryId: categoryId
+  };
 }; 

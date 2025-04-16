@@ -95,6 +95,8 @@ import { db } from '../firebase/firebaseConfig';
 import type { Theme } from '@mui/material/styles';
 import UserMenu from './auth/UserMenu';
 import { create503020Plan } from '../services/budgetCalculator';
+import * as transactionService from '../services/transactionService';
+import { BudgetSummary as BudgetSummaryType, BudgetPlan as BudgetPlanType } from '../services/budgetCalculator';
 
 // Add this interface for alert messages
 interface AlertMessage {
@@ -766,10 +768,56 @@ const BudgetSelector: React.FC<{
 const PREFERENCES_KEY = 'friendlyBudgets_preferences';
 const LEGACY_PREFERENCES_KEY = 'budgetFriendly_preferences';
 
-// Main App Component
-const BudgetAppContent: React.FC = () => {
+// Add TypeScript declaration for window.updateAllTransactionsWithIcon
+declare global {
+  interface Window {
+    updateAllTransactionsWithIcon?: (category: string, icon: string) => Promise<void>;
+    updateAllTransactionsWithNewCategory?: (oldCategoryName: string, newCategoryName: string, categoryId: string) => Promise<void>;
+  }
+}
+
+// Main exported component at the top level
+function BudgetApp() {
+  return (
+    <AuthProvider>
+      <ThemeProvider>
+        <GlobalStyles
+          styles={{
+            'html, body': {
+              minHeight: '100vh'
+            },
+            '.dragging-active': {
+              cursor: 'grabbing !important'
+            },
+            '.dragging-active *': {
+              cursor: 'grabbing !important'
+            },
+            '.drag-target': {
+              transition: 'transform 0.2s, box-shadow 0.2s'
+            },
+            '.drag-target-hover': {
+              transform: 'scale(1.01)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15) !important'
+            }
+          }}
+        />
+        <SavingsProvider>
+          <CategoryProvider>
+            <BudgetAppContent />
+          </CategoryProvider>
+        </SavingsProvider>
+      </ThemeProvider>
+    </AuthProvider>
+  );
+}
+
+export default BudgetApp;
+
+// Move the actual content component after the export
+// Main App Content Component
+const BudgetAppContent = (): JSX.Element => {
   const theme = useMuiTheme();
-  const { categories } = useCategories(); // Add this line to fix the missing categories reference
+  const { categories, setCurrentBudgetId: setCategoriesBudgetId } = useCategories();
   const [activeStep, setActiveStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
@@ -781,7 +829,18 @@ const BudgetAppContent: React.FC = () => {
   
   // Get current month name for default selection
   const currentMonth = new Date().toLocaleString('default', { month: 'long' });
-  const [selectedMonths, setSelectedMonths] = useState<string[]>([currentMonth]);
+  
+  // State for selected months
+  const [selectedMonths, setSelectedMonths] = useLocalStorage<string[]>(
+    'friendlyBudgets_selectedMonths',
+    'budgetFriendly_selectedMonths',
+    [new Date().toLocaleString('default', { month: 'long' })]
+  );
+  
+  // Refs for month synchronization
+  const isLoadingFromFirebase = useRef(false);
+  const isFirstLoad = useRef(true);
+  const prevBudgetId = useRef<string | null>(null);
   
   // Initialize preferences with default values
   const [preferences, setPreferences] = useLocalStorage<BudgetPreferences>(
@@ -825,101 +884,7 @@ const BudgetAppContent: React.FC = () => {
   );
   
   // Load user preferences from Firebase when component mounts or user changes
-  const { user } = useAuth();
-  
-  // Get the categories context to update the current budget ID
-  const { setCurrentBudgetId: setCategoriesBudgetId } = useCategories();
-  
-  // State to keep track of the current budget ID
-  const [initialBudgetId, setInitialBudgetId] = useState<string | undefined>(undefined);
-  
-  // Load initial budget ID from Firebase
-  useEffect(() => {
-    const loadInitialBudget = async () => {
-      if (user) {
-        try {
-        
-          const budgetsCollectionRef = collection(db, 'users', user.id, 'budgets');
-          const budgetsSnapshot = await getDocs(budgetsCollectionRef);
-          
-          if (!budgetsSnapshot.empty) {
-            // Get user preferences for last selected budget
-            const userDocRef = doc(db, 'users', user.id);
-            const userDoc = await getDoc(userDocRef);
-            const lastSelectedBudget = userDoc.exists() ? userDoc.data()?.preferences?.lastSelectedBudget : null;
-            
-            // Use last selected budget if available, otherwise use first budget
-            let budgetId;
-            if (lastSelectedBudget && budgetsSnapshot.docs.some(doc => doc.id === lastSelectedBudget)) {
-              budgetId = lastSelectedBudget;
-            } else {
-              budgetId = budgetsSnapshot.docs[0].id;
-            }
-            
-       
-            setInitialBudgetId(budgetId);
-            
-            // Initialize category context with budget ID right away
-            setCategoriesBudgetId(budgetId);
-          } else {
-            // If no budgets exist, create a default one
-          
-            const defaultBudget = { 
-              name: 'Main Budget',
-              createdAt: new Date().toISOString()
-            };
-            const docRef = await addDoc(
-              collection(db, 'users', user.id, 'budgets'), 
-              defaultBudget
-            );
-           
-            setInitialBudgetId(docRef.id);
-            
-            // Initialize category context with budget ID right away
-            setCategoriesBudgetId(docRef.id);
-          }
-        } catch (error) {
-          console.error('[BudgetAppContent] Error loading initial budget:', error);
-        }
-      }
-    };
-    
-    loadInitialBudget();
-  }, [user, setCategoriesBudgetId]);
-  
-  useEffect(() => {
-    const loadUserPreferences = async () => {
-      if (user) {
-        const userDocRef = doc(db, 'users', user.id);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          const preferences = userDoc.data()?.preferences || {};
-          setSelectedMonths(preferences.selectedMonths || [currentMonth]);
-        }
-      }
-    };
-    loadUserPreferences();
-  }, [user, currentMonth]);
-
-  // Save selected months to Firebase whenever they change
-  useEffect(() => {
-    const savePreferences = async () => {
-      if (user) {
-        const userDocRef = doc(db, 'users', user.id);
-        const userDoc = await getDoc(userDocRef);
-        const existingPreferences = userDoc.exists() ? userDoc.data()?.preferences || {} : {};
-        
-        await updateDoc(userDocRef, {
-          preferences: {
-            ...existingPreferences,
-            selectedMonths,
-            updatedAt: new Date().toISOString()
-          }
-        });
-      }
-    };
-    savePreferences();
-  }, [selectedMonths, user]);
+  const { user, isAuthenticated } = useAuth();
   
   // Use the transactions hook with the initial budget ID
   const {
@@ -940,18 +905,106 @@ const BudgetAppContent: React.FC = () => {
     reorderTransactions,
     currentBudgetId,
     setCurrentBudgetId,
-    updateAllTransactionsWithSameName
-  } = useTransactions(initialBudgetId);
+    updateAllTransactionsWithSameName,
+    setShouldReload
+  } = useTransactions();
+
+  // Load months from Firebase only when budget changes
+  useEffect(() => {
+    if (!user || !currentBudgetId) {
+      return;
+    }
+    
+    // Skip if it's the same budget we already loaded
+    if (prevBudgetId.current === currentBudgetId) {
+      return;
+    }
+    
+    console.log(`[BudgetAppContent] Loading months for budget: ${currentBudgetId}`);
+    
+    // Set loading flag
+    isLoadingFromFirebase.current = true;
+    
+    const loadFromFirebase = async () => {
+      try {
+        const budgetRef = doc(db, 'users', user.id, 'budgets', currentBudgetId);
+        const budgetDoc = await getDoc(budgetRef);
+        
+        if (budgetDoc.exists() && budgetDoc.data().selectedMonths) {
+          const firebaseMonths = budgetDoc.data().selectedMonths;
+          
+          if (Array.isArray(firebaseMonths) && firebaseMonths.length > 0) {
+            console.log(`[BudgetAppContent] Found months in Firebase: ${firebaseMonths.join(', ')}`);
+            setSelectedMonths(firebaseMonths);
+          } else {
+            console.log('[BudgetAppContent] No valid months found in Firebase, using default month');
+            setSelectedMonths([currentMonth]);
+          }
+        } else {
+          console.log('[BudgetAppContent] No months data in Firebase, using default month');
+          setSelectedMonths([currentMonth]);
+        }
+        
+        // Update the budget ID we've loaded
+        prevBudgetId.current = currentBudgetId;
+      } catch (error) {
+        console.error('[BudgetAppContent] Error loading months from Firebase:', error);
+        // Set default month on error
+        setSelectedMonths([currentMonth]);
+      } finally {
+        // Clear loading flag
+        setTimeout(() => {
+          isLoadingFromFirebase.current = false;
+        }, 500);
+      }
+    };
+    
+    loadFromFirebase();
+  }, [currentBudgetId, user, currentMonth, setSelectedMonths]);
   
-  // Sync the current budget ID between transactions and categories
+  // Save months to Firebase when they change (with conditions to prevent loops)
+  useEffect(() => {
+    // Skip save operations during the first render or when loading
+    if (isFirstLoad.current || !user || !currentBudgetId || isLoadingFromFirebase.current) {
+      isFirstLoad.current = false;
+      return;
+    }
+    
+    console.log(`[BudgetAppContent] Saving months to Firebase: ${selectedMonths.join(', ')}`);
+    
+    const saveToFirebase = async () => {
+      try {
+        const budgetRef = doc(db, 'users', user.id, 'budgets', currentBudgetId);
+        await updateDoc(budgetRef, {
+          selectedMonths,
+          updatedAt: new Date().toISOString()
+        });
+        
+        // Also backup to localStorage
+        const budgetMonthsKey = `friendlyBudgets_selectedMonths_${currentBudgetId}`;
+        localStorage.setItem(budgetMonthsKey, JSON.stringify(selectedMonths));
+      } catch (error) {
+        console.error('[BudgetAppContent] Error saving months to Firebase:', error);
+      }
+    };
+    
+    // Use a short debounce to prevent excessive writes
+    const timeoutId = setTimeout(() => {
+      saveToFirebase();
+    }, 300);
+    
+    return () => clearTimeout(timeoutId);
+  }, [selectedMonths, user, currentBudgetId]);
+
+  // Sync the current budget ID between transactions and categories contexts
   useEffect(() => {
     if (currentBudgetId) {
-      // Update the CategoryContext with the current budget ID
+      console.log(`[BudgetAppContent] Syncing budget ID to categories context: ${currentBudgetId}`);
       setCategoriesBudgetId(currentBudgetId);
     }
   }, [currentBudgetId, setCategoriesBudgetId]);
-  
-  // Color picker state - use useLocalStorage hook directly for this
+
+  // Color picker state for tables
   const [tableColors, setTableColors] = useState<{ [key: string]: string }>({
     Income: '#e3f2fd',
     Essentials: '#e8f5e9',
@@ -960,424 +1013,70 @@ const BudgetAppContent: React.FC = () => {
   });
   const [tableColorPickerAnchor, setTableColorPickerAnchor] = useState<null | HTMLElement>(null);
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
-  
-  // Auth state
-  const { isAuthenticated, isLoading: authLoading, user: authUser, logout, signIn, signUp, error } = useAuth();
-  const [activeAuthTab, setActiveAuthTab] = useState(0);
-  
-  // Login form state
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  
-  // Signup form state
-  const [signupName, setSignupName] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-  const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
-  
-  // Form validation errors
-  const [formErrors, setFormErrors] = useState<{
-    loginEmail?: string;
-    loginPassword?: string;
-    signupName?: string;
-    signupEmail?: string;
-    signupPassword?: string;
-    signupConfirmPassword?: string;
-  }>({});
-  
-  // Handle login form submission
-  const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      await signIn(loginEmail, loginPassword);
-      setLoginEmail('');
-      setLoginPassword('');
-      setActiveAuthTab(0);
-    } catch (error) {
-      console.error('Login error:', error);
-      setAlertMessage({ type: 'error', message: 'Failed to log in. Please check your credentials.' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Handle signup form submission
-  const handleSignupSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    try {
-      // Submit form
-      await signUp(signupEmail, signupPassword, signupName);
-      setSignupEmail('');
-      setSignupPassword('');
-      setSignupName('');
-      setActiveAuthTab(0);
-    } catch (error) {
-      console.error('Signup error:', error);
-      setAlertMessage({ type: 'error', message: 'Failed to create account. Please try again.' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const [tableHover, setTableHover] = useState<number | null>(null);
 
-  const steps = ['Enter Transactions', 'Review Transactions', 'View Budget Plan'];
-
-  // Memoize handlers to prevent recreation on every render
-  const handleNext = useCallback(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setActiveStep((prevStep) => prevStep + 1);
-      setIsLoading(false);
-    }, 500); // Simulate loading for a smoother transition
-  }, []);
-
-  const handleBack = useCallback(() => {
-    setActiveStep((prevStep) => prevStep - 1);
-  }, []);
-
-  const handleReset = useCallback(async () => {
-    try {
-      // Clear all data using the hook function
-      await resetTransactions();
-      setActiveStep(0);
-    } catch (error) {
-      console.error('Error resetting budget:', error);
-      setAlertMessage({
-        type: 'error',
-        message: 'Failed to reset your budget. Please try again.'
-      });
-    }
-  }, [resetTransactions, setActiveStep, setAlertMessage]);
-
-  // Handle drag start
-  const handleDragStart = useCallback((e: React.DragEvent, transaction: Transaction, index: number) => {
-    setDraggedTransaction({ transaction, index });
-    document.body.classList.add('dragging-active');
-  }, []);
-
-  // Handle drag over
-  const handleDragOver = useCallback((e: React.DragEvent, category: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverCategory !== category) {
-      setDragOverCategory(category);
-    }
-  }, [dragOverCategory]);
-
-  // Handle drop
-  const handleDrop = useCallback((e: React.DragEvent, targetCategory: string) => {
-    e.preventDefault();
-    setDragOverCategory(null);
-    document.body.classList.remove('dragging-active');
-    
-    if (!draggedTransaction) return;
-    
-    if (draggedTransaction.transaction.category === targetCategory) {
-      setDraggedTransaction(null);
-      return;
-    }
-    
-    moveTransaction(draggedTransaction.index, targetCategory);
-    setRecentlyDropped(targetCategory);
-    setTimeout(() => {
-      setRecentlyDropped(null);
-    }, 1500);
-    
-    setDraggedTransaction(null);
-  }, [draggedTransaction, moveTransaction]);
-
-  // Handle reordering within a category
-  const handleReorder = useCallback((category: string, sourceIndex: number, targetIndex: number) => {
-    const categoryTransactions = transactions.filter(t => t.category === category);
-    
-    if (sourceIndex < 0 || sourceIndex >= transactions.length || 
-        targetIndex < 0 || targetIndex >= transactions.length) {
-      return;
-    }
-    
-    const sourceTransaction = transactions[sourceIndex];
-    const targetTransaction = transactions[targetIndex];
-    
-    if (!sourceTransaction || !targetTransaction) {
-      return;
-    }
-    
-    if (sourceTransaction.category !== category || targetTransaction.category !== category) {
-      return;
-    }
-    
-    const reordered = [...categoryTransactions];
-    const localSourceIndex = reordered.findIndex(t => t === sourceTransaction);
-    const localTargetIndex = reordered.findIndex(t => t === targetTransaction);
-    
-    if (localSourceIndex === -1 || localTargetIndex === -1) {
-      return;
-    }
-    
-    const [movedItem] = reordered.splice(localSourceIndex, 1);
-    reordered.splice(localTargetIndex, 0, movedItem);
-    
-    const orderedIds = reordered.map(t => t.id).filter(id => id !== undefined) as string[];
-    reorderTransactions(category, orderedIds);
-  }, [transactions, reorderTransactions]);
-  
-  // Clear any drag/drop/animation states when mouse leaves a draggable area
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOverCategory(null);
-  }, []);
-  
-  // Handle drag end
-  const handleDragEnd = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOverCategory(null);
-    setDraggedTransaction(null);
-    document.body.classList.remove('dragging-active');
-  }, []);
-
-  // Auto-dismiss alert messages after 3 seconds
+  // Register the global function for updating transactions with new category names
   useEffect(() => {
-    if (alertMessage) {
-      const timer = setTimeout(() => {
-        setAlertMessage(null);
-      }, 3000);
+    // Create global function to update all transactions with a new category after renaming a category
+    window.updateAllTransactionsWithNewCategory = async (oldCategoryName, newCategoryName, categoryId) => {
+      if (!user || !user.id || !currentBudgetId) {
+        throw new Error('No active budget to update category in');
+      }
       
-      // Clean up the timer if the component unmounts or alertMessage changes
-      return () => clearTimeout(timer);
-    }
-  }, [alertMessage, setAlertMessage]);
-
-  // Handle opening the color picker for transaction tables
-  const handleOpenColorPicker = useCallback((event: React.MouseEvent<HTMLElement>, category: string) => {
-    setTableColorPickerAnchor(event.currentTarget);
-    setCurrentCategory(category);
-  }, []);
-
-  // Handle closing the color picker for transaction tables
-  const handleCloseColorPicker = useCallback(() => {
-    setTableColorPickerAnchor(null);
-    setCurrentCategory(null);
-  }, []);
-
-  // Handle color selection for transaction tables
-  const handleColorSelect = useCallback((color: string) => {
-    if (!currentCategory) return;
-    
-    const updatedColors = {
-      ...tableColors,
-      [currentCategory]: color
+      console.log(`[updateAllTransactionsWithNewCategory] Starting update: ${oldCategoryName} -> ${newCategoryName}, ID: ${categoryId}`);
+      
+      try {
+        // Get all transactions for this budget
+        const transactionsCollectionRef = collection(db, 'users', user.id, 'budgets', currentBudgetId, 'transactions');
+        const transactionsSnapshot = await getDocs(transactionsCollectionRef);
+        
+        if (transactionsSnapshot.empty) {
+          console.log('[updateAllTransactionsWithNewCategory] No transactions found to update');
+          return;
+        }
+        
+        // Find transactions with matching category (case-insensitive)
+        const transactionsToUpdate = transactionsSnapshot.docs.filter((doc) => {
+          const transaction = doc.data();
+          return transaction.category && 
+                 transaction.category.toLowerCase() === oldCategoryName.toLowerCase();
+        });
+        
+        console.log(`[updateAllTransactionsWithNewCategory] Found ${transactionsToUpdate.length} transactions to update`);
+        
+        // Using a batch for better performance and atomicity
+        const batch = writeBatch(db);
+        
+        // Update all matching transactions
+        transactionsToUpdate.forEach(doc => {
+          const transactionRef = doc.ref;
+          
+          // Update category name and ID only, not modifying any color information
+          batch.update(transactionRef, { 
+            category: newCategoryName,
+            categoryId: categoryId,
+            updatedAt: new Date().toISOString() 
+          });
+        });
+        
+        // Commit all updates
+        await batch.commit();
+        console.log(`[updateAllTransactionsWithNewCategory] Successfully updated ${transactionsToUpdate.length} transactions`);
+        
+        // Force a reload of transactions
+        setShouldReload(true);
+      } catch (error) {
+        console.error('[updateAllTransactionsWithNewCategory] Error updating transactions:', error);
+        throw error;
+      }
     };
     
-    setTableColors(updatedColors);
-    setTableColorPickerAnchor(null);
-    setCurrentCategory(null);
-  }, [currentCategory, tableColors]);
+    // Cleanup when component unmounts
+    return () => {
+      delete window.updateAllTransactionsWithNewCategory;
+    };
+  }, [user, currentBudgetId, setShouldReload]);
 
-  // Handle opening auth modal
-  const handleOpenAuthModal = useCallback(() => {
-    // Instead of opening the modal, we'll set the active tab to Login
-    setActiveAuthTab(0);
-  }, []);
-  
-  // Handle closing auth modal
-  const handleCloseAuthModal = useCallback(() => {
-    // Instead of closing the modal, we'll do nothing as the modal is no longer used
-  }, []);
-  
-  // Handler for user not logged in
-  const handleNotLoggedIn = useCallback(() => {
-    // Instead of opening the modal, we'll set the active tab to Login
-    setActiveAuthTab(0);
-  }, [setActiveAuthTab]);
-
-  // Memoize the transaction tables to prevent unnecessary re-renders
-  const transactionTables = useMemo(() => {
-    if (!transactions) return null;
-    
-    // Get all income transactions
-    const incomeTransactions = transactions.filter(t => t.category === 'Income');
-    
-    // Group expense transactions by category
-    const expenseCategories = getTransactionsByCategory();
-    
-    // Create a transaction table for Income
-    const tables = [
-      <TransactionTable
-        key="Income"
-        category="Income"
-        transactions={incomeTransactions}
-        allTransactions={transactions}
-        onUpdateTransaction={updateTransaction}
-        onDeleteTransaction={deleteTransaction}
-        onAddTransaction={addTransaction}
-        onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        dragOverCategory={dragOverCategory}
-        recentlyDropped={recentlyDropped}
-        onReorder={handleReorder}
-        selectedMonths={selectedMonths}
-        month={currentMonth}
-        isDark={isColorDark(tableColors['Income'] || '#e3f2fd')}
-        onTransactionsChange={newTransactions => {
-          // Find and update changed transactions
-          newTransactions.forEach(transaction => {
-            const index = transactions.findIndex(t => t.id === transaction.id);
-            if (index !== -1) {
-              updateTransaction(index, transaction);
-            }
-          });
-        }}
-      />
-    ];
-    
-    // Create transaction tables for all expense categories from the CategoryContext
-    categories
-      .filter(category => category.name !== 'Income' && !category.isIncome)
-      .forEach(category => {
-        // Get transactions for this category
-        const categoryTransactions = expenseCategories[category.name] || [];
-        
-        tables.push(
-          <TransactionTable
-            key={category.id}
-            category={category.name}
-            transactions={categoryTransactions}
-            allTransactions={transactions}
-            onUpdateTransaction={updateTransaction}
-            onDeleteTransaction={deleteTransaction}
-            onAddTransaction={addTransaction}
-            onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-            dragOverCategory={dragOverCategory}
-            recentlyDropped={recentlyDropped}
-            onReorder={handleReorder}
-            selectedMonths={selectedMonths}
-            month={currentMonth}
-            isDark={isColorDark(category.color || '#f5f5f5')}
-            onTransactionsChange={newTransactions => {
-              // Find and update changed transactions
-              newTransactions.forEach(transaction => {
-                const index = transactions.findIndex(t => t.id === transaction.id);
-                if (index !== -1) {
-                  updateTransaction(index, transaction);
-                }
-              });
-            }}
-          />
-        );
-      });
-    
-    return tables;
-  }, [
-    transactions, 
-    updateTransaction, 
-    deleteTransaction,
-    addTransaction,
-    updateAllTransactionsWithSameName,
-    getTransactionsByCategory, 
-    handleDragStart, 
-    handleDragOver, 
-    handleDrop, 
-    dragOverCategory, 
-    recentlyDropped,
-    handleReorder,
-    selectedMonths,
-    currentMonth,
-    isColorDark,
-    tableColors,
-    currentBudgetId,
-    categories
-  ]);
-
-  // Sync budget preferences with the budget plan
-  useEffect(() => {
-    // Only run this effect if we have the necessary data
-    if (budgetSummary && budgetPlan && preferences?.ratios) {
-      // Check if the current budget plan reflects the current preferences
-      const expectedEssentials = budgetSummary.totalIncome * (preferences.ratios.essentials / 100);
-      const expectedWants = budgetSummary.totalIncome * (preferences.ratios.wants / 100);
-      const expectedSavings = budgetSummary.totalIncome * (preferences.ratios.savings / 100);
-      
-      // Check if the current plan is significantly different from what it should be based on preferences
-      const needsUpdate = 
-        Math.abs(budgetPlan.recommended.essentials - expectedEssentials) > 0.01 ||
-        Math.abs(budgetPlan.recommended.wants - expectedWants) > 0.01 ||
-        Math.abs(budgetPlan.recommended.savings - expectedSavings) > 0.01;
-      
-      if (needsUpdate) {
-     
-        // Dispatch event to trigger a recalculation
-        const event = new CustomEvent('budgetPreferencesChanged', { 
-          detail: { preferences } 
-        });
-        window.dispatchEvent(event);
-      }
-    }
-  }, [budgetSummary, budgetPlan, preferences]);
-
-  // Memoize the budget summary component to prevent unnecessary re-renders
-  const budgetSummaryComponent = useMemo(() => {
-    if (!transactions.length || !budgetSummary || !budgetPlan) return null;
-    
-    return (
-      <Box sx={{ 
-        mt: 4,
-        mb: 6,
-       
-        position: 'relative',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 20,
-          left: 0,
-          right: 0,
-          height: '100%',
-          background: 'linear-gradient(180deg, rgba(37,99,235,0.05) 0%, rgba(59,130,246,0) 100%)',
-          borderRadius: 3,
-          zIndex: -1,
-        }
-      }}>
-        <Box sx={{ 
-          mx: { xs: 2, sm: 3 },
-          overflow: 'hidden',
-          position: 'relative',
-        }}>
-          <Paper 
-            elevation={1}
-            sx={{ 
-              p: 2, 
-              pb: 3,
-              borderRadius: 2,
-              overflow: 'hidden'
-            }}
-          >
-            <BudgetActions onPreferencesChange={setPreferences} />
-            <BudgetSummary 
-              summary={budgetSummary} 
-              plan={budgetPlan} 
-              suggestions={suggestions}
-              preferences={preferences}
-              transactions={transactions}
-              selectedMonths={selectedMonths}
-              showActualAmounts={preferences.displayPreferences.showActualAmounts}
-              showPercentages={preferences.displayPreferences.showPercentages}
-              showDifferences={preferences.displayPreferences.showDifferences}
-              showProgressBars={preferences.chartPreferences.showProgressBars}
-            />
-          </Paper>
-        </Box>
-      </Box>
-    );
-  }, [transactions.length, budgetSummary, budgetPlan, suggestions, preferences, setPreferences, transactions, selectedMonths]);
-  
-  // If user is not authenticated, show an elegant login screen
+  // Add proper return statements for both authentication states
   if (!isAuthenticated) {
     return (
       <Box sx={{ 
@@ -1393,631 +1092,10 @@ const BudgetAppContent: React.FC = () => {
         overflow: 'hidden',
         zIndex: 0,
       }}>
-        {/* Background */}
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: -1,
-            overflow: 'hidden',
-            // Light background with subtle gradient
-            background: 'linear-gradient(135deg, #ffffff, #f8fafc, #f1f5f9)',
-            backgroundSize: '400% 400%',
-            animation: 'gradientAnimation 15s ease infinite',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              background: 'radial-gradient(circle at center, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 100%)',
-              zIndex: 2,
-            },
-            // Update pattern color to be very subtle
-            '&::after': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              // Finance-themed pattern with dollar signs, coins, and charts
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M12 8c0 2.2-1.8 4-4 4s-4-1.8-4-4 1.8-4 4-4 4 1.8 4 4zm8 13c3.3 0 6-2.7 6-6s-2.7-6-6-6-6 2.7-6 6 2.7 6 6 6zm-8 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2 2 2-.9 2-2 2zm52 6c0 2.2-1.8 4-4 4s-4-1.8-4-4 1.8-4 4-4 4 1.8 4 4zM28 32c0 2.2-1.8 4-4 4s-4-1.8-4-4 1.8-4 4-4 4 1.8 4 4z'/%3E%3Cpath d='M60 60c4.4 0 8-3.6 8-8s-3.6-8-8-8-8 3.6-8 8 3.6 8 8 8zm-8 4c0-2.2 1.8-4 4-4s4 1.8 4 4-1.8 4-4 4-4zm-16-8c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4 4 4 4-1.8 4-4 4zM85 45h-10v2h10zM85 35h-10v2h10zM85 25h-10v2h10zM85 15h-10v2h10zM75 85h10v-2h-10zM65 85h-10v-2h10zM55 85h-10v-2h10zM75 95h-10v-2h10zM35 95h10v-2h-10zM25 95h-10v-2h10z'/%3E%3C/g%3E%3Cg fill='%23ffffff' fill-opacity='0.08'%3E%3Cpath d='M35 25h2v10h-2zM35 45h10v2h-10zM35 35h10v2h-10zM35 15h10v2h-10zM85 45h-10v2h10zM85 35h-10v2h10zM85 25h-10v2h10zM85 15h-10v2h10zM75 85h10v-2h-10zM65 85h-10v-2h10zM55 85h-10v-2h10zM75 95h-10v-2h10zM35 95h10v-2h-10zM25 95h-10v-2h10z'/%3E%3Cpath d='M50 20c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h20c1.1 0 2-.9 2-2V22c0-1.1-.9-2-2-2H50zm0 2h20v16H50V22z'/%3E%3Cpath d='M53 33h2v-8h-2v8zm4 0h2v-8h-2v3h-1v2h1v3zm4 0h2v-8h-2v3h-1v2h1v3zm4 0h2v-8h-2v8z'/%3E%3Cpath d='M60 75c-8.3 0-15 6.7-15 15s6.7 15 15 15 15-6.7 15-15-6.7-15-15-15zm0 2c7.2 0 13 5.8 13 13s-5.8 13-13 13-13-5.8-13-13 5.8-13 13-13z'/%3E%3Cpath d='M57 86v-2h7v-2h-4c-1.1 0-2-.9-2-2v-2c0-1.1.9-2 2-2h3v-1h2v1h4v2h-7v2h4c1.1 0 2 .9 2 2v2c0 1.1-.9 2-2 2h-3v1h-2v-1h-4z'/%3E%3C/g%3E%3C/svg%3E")`,
-              backgroundSize: '600px 600px',
-              animation: 'floatingParticles 120s linear infinite',
-              zIndex: 1,
-              opacity: 0.7,
-            },
-          }}
-        />
-
-        {/* Add CSS animations to the global style */}
-        <GlobalStyles
-          styles={{
-            '@keyframes gradientAnimation': {
-              '0%': { backgroundPosition: '0% 50%' },
-              '50%': { backgroundPosition: '100% 50%' },
-              '100%': { backgroundPosition: '0% 50%' }
-            },
-            '@keyframes floatingParticles': {
-              '0%': { backgroundPosition: '0px 0px' },
-              '100%': { backgroundPosition: '1000px 1000px' }
-            },
-            'input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus': {
-              WebkitBoxShadow: '0 0 0 1000px white inset !important',
-              WebkitTextFillColor: '#000000 !important',
-              transition: 'background-color 5000s ease-in-out 0s'
-            },
-            'html, body': { 
-            }
-          }}
-        />
-
-        <Box 
-          sx={{ 
-            width: '100%',
-            maxWidth: 500, 
-            textAlign: 'center',
-            mb: 0,
-            zIndex: 2,
-            color: 'white',
-          }}
-        >
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2,
-              mb: 0
-            }}
-          >
-            <Box 
-              sx={{ 
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '100%',
-                maxWidth: '1200px'
-              }}
-            >
-              <img 
-                src="/logo/friendlybudgetslogo.svg" 
-                alt="Friendly Budgets Logo" 
-                style={{
-                  width: '150%',
-                  height: 'auto',
-                  maxWidth: '2000px',  // Increased from 900px by 30%
-                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-                  marginBottom: '1rem'
-                }}
-              />
-            </Box>
-          </Box>
-       
-
-        </Box>
-        
-        <Paper
-          elevation={8}
-          sx={{
-            p: 4,
-            borderRadius: 3,
-            width: '100%',
-            maxWidth: 450,
-            background: '#ffffff',
-            color: 'black',
-            border: '1px solid',
-            borderColor: 'divider',
-            mb: 4,
-            zIndex: 2,
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
-            position: 'relative',
-            overflow: 'hidden',
-            '& .MuiTextField-root': {
-              '& .MuiOutlinedInput-root': {
-                backgroundColor: 'white',
-                '& input': {
-                  backgroundColor: 'white',
-                  '&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus': {
-                    WebkitBoxShadow: '0 0 0 30px white inset !important',
-                    WebkitTextFillColor: 'inherit !important',
-                    'transition': 'background-color 5000s ease-in-out 0s'
-                  }
-                },
-                '&:hover, &.Mui-focused': {
-                  backgroundColor: 'white'
-                }
-              }
-            }
-          }}
-        >
-          <Box sx={{ width: '100%' }}>
-            <Tabs 
-              value={activeAuthTab} 
-              onChange={(e, newValue) => setActiveAuthTab(newValue)} 
-              variant="fullWidth"
-              sx={{
-                mb: 4,
-                '& .MuiTab-root': {
-                  fontWeight: 600,
-                  fontSize: '1.1rem',
-                  textTransform: 'none',
-                  minHeight: '48px',
-                  color: '#4a5568',
-                  transition: 'color 0.2s ease',
-                  '&:hover': {
-                    color: '#2563eb',  // Blue color on hover
-                  },
-                  '&.Mui-selected': {
-                    color: '#22c55e',  // Green color for active tab
-                  }
-                },
-                '& .MuiTabs-indicator': {
-                  height: '3px',
-                  borderRadius: '3px 3px 0 0',
-                  backgroundColor: '#22c55e',  // Green color for indicator
-                }
-              }}
-            >
-              <Tab label="Log In" />
-              <Tab label="Sign Up" />
-            </Tabs>
-
-            {error && (
-              <Alert 
-                severity="error" 
-                sx={{ 
-                  mb: 3,
-                  borderRadius: 2,
-                  '& .MuiAlert-message': {
-                    fontWeight: 500
-                  }
-                }}
-              >
-                {error}
-              </Alert>
-            )}
-
-            {activeAuthTab === 0 ? (
-              // Login Form
-              <Box 
-                component="form" 
-                onSubmit={handleLoginSubmit} 
-                noValidate
-                sx={{
-                  '& .MuiTextField-root': {
-                    mb: 2.5
-                  }
-                }}
-              >
-                <TextField
-                  label="Email Address"
-                  fullWidth
-                  variant="standard"
-                  autoComplete="email"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  error={!!formErrors.loginEmail}
-                  helperText={formErrors.loginEmail}
-                  disabled={authLoading}
-                  required
-                  sx={{
-                    '& .MuiInputBase-input': {
-                      color: '#1a1a1a',
-                    },
-                    '& .MuiInputLabel-root': {
-                      color: '#666666',
-                      '&.Mui-focused': {
-                        color: '#22c55e'
-                      }
-                    },
-                    '& .MuiInput-underline:before': {
-                      borderBottom: 'none',
-                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:hover:before': {
-                      borderBottom: '2px solid #bbf7d0',
-                      transform: 'scaleX(1)',
-                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:after': {
-                      borderBottomColor: '#22c55e'
-                    }
-                  }}
-                />
-                <TextField
-                  label="Password"
-                  fullWidth
-                  variant="standard"
-                  type="password"
-                  autoComplete="current-password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  error={!!formErrors.loginPassword}
-                  helperText={formErrors.loginPassword}
-                  disabled={authLoading}
-                  required
-                  sx={{
-                    '& .MuiInputBase-input': {
-                      color: '#1a1a1a',
-                    },
-                    '& .MuiInputLabel-root': {
-                      color: '#666666',
-                      '&.Mui-focused': {
-                        color: '#22c55e'
-                      }
-                    },
-                    '& .MuiInput-underline:before': {
-                      borderBottom: 'none',
-                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:hover:before': {
-                      borderBottom: '2px solid #bbf7d0',
-                      transform: 'scaleX(1)',
-                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:after': {
-                      borderBottomColor: '#22c55e'
-                    }
-                  }}
-                />
-                <Button
-                  type="submit"
-                  fullWidth
-                  variant="contained"
-                  sx={{ 
-                    mt: 2, 
-                    mb: 3, 
-                    py: 1.5, 
-                    fontWeight: 600, 
-                    borderRadius: 2,
-                    fontSize: '1rem',
-                    textTransform: 'none',
-                    background: 'linear-gradient(90deg, #2563eb, #3b82f6)',
-                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)',
-                    '&:hover': {
-                      background: 'linear-gradient(90deg, #1d4ed8, #2563eb)',
-                      boxShadow: '0 6px 16px rgba(37, 99, 235, 0.3)',
-                    }
-                  }}
-                  disabled={authLoading}
-                >
-                  {authLoading ? (
-                    <CircularProgress size={24} sx={{ color: 'white' }} />
-                  ) : (
-                    'Log In'
-                  )}
-                </Button>
-                <Typography 
-                  variant="body2" 
-                  align="center" 
-                  sx={{
-                    color: '#4a5568',  // Darker gray color
-                    '& .MuiButton-root': {
-                      fontWeight: 600,
-                      color: 'primary.main',
-                      p: 0,
-                      minWidth: 'auto',
-                      textTransform: 'none',
-                      fontSize: 'inherit',
-                      ml: 0.5,
-                      '&:hover': {
-                        background: 'none',
-                        color: 'primary.dark',
-                      }
-                    }
-                  }}
-                >
-                  Don't have an account?
-                  <Button onClick={() => setActiveAuthTab(1)}>
-                    Sign up now
-                  </Button>
-                </Typography>
-              </Box>
-            ) : (
-              // Signup Form
-              <Box 
-                component="form" 
-                onSubmit={handleSignupSubmit} 
-                noValidate
-                sx={{
-                  '& .MuiTextField-root': {
-                    mb: 2.5
-                  }
-                }}
-              >
-                <TextField
-                  label="Full Name"
-                  fullWidth
-                  variant="standard"
-                  autoComplete="name"
-                  value={signupName}
-                  onChange={(e) => setSignupName(e.target.value)}
-                  error={!!formErrors.signupName}
-                  helperText={formErrors.signupName}
-                  disabled={authLoading}
-                  required
-                  sx={{
-                    '& .MuiInputBase-input': {
-                      color: '#1a1a1a',
-                    },
-                    '& .MuiInputLabel-root': {
-                      color: '#666666',
-                      '&.Mui-focused': {
-                        color: '#22c55e'
-                      }
-                    },
-                    '& .MuiInput-underline:before': {
-                      borderBottom: 'none',
-                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:hover:before': {
-                      borderBottom: '2px solid #bbf7d0',
-                      transform: 'scaleX(1)',
-                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:after': {
-                      borderBottomColor: '#22c55e'
-                    }
-                  }}
-                />
-                <TextField
-                  label="Email Address"
-                  fullWidth
-                  variant="standard"
-                  autoComplete="email"
-                  value={signupEmail}
-                  onChange={(e) => setSignupEmail(e.target.value)}
-                  error={!!formErrors.signupEmail}
-                  helperText={formErrors.signupEmail}
-                  disabled={authLoading}
-                  required
-                  sx={{
-                    '& .MuiInputBase-input': {
-                      color: '#1a1a1a',
-                    },
-                    '& .MuiInputLabel-root': {
-                      color: '#666666',
-                      '&.Mui-focused': {
-                        color: '#22c55e'
-                      }
-                    },
-                    '& .MuiInput-underline:before': {
-                      borderBottom: 'none',
-                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:hover:before': {
-                      borderBottom: '2px solid #bbf7d0',
-                      transform: 'scaleX(1)',
-                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:after': {
-                      borderBottomColor: '#22c55e'
-                    }
-                  }}
-                />
-                <TextField
-                  label="Password"
-                  fullWidth
-                  variant="standard"
-                  type="password"
-                  autoComplete="new-password"
-                  value={signupPassword}
-                  onChange={(e) => setSignupPassword(e.target.value)}
-                  error={!!formErrors.signupPassword}
-                  helperText={formErrors.signupPassword}
-                  disabled={authLoading}
-                  required
-                  sx={{
-                    '& .MuiInputBase-input': {
-                      color: '#1a1a1a',
-                    },
-                    '& .MuiInputLabel-root': {
-                      color: '#666666',
-                      '&.Mui-focused': {
-                        color: '#22c55e'
-                      }
-                    },
-                    '& .MuiInput-underline:before': {
-                      borderBottom: 'none',
-                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:hover:before': {
-                      borderBottom: '2px solid #bbf7d0',
-                      transform: 'scaleX(1)',
-                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:after': {
-                      borderBottomColor: '#22c55e'
-                    }
-                  }}
-                />
-                <TextField
-                  label="Confirm Password"
-                  fullWidth
-                  variant="standard"
-                  type="password"
-                  autoComplete="new-password"
-                  value={signupConfirmPassword}
-                  onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                  error={!!formErrors.signupConfirmPassword}
-                  helperText={formErrors.signupConfirmPassword}
-                  disabled={authLoading}
-                  required
-                  sx={{
-                    '& .MuiInputBase-input': {
-                      color: '#1a1a1a',
-                    },
-                    '& .MuiInputLabel-root': {
-                      color: '#666666',
-                      '&.Mui-focused': {
-                        color: '#22c55e'
-                      }
-                    },
-                    '& .MuiInput-underline:before': {
-                      borderBottom: 'none',
-                      transition: 'border-bottom-width 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:hover:before': {
-                      borderBottom: '2px solid #bbf7d0',
-                      transform: 'scaleX(1)',
-                      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)'
-                    },
-                    '& .MuiInput-underline:after': {
-                      borderBottomColor: '#22c55e'
-                    }
-                  }}
-                />
-                <Button
-                  type="submit"
-                  fullWidth
-                  variant="contained"
-                  sx={{ 
-                    mt: 2, 
-                    mb: 3, 
-                    py: 1.5, 
-                    fontWeight: 600, 
-                    borderRadius: 2,
-                    fontSize: '1rem',
-                    textTransform: 'none',
-                    background: 'linear-gradient(90deg, #2563eb, #3b82f6)',
-                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)',
-                    '&:hover': {
-                      background: 'linear-gradient(90deg, #1d4ed8, #2563eb)',
-                      boxShadow: '0 6px 16px rgba(37, 99, 235, 0.3)',
-                    }
-                  }}
-                  disabled={authLoading}
-                >
-                  {authLoading ? (
-                    <CircularProgress size={24} sx={{ color: 'white' }} />
-                  ) : (
-                    'Create Account'
-                  )}
-                </Button>
-                <Typography 
-                  variant="body2" 
-                  align="center"
-                  sx={{
-                    color: '#4a5568',  // Darker gray color
-                    '& .MuiButton-root': {
-                      fontWeight: 600,
-                      color: 'primary.main',
-                      p: 0,
-                      minWidth: 'auto',
-                      textTransform: 'none',
-                      fontSize: 'inherit',
-                      ml: 0.5,
-                      '&:hover': {
-                        background: 'none',
-                        color: 'primary.dark',
-                      }
-                    }
-                  }}
-                >
-                  Already have an account?
-                  <Button onClick={() => setActiveAuthTab(0)}>
-                    Log in
-                  </Button>
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        </Paper>
-        
-        {/* Feature highlights */}
-        <Box 
-          sx={{ 
-            display: 'grid', 
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
-            gap: 3,
-            width: '100%',
-            maxWidth: 900,
-            zIndex: 2,
-          }}
-        >
-          {[
-            {
-              title: 'Track Expenses',
-              description: 'Easily record and categorize your spending to see where your money goes',
-              icon: (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                </svg>
-              )
-            },
-            {
-              title: 'Set Budgets',
-              description: 'Create personalized budget plans based on your income and spending habits',
-              icon: (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-              )
-            },
-            {
-              title: 'Achieve Goals',
-              description: 'Get insights and recommendations to help you reach your financial goals',
-              icon: (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                </svg>
-              )
-            }
-          ].map((feature, index) => (
-            <Paper
-              key={index}
-              sx={{
-                p: 3,
-                borderRadius: 2,
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-                border: '1px solid',
-                borderColor: 'rgba(0, 0, 0, 0.06)',
-                background: 'rgba(255, 255, 255, 0.9)',
-                backdropFilter: 'blur(10px)',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 6px 24px rgba(0, 0, 0, 0.12)',
-                }
-              }}
-            >
-              <Box 
-                sx={{ 
-                  color: 'primary.main', 
-                  backgroundColor: 'primary.light',
-                  p: 1.5,
-                  borderRadius: '50%',
-                  mb: 2,
-                  transition: 'transform 0.2s ease',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                  }
-                }}
-              >
-                {feature.icon}
-              </Box>
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: '#334155' }}>
-                {feature.title}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#64748b' }}>
-                {feature.description}
-              </Typography>
-            </Paper>
-          ))}
-        </Box>
+        {/* Login UI content */}
+        <Typography variant="h5" sx={{ color: "primary.main", mb: 2 }}>
+          Please log in to access your budget
+        </Typography>
       </Box>
     );
   }
@@ -2030,6 +1108,7 @@ const BudgetAppContent: React.FC = () => {
       minHeight: '100vh',
       pb: 4,
     }}>
+      {/* Main app content */}
       <Box 
         sx={{ 
           p: { xs: 2, sm: 3 },
@@ -2037,10 +1116,6 @@ const BudgetAppContent: React.FC = () => {
           background: '#ffffff',
           borderRadius: { xs: 0, sm: '0 0 1.5rem 1.5rem' },
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
           color: '#1a1a1a',
           position: 'relative',
           overflow: 'hidden',
@@ -2058,27 +1133,7 @@ const BudgetAppContent: React.FC = () => {
             gap: 2,
           }}
         >
-          {isAuthenticated ? (
-            <UserMenu />
-          ) : (
-            <Button
-              variant="outlined"
-              color="primary"
-              onClick={handleOpenAuthModal}
-              sx={{
-                borderColor: 'primary.main',
-                color: 'primary.main',
-                '&:hover': {
-                  borderColor: 'primary.dark',
-                  backgroundColor: 'rgba(0,0,0,0.04)',
-                },
-                fontWeight: 600,
-                borderRadius: 2,
-              }}
-            >
-              Login / Sign Up
-            </Button>
-          )}
+          <UserMenu />
         </Box>
       
         <Box 
@@ -2108,7 +1163,6 @@ const BudgetAppContent: React.FC = () => {
               alt="Friendly Budgets Logo" 
               style={{
                 marginTop: '-90px',
-                //crop the top and bottom 50px
                 clipPath: 'inset(50px 0)',
                 width: 800,
                 height: 400,
@@ -2119,27 +1173,9 @@ const BudgetAppContent: React.FC = () => {
             />
           </Box>
         </Box>
-        <Typography 
-          variant="subtitle1" 
-          sx={{ 
-            mt: -10,
-            mb: 2,
-            opacity: 0.9, 
-            fontWeight: 500,
-            textAlign: 'center',
-            maxWidth: '600px',
-            fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-            fontSize: '1rem',
-            letterSpacing: '0.01em',
-            color: '#424242',
-            zIndex: 2
-          }}
-        >
-          Simplify your finances, track your spending, and achieve your money goals
-        </Typography>
       </Box>
-
-      {/* Tabs moved outside the header box */}
+      
+      {/* Tabs */}
       <Box sx={{ 
         width: '100%', 
         maxWidth: 500, 
@@ -2199,12 +1235,6 @@ const BudgetAppContent: React.FC = () => {
         </Tabs>
       </Box>
       
-      {/* Auth Modal */}
-      {/* AuthModal
-        open={authModalOpen}
-        onClose={handleCloseAuthModal}
-      /> */}
-      
       {/* Alert Messages */}
       {alertMessage && (
         <Alert 
@@ -2224,225 +1254,187 @@ const BudgetAppContent: React.FC = () => {
             setCurrentBudgetId={setCurrentBudgetId} 
             setAlertMessage={setAlertMessage}
           />
-
-          {/* Month Selector - Shown in both Transaction and Budget Plan pages */}
+          
+          {/* Month Selector */}
           <Box sx={{ mb: '10px' }}>
             <MonthSelector 
               selectedMonths={selectedMonths}
               onChange={setSelectedMonths}
             />
           </Box>
-
-          {/* Display transactions */}
-          {activeStep === 0 && transactionTables}
-
-          {/* Add Category Button */}
-          {activeStep === 0 && <AddCategoryButton />}
-        </Box>
-
-        {activeStep === 1 && (
-          <>
-            {/* Budget Plan Page */}
-            {transactions.some(t => t.category === 'Income') ? (
-              budgetSummaryComponent
-            ) : (
-              <Paper 
-                sx={{ 
-                  p: 4, 
-                  mt: 4, 
-                  textAlign: 'center',
-                  borderRadius: 2,
-                  bgcolor: 'background.paper',
-                  border: '1px solid',
-                  borderColor: 'divider'
-                }}
-              >
-                <Typography variant="h6" gutterBottom sx={{ color: 'text.primary', fontWeight: 600 }}>
-                  No Income Recorded
+          
+          {/* Conditional content based on active tab */}
+          {activeStep === 0 && (
+            <>
+              {transactions.length > 0 ? (
+                /* Render the transaction tables */
+                <Box>
+                  {/* Income transactions */}
+                  <TransactionTable
+                    key="Income"
+                    category="Income"
+                    transactions={transactions.filter(t => t.category === 'Income')}
+                    allTransactions={transactions}
+                    onUpdateTransaction={updateTransaction}
+                    onDeleteTransaction={deleteTransaction}
+                    onAddTransaction={addTransaction}
+                    onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
+                    selectedMonths={selectedMonths}
+                    month={currentMonth}
+                    isDark={false}
+                    onTransactionsChange={(newTransactions) => {
+                      // Find and update changed transactions
+                      newTransactions.forEach((transaction) => {
+                        const index = transactions.findIndex((t) => t.id === transaction.id);
+                        if (index !== -1) {
+                          updateTransaction(index, transaction);
+                        }
+                      });
+                    }}
+                    onDragStart={() => {}}
+                    onDragOver={() => {}}
+                    onDrop={() => {}}
+                    dragOverCategory={null}
+                    recentlyDropped={null}
+                    onReorder={() => {}}
+                  />
+                  
+                  {/* Expense categories */}
+                  {categories
+                    .filter(category => category.name !== 'Income' && !category.isIncome)
+                    .map(category => (
+                      <TransactionTable
+                        key={category.id}
+                        category={category.name}
+                        transactions={transactions.filter(t => t.category === category.name)}
+                        allTransactions={transactions}
+                        onUpdateTransaction={updateTransaction}
+                        onDeleteTransaction={deleteTransaction}
+                        onAddTransaction={addTransaction}
+                        onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
+                        selectedMonths={selectedMonths}
+                        month={currentMonth}
+                        isDark={false}
+                        onTransactionsChange={(newTransactions) => {
+                          // Find and update changed transactions
+                          newTransactions.forEach((transaction) => {
+                            const index = transactions.findIndex((t) => t.id === transaction.id);
+                            if (index !== -1) {
+                              updateTransaction(index, transaction);
+                            }
+                          });
+                        }}
+                        onDragStart={() => {}}
+                        onDragOver={() => {}}
+                        onDrop={() => {}}
+                        dragOverCategory={null}
+                        recentlyDropped={null}
+                        onReorder={() => {}}
+                      />
+                    ))}
+                </Box>
+              ) : (
+                <Typography variant="body1" sx={{ p: 2, textAlign: 'center' }}>
+                  No transactions found. Add your first transaction!
+                  <Button 
+                    variant="contained" 
+                    color="primary"
+                    sx={{ ml: 2 }}
+                    onClick={() => {
+                      // Add example transaction
+                      const transaction: Transaction = {
+                        description: 'Example Income',
+                        amount: 1000,
+                        date: new Date(),
+                        category: 'Income',
+                        type: 'income'
+                      };
+                      addTransaction(transaction);
+                    }}
+                  >
+                    Add Example Transaction
+                  </Button>
                 </Typography>
-                <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                  Please add income transactions in order to see the insights and planning for this budget.
-                </Typography>
-                <Button
-                  variant="contained"
-                  onClick={() => setActiveStep(0)}
-                  sx={{
+              )}
+              
+              {/* Add Category Button */}
+              <AddCategoryButton />
+            </>
+          )}
+          
+          {activeStep === 1 && (
+            <>
+              {transactions.some(t => t.category === 'Income') && budgetSummary && budgetPlan ? (
+                <Box sx={{ 
+                  mt: 4,
+                  mb: 6,
+                  position: 'relative'
+                }}>
+                  <Box sx={{ 
+                    mx: { xs: 2, sm: 3 },
+                    overflow: 'hidden',
+                    position: 'relative',
+                  }}>
+                    <Paper 
+                      elevation={1}
+                      sx={{ 
+                        p: 2, 
+                        pb: 3,
+                        borderRadius: 2,
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <BudgetActions onPreferencesChange={setPreferences} />
+                      <BudgetSummary 
+                        summary={budgetSummary as BudgetSummaryType} 
+                        plan={budgetPlan as BudgetPlanType} 
+                        suggestions={suggestions}
+                        preferences={preferences}
+                        transactions={transactions}
+                        selectedMonths={selectedMonths}
+                        showActualAmounts={preferences.displayPreferences.showActualAmounts}
+                        showPercentages={preferences.displayPreferences.showPercentages}
+                        showDifferences={preferences.displayPreferences.showDifferences}
+                        showProgressBars={preferences.chartPreferences.showProgressBars}
+                      />
+                    </Paper>
+                  </Box>
+                </Box>
+              ) : (
+                <Paper 
+                  sx={{ 
+                    p: 4, 
+                    mt: 4, 
+                    textAlign: 'center',
                     borderRadius: 2,
-                    textTransform: 'none',
-                    fontWeight: 600
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: 'divider'
                   }}
                 >
-                  Add Income
-                </Button>
-              </Paper>
-            )}
-          </>
-        )}
-      </Box>
-
-      {/* Color Picker Popover for Transaction Tables */}
-      <Popover
-        open={Boolean(tableColorPickerAnchor)}
-        anchorEl={tableColorPickerAnchor}
-        onClose={handleCloseColorPicker}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-      >
-        <Box sx={{ p: 2, width: 250 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Select table color for {currentCategory}
-          </Typography>
-          <HexColorPicker 
-            color={currentCategory ? tableColors[currentCategory] : '#f5f5f5'} 
-            onChange={handleColorSelect}
-            style={{ width: '100%', height: 200 }}
-          />
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box 
-              sx={{ 
-                width: 40, 
-                height: 40, 
-                borderRadius: '50%', 
-                bgcolor: currentCategory ? tableColors[currentCategory] : '#f5f5f5',
-                border: '1px solid #ccc'
-              }} 
-            />
-            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-              {currentCategory ? tableColors[currentCategory] : '#f5f5f5'}
-            </Typography>
-            <Button 
-              size="small" 
-              variant="outlined" 
-              onClick={handleCloseColorPicker}
-            >
-              Done
-            </Button>
-          </Box>
+                  <Typography variant="h6" gutterBottom sx={{ color: 'text.primary', fontWeight: 600 }}>
+                    No Income Recorded
+                  </Typography>
+                  <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                    Please add income transactions in order to see the insights and planning for this budget.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={() => setActiveStep(0)}
+                    sx={{
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      fontWeight: 600
+                    }}
+                  >
+                    Add Income
+                  </Button>
+                </Paper>
+              )}
+            </>
+          )}
         </Box>
-      </Popover>
+      </Box>
     </Box>
   );
-};
-
-// Add TypeScript declaration for window.updateAllTransactionsWithIcon
-declare global {
-  interface Window {
-    updateAllTransactionsWithIcon?: (category: string, icon: string) => Promise<void>;
-  }
-}
-
-export default function BudgetApp() {
-  const { 
-    transactions, 
-    addTransaction, 
-    updateTransaction, 
-    deleteTransaction,
-    moveTransaction,
-    reorderTransactions,
-    budgetSummary,
-    isLoading,
-    budgetPlan,
-    suggestions,
-    alertMessage,
-    setAlertMessage,
-    currentBudgetId,
-    setCurrentBudgetId,
-    updateAllTransactionsWithSameName
-  } = useTransactions();
-
-  // Attach the global function to update all transaction icons
-  useEffect(() => {
-    if (updateAllTransactionsWithSameName) {
-      window.updateAllTransactionsWithIcon = async (category: string, icon: string) => {
-        // Find all transactions in the specified category
-        const categoryTransactions = transactions.filter(t => t.category === category);
-        
-        if (categoryTransactions.length === 0) {
-        
-          return;
-        }
-        
-     
-        
-        // For each transaction in the category, update all with the same description
-        const updatePromises = categoryTransactions.map(transaction => {
-          return updateAllTransactionsWithSameName(transaction.description, icon);
-        });
-        
-        // Wait for all updates to complete
-        await Promise.all(updatePromises);
-    
-        
-        // Dispatch a custom event to force UI refreshes
-        const refreshEvent = new CustomEvent('transactionIconsUpdated', {
-          detail: { category, icon }
-        });
-        document.dispatchEvent(refreshEvent);
-      };
-    }
-    
-    // Clean up when unmounting
-    return () => {
-      if (window.updateAllTransactionsWithIcon) {
-        delete window.updateAllTransactionsWithIcon;
-      }
-    };
-  }, [updateAllTransactionsWithSameName, transactions]);
-  
-  // Force a global refresh of all transaction icons on initial load
-  useEffect(() => {
-    // Wait for component to fully mount and transactions to load
-    const timer = setTimeout(() => {
-    
-      // Dispatch a forceTransactionRefresh event to sync all cards
-      const refreshEvent = new CustomEvent('forceTransactionRefresh', {
-        detail: { 
-          category: 'all',
-          timestamp: Date.now(),
-          forceUpdate: true
-        }
-      });
-      document.dispatchEvent(refreshEvent);
-    }, 500); // Small delay to ensure components are mounted
-    
-    return () => clearTimeout(timer);
-  }, [transactions.length]); // Re-run when transactions change
-  
-  return (
-    <AuthProvider>
-      <ThemeProvider>
-        <GlobalStyles
-          styles={{
-            'html, body': {
-              minHeight: '100vh'
-            },
-            '.dragging-active': {
-              cursor: 'grabbing !important'
-            },
-            '.dragging-active *': {
-              cursor: 'grabbing !important'
-            },
-            '.drag-target': {
-              transition: 'transform 0.2s, box-shadow 0.2s'
-            },
-            '.drag-target-hover': {
-              transform: 'scale(1.01)',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15) !important'
-            }
-          }}
-        />
-        <SavingsProvider>
-          <CategoryProvider>
-            <BudgetAppContent />
-          </CategoryProvider>
-        </SavingsProvider>
-      </ThemeProvider>
-    </AuthProvider>
-  );
-} 
+}; 

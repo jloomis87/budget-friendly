@@ -17,10 +17,14 @@ import { useCategorizer } from './useCategories';
 import { useCategories } from '../contexts/CategoryContext';
 import { v4 as uuidv4 } from 'uuid';
 import type { BudgetPreferences } from '../components/BudgetActions';
+import { getCategoryWithId } from '../services/fileParser';
 
 export function useTransactions(initialBudgetId?: string) {
   // Get current user from auth context
   const { user, isAuthenticated } = useAuth();
+  
+  // Get categories from context
+  const { categories: categoryList } = useCategories();
   
   // State for transactions and budget data
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -147,12 +151,134 @@ export function useTransactions(initialBudgetId?: string) {
     };
   }, [budgetSummary]); // Only re-run if budgetSummary changes
 
+  // Listen for category updates and reload transactions to ensure consistency
+  useEffect(() => {
+    const handleCategoryUpdated = (event: Event) => {
+      // Cast the event to CustomEvent
+      const customEvent = event as CustomEvent<{oldCategory: string, newCategory: string}>;
+      
+      if (customEvent.detail) {
+        const { oldCategory, newCategory } = customEvent.detail;
+        console.log(`[DEBUG] Category update event received: ${oldCategory} -> ${newCategory}`);
+        
+        // Force a reload of transactions to ensure all category changes are reflected
+        if (isAuthenticated && user?.id) {
+          console.log(`[DEBUG] Authenticated user, forcing transaction reload from database`);
+          setShouldReload(true);
+        } else {
+          console.log(`[DEBUG] Non-authenticated user, updating local transactions`);
+          // For non-authenticated users, we should manually update the categories in memory
+          const updatedTransactions = transactions.map(transaction => {
+            if (transaction.category?.toLowerCase() === oldCategory.toLowerCase()) {
+              console.log(`[DEBUG] Updating local transaction: ${transaction.description}`);
+              return { ...transaction, category: newCategory };
+            }
+            return transaction;
+          });
+          
+          // Only update if changes were made
+          if (JSON.stringify(updatedTransactions) !== JSON.stringify(transactions)) {
+            console.log(`[DEBUG] Applying local transaction updates`);
+            setTransactions(updatedTransactions);
+            
+            // Also update localStorage
+            setLocalTransactions(updatedTransactions);
+          }
+        }
+      }
+    };
+    
+    // Add event listener
+    document.addEventListener('categoriesUpdated', handleCategoryUpdated);
+    
+    // Clean up when the component unmounts
+    return () => {
+      document.removeEventListener('categoriesUpdated', handleCategoryUpdated);
+    };
+  }, [isAuthenticated, user, transactions, setLocalTransactions, setShouldReload]);
+
+  // Listen for direct category rename events to update transactions
+  useEffect(() => {
+    const handleCategoryRenamed = (event: Event) => {
+      // Cast the event to CustomEvent
+      const customEvent = event as CustomEvent<{
+        oldName: string, 
+        newName: string,
+        categoryId: string
+      }>;
+      
+      if (customEvent.detail) {
+        const { oldName, newName, categoryId } = customEvent.detail;
+        console.log(`[DEBUG] Category rename event received: ${oldName} -> ${newName} (ID: ${categoryId})`);
+        
+        // Directly update transactions that match the old category name
+        const txUpdates = transactions.map((transaction, index) => {
+          // Use case-insensitive comparison to be extra safe
+          if (transaction.category?.toLowerCase() === oldName.toLowerCase()) {
+            console.log(`[DEBUG] Local update - Changing transaction category:
+              Index: ${index},
+              ID: ${transaction.id || 'no-id'}, 
+              Description: ${transaction.description}
+              From: ${transaction.category} -> To: ${newName}`);
+            
+            // Return a new object with both category and categoryId updated
+            return { 
+              ...transaction, 
+              category: newName,
+              categoryId: categoryId // Update the categoryId to match the category
+            };
+          }
+          return transaction;
+        });
+        
+        // Only update if changes were made
+        if (JSON.stringify(txUpdates) !== JSON.stringify(transactions)) {
+          console.log(`[DEBUG] Updating ${txUpdates.filter(t => t.category === newName).length} transactions to new category name`);
+          setTransactions(txUpdates);
+          
+          // If not authenticated, also update localStorage
+          if (!isAuthenticated) {
+            setLocalTransactions(txUpdates);
+          }
+        } else {
+          console.log(`[DEBUG] No transaction updates needed for category rename`);
+        }
+      }
+    };
+    
+    // Add event listener
+    document.addEventListener('categoryRenamed', handleCategoryRenamed);
+    
+    // Clean up when the component unmounts
+    return () => {
+      document.removeEventListener('categoryRenamed', handleCategoryRenamed);
+    };
+  }, [transactions, isAuthenticated, setLocalTransactions]);
+
   // Add a transaction
   const addTransaction = useCallback(async (transaction: Transaction) => {
     try {
       // If no category is provided, categorize the transaction
       if (!transaction.category) {
-        transaction.category = categorizeTransaction(transaction.description, transaction.amount);
+        const categoryInfo = getCategoryWithId(transaction.description, transaction.amount);
+        transaction.category = categoryInfo.category;
+        transaction.categoryId = categoryInfo.categoryId;
+      } else if (!transaction.categoryId) {
+        // If category is provided but categoryId is not, try to get categoryId from CategoryContext
+        const { getCategoryByName } = useCategories();
+        const category = getCategoryByName(transaction.category);
+        if (category) {
+          transaction.categoryId = category.id;
+        } else {
+          // Fall back to default categoryId mapping if not found in context
+          const defaultCategoryMapping: Record<string, string> = {
+            'Income': 'income',
+            'Essentials': 'essentials',
+            'Wants': 'wants', 
+            'Savings': 'savings'
+          };
+          transaction.categoryId = defaultCategoryMapping[transaction.category] || 'uncategorized';
+        }
       }
       
       // Ensure the transaction has an ID
@@ -343,6 +469,14 @@ export function useTransactions(initialBudgetId?: string) {
     }
     
     try {
+      // Log category changes for debugging
+      if (updatedFields.category !== undefined && updatedFields.category !== transaction.category) {
+        console.log(`[DEBUG] Changing transaction category: 
+          ID: ${transaction.id}, 
+          Description: ${transaction.description}
+          From: ${transaction.category} -> To: ${updatedFields.category}`);
+      }
+      
       // If authenticated and transaction has an ID, update in Firestore
       if (isAuthenticated && user?.id && transaction.id) {
         setIsLoading(true);
@@ -371,68 +505,17 @@ export function useTransactions(initialBudgetId?: string) {
         setLocalTransactions(updatedTransactions);
       }
       
-      // Recalculate budget
-      try {
-        // Calculate budget summary
-        const summary = calculateBudgetSummary(updatedTransactions);
-        setBudgetSummary(summary);
-        
-        // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.id) {
-          setLocalBudgetSummary(summary);
-        }
-        
-        // Create budget plan
-        const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
-        setBudgetPlan(plan);
-        
-        // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.id) {
-          setLocalBudgetPlan(plan);
-        }
-        
-        // Get suggestions
-        const budgetSuggestions = getBudgetSuggestions(plan);
-        setSuggestions(budgetSuggestions);
-        
-        // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.id) {
-          setLocalSuggestions(budgetSuggestions);
-        }
-        
-        setAlertMessage({
-          type: 'success',
-          message: 'Transaction updated successfully!'
-        });
-      } catch (error) {
-        console.error('[useTransactions] Error recalculating budget:', error);
-        setAlertMessage({
-          type: 'error',
-          message: 'Error updating budget calculations. Please try again.'
-        });
-      }
+      return updatedTransaction;
     } catch (error) {
-      console.error('[useTransactions] Error updating transaction:', error);
+      console.error('Error updating transaction:', error);
       setAlertMessage({
         type: 'error',
-        message: `Error updating transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
+        message: `Failed to update transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
     } finally {
-      if (isAuthenticated && user?.id) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
-  }, [
-    transactions, 
-    isAuthenticated, 
-    user, 
-    setLocalTransactions, 
-    setLocalBudgetSummary, 
-    setLocalBudgetPlan, 
-    setLocalSuggestions,
-    currentBudgetId,  // Add currentBudgetId dependency
-    budgetPreferences
-  ]);
+  }, [transactions, isAuthenticated, user, setLocalTransactions, setAlertMessage, currentBudgetId]);
 
   // Update transaction by description
   const updateTransactionByDescription = useCallback((description: string, updates: Partial<Transaction>) => {
@@ -450,21 +533,82 @@ export function useTransactions(initialBudgetId?: string) {
     // Create an object to hold transactions by category
     const categories = {} as Record<string, Transaction[]>;
     
+    // Create a map of category IDs to category names for quick lookup
+    const categoryIdMap: Record<string, string> = {};
+    categoryList.forEach(category => {
+      categoryIdMap[category.id] = category.name;
+    });
+    
+    console.log('[DEBUG] Category ID map for transaction grouping:', categoryIdMap);
+    
     // Loop through transactions and group by category
     transactions.forEach(transaction => {
       // Skip income transactions as they are handled separately
-      if (transaction.category !== 'Income' && transaction.category) {
-        // Ensure category exists in the object
-        if (!categories[transaction.category]) {
-          categories[transaction.category] = [];
+      if (transaction.category !== 'Income') {
+        let categoryName = transaction.category;
+        let mappedCategory = null;
+        
+        // First priority: If the transaction has a categoryId, use the current name for that ID
+        if (transaction.categoryId && categoryIdMap[transaction.categoryId]) {
+          mappedCategory = categoryList.find(c => c.id === transaction.categoryId);
+          if (mappedCategory) {
+            categoryName = mappedCategory.name;
+            console.log(`[DEBUG] Transaction "${transaction.description}" mapped by ID: ${transaction.categoryId} -> ${categoryName}`);
+          }
+        } 
+        // Second priority: if category name exists, use case-insensitive matching
+        else if (categoryName) {
+          // Try to find a matching category by name (case-insensitive)
+          mappedCategory = categoryList.find(
+            c => c.name.toLowerCase() === categoryName?.toLowerCase()
+          );
+          
+          if (mappedCategory) {
+            categoryName = mappedCategory.name; // Use the current category name (proper case)
+            console.log(`[DEBUG] Transaction "${transaction.description}" mapped by name: ${transaction.category} -> ${categoryName}`);
+          } else {
+            // No direct match by name, try to find by known category IDs
+            // This handles the case of renamed categories
+            // Check list of common category IDs
+            const defaultCategoryIds = {
+              'wants': ['Wants', 'Desires'],
+              'essentials': ['Essentials', 'Necessities', 'Needs'],
+              'savings': ['Savings', 'Investments'],
+              'income': ['Income', 'Revenue']
+            };
+            
+            for (const [categoryId, possibleNames] of Object.entries(defaultCategoryIds)) {
+              if (possibleNames.some(name => name.toLowerCase() === transaction.category?.toLowerCase())) {
+                const targetCategory = categoryList.find(c => c.id === categoryId);
+                if (targetCategory) {
+                  categoryName = targetCategory.name;
+                  console.log(`[DEBUG] Transaction "${transaction.description}" mapped from "${transaction.category}" to "${categoryName}" via known category ID: ${categoryId}`);
+                  break;
+                }
+              }
+            }
+          }
         }
-        // Add transaction to appropriate category
-        categories[transaction.category].push(transaction);
+        
+        if (categoryName) {
+          // Ensure category exists in the object
+          if (!categories[categoryName]) {
+            categories[categoryName] = [];
+          }
+          // Add transaction to appropriate category
+          categories[categoryName].push(transaction);
+        }
+      } else {
+        // Handle Income transactions
+        if (!categories['Income']) {
+          categories['Income'] = [];
+        }
+        categories['Income'].push(transaction);
       }
     });
     
     return categories;
-  }, [transactions]);
+  }, [transactions, categoryList]);
 
   // Get total income
   const getTotalIncome = useCallback(() => {
@@ -880,6 +1024,7 @@ export function useTransactions(initialBudgetId?: string) {
     moveTransaction,
     reorderTransactions,
     updateAllTransactionsWithSameName,
+    setShouldReload,
     budgetPreferences
   };
 } 
