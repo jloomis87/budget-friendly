@@ -1145,66 +1145,6 @@ const BudgetAppContent = (): JSX.Element => {
         </Box>
       </Box>
       
-      {/* Tabs */}
-      <Box sx={{ 
-        width: '100%', 
-        maxWidth: 500, 
-        mx: 'auto',
-        mt: 2,
-        mb: 3
-      }}>
-        <Tabs
-          value={activeStep}
-          onChange={(e, newValue) => setActiveStep(newValue)}
-          variant="fullWidth"
-          sx={{
-            '& .MuiTab-root': {
-              color: 'text.secondary',
-              transition: 'all 0.2s ease',
-              '&.Mui-selected': {
-                color: 'success.main',
-                fontWeight: 700,
-              },
-              '&:not(.Mui-selected):hover': {
-                color: 'primary.main',
-                backgroundColor: (theme) => 
-                  theme.palette.mode === 'dark' 
-                    ? 'rgba(25, 118, 210, 0.08)' 
-                    : 'rgba(25, 118, 210, 0.04)',
-              },
-              whiteSpace: 'nowrap',
-              minWidth: 160,
-              minHeight: '48px',
-              py: 1,
-              borderRadius: 1
-            },
-            '& .MuiTabs-indicator': {
-              backgroundColor: 'success.main',
-              height: '3px',
-              borderRadius: '3px 3px 0 0',
-              transition: 'all 0.2s ease'
-            },
-          }}
-        >
-          <Tab 
-            label="Budgets" 
-            sx={{ 
-              fontWeight: 600,
-              textTransform: 'none',
-              fontSize: '0.95rem',
-            }} 
-          />
-          <Tab 
-            label="Insights and Planning" 
-            sx={{ 
-              fontWeight: 600,
-              textTransform: 'none',
-              fontSize: '0.95rem',
-            }} 
-          />
-        </Tabs>
-      </Box>
-      
       {/* Main Content */}
       <Box sx={{ px: 0 }}>
         {/* Budget Selector and Month Selector - Always shown and sticky */}
@@ -1214,8 +1154,8 @@ const BudgetAppContent = (): JSX.Element => {
             top: 0,
             zIndex: 1100,
             bgcolor: 'background.default',
-            pt: 1,
-            pb: 1,
+            pt: 1.5,
+            pb: 0.5,
             px: { xs: 1, sm: 2, md: 3 },
             boxShadow: (theme) => `0 2px 4px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.1)'}`,
             borderBottom: '1px solid',
@@ -1223,6 +1163,66 @@ const BudgetAppContent = (): JSX.Element => {
             transition: 'box-shadow 0.3s ease'
           }}
         >
+          {/* Tabs */}
+          <Box sx={{ 
+            width: '100%', 
+            maxWidth: 500, 
+            mx: 'auto',
+            mt: 0,
+            mb: 2
+          }}>
+            <Tabs
+              value={activeStep}
+              onChange={(e, newValue) => setActiveStep(newValue)}
+              variant="fullWidth"
+              sx={{
+                '& .MuiTab-root': {
+                  color: 'text.secondary',
+                  transition: 'all 0.2s ease',
+                  '&.Mui-selected': {
+                    color: 'success.main',
+                    fontWeight: 700,
+                  },
+                  '&:not(.Mui-selected):hover': {
+                    color: 'primary.main',
+                    backgroundColor: (theme) => 
+                      theme.palette.mode === 'dark' 
+                        ? 'rgba(25, 118, 210, 0.08)' 
+                        : 'rgba(25, 118, 210, 0.04)',
+                  },
+                  whiteSpace: 'nowrap',
+                  minWidth: 160,
+                  minHeight: '48px',
+                  py: 1,
+                  borderRadius: 1
+                },
+                '& .MuiTabs-indicator': {
+                  backgroundColor: 'success.main',
+                  height: '3px',
+                  borderRadius: '3px 3px 0 0',
+                  transition: 'all 0.2s ease'
+                },
+              }}
+            >
+              <Tab 
+                label="Budgets" 
+                sx={{ 
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  fontSize: '0.95rem',
+                }} 
+              />
+              <Tab 
+                label="Insights and Planning" 
+                sx={{ 
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  fontSize: '0.95rem',
+                }} 
+              />
+            </Tabs>
+          </Box>
+          
           <BudgetSelector 
             setCurrentBudgetId={setCurrentBudgetId} 
             setAlertMessage={setAlertMessage}
