@@ -47,11 +47,8 @@ export const updateTransactionsWithCategoryId = async (
     const transactionsSnapshot = await getDocs(transactionsRef);
     
     if (transactionsSnapshot.empty) {
-      console.log(`No transactions found for budget ${budgetId}`);
       return 0;
     }
-    
-    console.log(`Found ${transactionsSnapshot.size} transactions to process`);
     
     // Use a batch to update all transactions
     const batchSize = 450; // Firestore batch limit is 500
@@ -79,7 +76,6 @@ export const updateTransactionsWithCategoryId = async (
           
           // If we've reached the batch limit, commit and start a new batch
           if (operationCount >= batchSize) {
-            console.log(`Committing batch with ${operationCount} updates`);
             await batch.commit();
             batch = writeBatch(db);
             operationCount = 0;
@@ -90,14 +86,11 @@ export const updateTransactionsWithCategoryId = async (
     
     // Commit any remaining updates
     if (operationCount > 0) {
-      console.log(`Committing final batch with ${operationCount} updates`);
       await batch.commit();
     }
     
-    console.log(`Successfully updated ${updatedCount} transactions with categoryId`);
     return updatedCount;
   } catch (error) {
-    console.error('Error updating transactions with categoryId:', error);
     throw error;
   }
 };
@@ -132,11 +125,8 @@ export const updateCategoryTransactionsWithCategoryId = async (
     const querySnapshot = await getDocs(categoryQuery);
     
     if (querySnapshot.empty) {
-      console.log(`No transactions found for category "${category.name}"`);
       return 0;
     }
-    
-    console.log(`Found ${querySnapshot.size} transactions in category "${category.name}"`);
     
     // Use a batch to update all transactions
     const batch = writeBatch(db);
@@ -156,16 +146,13 @@ export const updateCategoryTransactionsWithCategoryId = async (
     });
     
     if (updatedCount === 0) {
-      console.log(`No transactions need categoryId updates for category "${category.name}"`);
       return 0;
     }
     
-    console.log(`Committing batch with ${updatedCount} updates for category "${category.name}"`);
     await batch.commit();
     
     return updatedCount;
   } catch (error) {
-    console.error(`Error updating transactions for category "${category.name}":`, error);
     throw error;
   }
 }; 

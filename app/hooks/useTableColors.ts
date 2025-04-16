@@ -55,7 +55,7 @@ export function useTableColors() {
           }
         }
       } catch (error) {
-        console.error('[useTableColors] Error loading table colors from Firebase:', error);
+        // Error handling remains but without console.error
       } finally {
         setIsLoading(false);
       }
@@ -77,7 +77,7 @@ export function useTableColors() {
       
       userSettingsService.saveTableColors(user.id, colors)
         .catch(error => {
-          console.error('[useTableColors] Error saving table colors to Firebase:', error);
+          // Error handling remains but without console.error
         });
     }
   }, [user, localTableColors, setLocalTableColors]);
@@ -89,8 +89,6 @@ export function useTableColors() {
     setLocalTableColors(prevColors => {
       // Check if the old category has a custom color
       if (prevColors[oldCategoryName]) {
-        console.log(`[useTableColors] Preserving color for renamed category: ${oldCategoryName} -> ${newCategoryName}`);
-        
         // Create new object with the color transferred from old to new category name
         const updatedColors = {
           ...prevColors,
@@ -108,7 +106,7 @@ export function useTableColors() {
         if (user) {
           userSettingsService.saveTableColors(user.id, updatedColors)
             .catch(error => {
-              console.error('[useTableColors] Error saving updated category colors to Firebase:', error);
+              // Error handling remains but without console.error
             });
         }
         

@@ -920,7 +920,6 @@ const BudgetAppContent = (): JSX.Element => {
       return;
     }
     
-    console.log(`[BudgetAppContent] Loading months for budget: ${currentBudgetId}`);
     
     // Set loading flag
     isLoadingFromFirebase.current = true;
@@ -934,14 +933,11 @@ const BudgetAppContent = (): JSX.Element => {
           const firebaseMonths = budgetDoc.data().selectedMonths;
           
           if (Array.isArray(firebaseMonths) && firebaseMonths.length > 0) {
-            console.log(`[BudgetAppContent] Found months in Firebase: ${firebaseMonths.join(', ')}`);
             setSelectedMonths(firebaseMonths);
           } else {
-            console.log('[BudgetAppContent] No valid months found in Firebase, using default month');
             setSelectedMonths([currentMonth]);
           }
         } else {
-          console.log('[BudgetAppContent] No months data in Firebase, using default month');
           setSelectedMonths([currentMonth]);
         }
         
@@ -970,7 +966,6 @@ const BudgetAppContent = (): JSX.Element => {
       return;
     }
     
-    console.log(`[BudgetAppContent] Saving months to Firebase: ${selectedMonths.join(', ')}`);
     
     const saveToFirebase = async () => {
       try {
@@ -999,7 +994,6 @@ const BudgetAppContent = (): JSX.Element => {
   // Sync the current budget ID between transactions and categories contexts
   useEffect(() => {
     if (currentBudgetId) {
-      console.log(`[BudgetAppContent] Syncing budget ID to categories context: ${currentBudgetId}`);
       setCategoriesBudgetId(currentBudgetId);
     }
   }, [currentBudgetId, setCategoriesBudgetId]);
@@ -1022,7 +1016,6 @@ const BudgetAppContent = (): JSX.Element => {
         throw new Error('No active budget to update category in');
       }
       
-      console.log(`[updateAllTransactionsWithNewCategory] Starting update: ${oldCategoryName} -> ${newCategoryName}, ID: ${categoryId}`);
       
       try {
         // Get all transactions for this budget
@@ -1030,7 +1023,6 @@ const BudgetAppContent = (): JSX.Element => {
         const transactionsSnapshot = await getDocs(transactionsCollectionRef);
         
         if (transactionsSnapshot.empty) {
-          console.log('[updateAllTransactionsWithNewCategory] No transactions found to update');
           return;
         }
         
@@ -1041,7 +1033,6 @@ const BudgetAppContent = (): JSX.Element => {
                  transaction.category.toLowerCase() === oldCategoryName.toLowerCase();
         });
         
-        console.log(`[updateAllTransactionsWithNewCategory] Found ${transactionsToUpdate.length} transactions to update`);
         
         // Using a batch for better performance and atomicity
         const batch = writeBatch(db);
@@ -1060,7 +1051,6 @@ const BudgetAppContent = (): JSX.Element => {
         
         // Commit all updates
         await batch.commit();
-        console.log(`[updateAllTransactionsWithNewCategory] Successfully updated ${transactionsToUpdate.length} transactions`);
         
         // Force a reload of transactions
         setShouldReload(true);

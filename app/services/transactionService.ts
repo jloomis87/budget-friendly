@@ -28,7 +28,6 @@ interface FirestoreTransaction extends Omit<Transaction, 'id'> {
 // Get the transactions subcollection for a user
 const getUserTransactionsRef = (userId: string) => {
   if (!userId || typeof userId !== 'string') {
-    console.error('[Firebase] getUserTransactionsRef called with invalid userId:', userId);
     throw new Error('Valid user ID string is required');
   }
  
@@ -38,12 +37,10 @@ const getUserTransactionsRef = (userId: string) => {
 // Get the transactions subcollection for a specific budget
 const getBudgetTransactionsRef = (userId: string, budgetId: string) => {
   if (!userId || typeof userId !== 'string') {
-    console.error('[Firebase] getBudgetTransactionsRef called with invalid userId:', userId);
     throw new Error('Valid user ID string is required');
   }
 
   if (!budgetId || typeof budgetId !== 'string') {
-    console.error('[Firebase] getBudgetTransactionsRef called with invalid budgetId:', budgetId);
     throw new Error('Valid budget ID string is required');
   }
  
@@ -113,7 +110,6 @@ export const addTransaction = async (
 
     return docRef.id;
   } catch (error) {
-    console.error('[transactionService] Error adding transaction:', error);
     throw error;
   }
 };
@@ -122,7 +118,6 @@ export const addTransaction = async (
 export const getUserTransactions = async (userId: string, budgetId?: string): Promise<Transaction[]> => {
   try {
     if (!userId) {
-      console.error('[Firebase] Error: getUserTransactions called with empty userId');
       return [];
     }
     
@@ -141,12 +136,6 @@ export const getUserTransactions = async (userId: string, budgetId?: string): Pr
     
     const querySnapshot = await getDocs(q);
     
-    if (querySnapshot.size === 0) {
-      // No transactions found
-    } else {
-
-    }
-    
     const transactions: Transaction[] = [];
     
     querySnapshot.forEach((doc) => {
@@ -154,7 +143,6 @@ export const getUserTransactions = async (userId: string, budgetId?: string): Pr
         const data = doc.data();
 
         if (!data.date) {
-          console.warn(`[Firebase] Transaction ${doc.id} missing date field`);
           return; // Skip this document
         }
         
@@ -171,7 +159,6 @@ export const getUserTransactions = async (userId: string, budgetId?: string): Pr
           processedDate = new Date(data.date);
         } else {
           // Fallback for other date formats
-          console.warn(`[Firebase] Document ${doc.id} has unknown date format:`, data.date);
           processedDate = new Date(); // Default to current date as fallback
         }
         
@@ -187,7 +174,7 @@ export const getUserTransactions = async (userId: string, budgetId?: string): Pr
           icon: data.icon || undefined
         });
       } catch (docError) {
-        console.error(`[Firebase] Error processing document ${doc.id}:`, docError);
+        // Error handling but no console.error
       }
     });
     
@@ -205,7 +192,6 @@ export const getUserTransactions = async (userId: string, budgetId?: string): Pr
       return (a.order || 0) - (b.order || 0);
     });
   } catch (error) {
-    console.error('[transactionService] Error fetching transactions:', error);
     throw error;
   }
 };
@@ -252,7 +238,6 @@ export const updateTransaction = async (
     await updateDoc(transactionRef, cleanUpdates);
    
   } catch (error) {
-    console.error('[transactionService] Error updating transaction:', error);
     throw error;
   }
 };
@@ -281,7 +266,6 @@ export const deleteTransaction = async (
     await deleteDoc(transactionRef);
    
   } catch (error) {
-    console.error('[transactionService] Error deleting transaction:', error);
     throw error;
   }
 };
@@ -340,7 +324,6 @@ export const moveTransactionToCategory = async (
       budgetId
     );
   } catch (error) {
-    console.error('[transactionService] Error moving transaction:', error);
     throw error;
   }
 };
@@ -381,7 +364,6 @@ export const reorderTransactions = async (
     // Commit the batch
     await batch.commit();
   } catch (error) {
-    console.error('[transactionService] Error reordering transactions:', error);
     throw error;
   }
 };
@@ -455,7 +437,6 @@ export const deleteTransactionsByCategory = async (
     }
     
   } catch (error) {
-    console.error('[transactionService] Error deleting category transactions:', error);
     throw error;
   }
 };
@@ -477,16 +458,13 @@ export const updateCategoryNameForAllTransactions = async (
     
     if (budgetId) {
       // If budgetId is provided, use the budget's transactions collection
-      console.log(`[transactionService] Using budget transactions collection with budgetId: ${budgetId}`);
       transactionsRef = getBudgetTransactionsRef(userId, budgetId);
     } else {
       // Otherwise use the legacy path (for backward compatibility)
-      console.log(`[transactionService] Using legacy user transactions collection (no budgetId provided)`);
       transactionsRef = getUserTransactionsRef(userId);
     }
     
     // Try exact match (case-sensitive)
-    console.log(`[transactionService] Updating transactions with category name: ${oldCategoryName} to ${newCategoryName}`);
     
     // Query for transactions with the old category name
     const categoryQuery = query(
@@ -497,11 +475,8 @@ export const updateCategoryNameForAllTransactions = async (
     const querySnapshot = await getDocs(categoryQuery);
     
     if (querySnapshot.empty) {
-      console.log(`[transactionService] No transactions found with category: ${oldCategoryName}`);
       return 0;
     }
-    
-    console.log(`[transactionService] Found ${querySnapshot.size} transactions to update`);
     
     // Update all transactions in batches
     const batch = writeBatch(db);
@@ -520,7 +495,6 @@ export const updateCategoryNameForAllTransactions = async (
       
       // Add categoryId to update if provided
       if (categoryId) {
-        console.log(`[transactionService] Including categoryId ${categoryId} in update`);
         updateData.categoryId = categoryId;
       }
       
@@ -529,11 +503,9 @@ export const updateCategoryNameForAllTransactions = async (
     });
     
     await batch.commit();
-    console.log(`[transactionService] Updated ${updatedCount} transactions from ${oldCategoryName} to ${newCategoryName}${categoryId ? ` with categoryId: ${categoryId}` : ''}`);
     
     return updatedCount;
   } catch (error) {
-    console.error(`[transactionService] Error updating category name: ${error}`);
     throw error;
   }
 };
@@ -556,11 +528,8 @@ export const updateTransactionsWithCategoryId = async (
     const transactionsSnapshot = await getDocs(transactionsRef);
     
     if (transactionsSnapshot.empty) {
-      console.log(`[transactionService] No transactions found for budget ${budgetId}`);
       return 0;
     }
-    
-    console.log(`[transactionService] Found ${transactionsSnapshot.size} transactions to update with categoryId`);
     
     // Use a batch to update all transactions
     const batch = writeBatch(db);
@@ -586,17 +555,13 @@ export const updateTransactionsWithCategoryId = async (
     });
     
     if (updatedCount === 0) {
-      console.log(`[transactionService] No transactions need categoryId updates`);
       return 0;
     }
     
-    console.log(`[transactionService] Committing batch with ${updatedCount} updates`);
     await batch.commit();
-    console.log(`[transactionService] Batch committed successfully - updated ${updatedCount} transactions`);
     
     return updatedCount;
   } catch (error) {
-    console.error('[transactionService] Error updating transactions with categoryId:', error);
     throw error;
   }
 };

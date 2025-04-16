@@ -24,7 +24,7 @@ export function useTransactions(initialBudgetId?: string) {
   const { user, isAuthenticated } = useAuth();
   
   // Get categories from context
-  const { categories: categoryList } = useCategories();
+  const { categories: categoryList, getCategoryByName } = useCategories();
   
   // State for transactions and budget data
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -113,7 +113,7 @@ export function useTransactions(initialBudgetId?: string) {
             setBudgetPreferences(prefs);
           }
         } catch (error) {
-          console.error('[useTransactions] Error loading budget preferences:', error);
+          // Error loading budget preferences
         }
       }
     };
@@ -159,18 +159,14 @@ export function useTransactions(initialBudgetId?: string) {
       
       if (customEvent.detail) {
         const { oldCategory, newCategory } = customEvent.detail;
-        console.log(`[DEBUG] Category update event received: ${oldCategory} -> ${newCategory}`);
         
         // Force a reload of transactions to ensure all category changes are reflected
         if (isAuthenticated && user?.id) {
-          console.log(`[DEBUG] Authenticated user, forcing transaction reload from database`);
           setShouldReload(true);
         } else {
-          console.log(`[DEBUG] Non-authenticated user, updating local transactions`);
           // For non-authenticated users, we should manually update the categories in memory
           const updatedTransactions = transactions.map(transaction => {
             if (transaction.category?.toLowerCase() === oldCategory.toLowerCase()) {
-              console.log(`[DEBUG] Updating local transaction: ${transaction.description}`);
               return { ...transaction, category: newCategory };
             }
             return transaction;
@@ -178,7 +174,6 @@ export function useTransactions(initialBudgetId?: string) {
           
           // Only update if changes were made
           if (JSON.stringify(updatedTransactions) !== JSON.stringify(transactions)) {
-            console.log(`[DEBUG] Applying local transaction updates`);
             setTransactions(updatedTransactions);
             
             // Also update localStorage
@@ -209,18 +204,11 @@ export function useTransactions(initialBudgetId?: string) {
       
       if (customEvent.detail) {
         const { oldName, newName, categoryId } = customEvent.detail;
-        console.log(`[DEBUG] Category rename event received: ${oldName} -> ${newName} (ID: ${categoryId})`);
         
         // Directly update transactions that match the old category name
         const txUpdates = transactions.map((transaction, index) => {
           // Use case-insensitive comparison to be extra safe
           if (transaction.category?.toLowerCase() === oldName.toLowerCase()) {
-            console.log(`[DEBUG] Local update - Changing transaction category:
-              Index: ${index},
-              ID: ${transaction.id || 'no-id'}, 
-              Description: ${transaction.description}
-              From: ${transaction.category} -> To: ${newName}`);
-            
             // Return a new object with both category and categoryId updated
             return { 
               ...transaction, 
@@ -233,15 +221,12 @@ export function useTransactions(initialBudgetId?: string) {
         
         // Only update if changes were made
         if (JSON.stringify(txUpdates) !== JSON.stringify(transactions)) {
-          console.log(`[DEBUG] Updating ${txUpdates.filter(t => t.category === newName).length} transactions to new category name`);
           setTransactions(txUpdates);
           
           // If not authenticated, also update localStorage
           if (!isAuthenticated) {
             setLocalTransactions(txUpdates);
           }
-        } else {
-          console.log(`[DEBUG] No transaction updates needed for category rename`);
         }
       }
     };
@@ -265,7 +250,6 @@ export function useTransactions(initialBudgetId?: string) {
         transaction.categoryId = categoryInfo.categoryId;
       } else if (!transaction.categoryId) {
         // If category is provided but categoryId is not, try to get categoryId from CategoryContext
-        const { getCategoryByName } = useCategories();
         const category = getCategoryByName(transaction.category);
         if (category) {
           transaction.categoryId = category.id;
@@ -340,7 +324,7 @@ export function useTransactions(initialBudgetId?: string) {
       });
       
     } catch (error) {
-      console.error('[useTransactions] Error adding transaction:', error);
+      // Error handling without console.error
       ReactDOM.unstable_batchedUpdates(() => {
         setIsLoading(false);
         setAlertMessage({
@@ -360,7 +344,8 @@ export function useTransactions(initialBudgetId?: string) {
     setLocalSuggestions,
     setShouldReload,
     categorizeTransaction,
-    budgetPreferences
+    budgetPreferences,
+    getCategoryByName
   ]);
 
   // Load transactions from Firestore when authenticated or when budget changes
@@ -407,7 +392,7 @@ export function useTransactions(initialBudgetId?: string) {
           }
         });
       } catch (error) {
-        console.error('[useTransactions] Error loading transactions:', error);
+        // Error handling without console.error
         ReactDOM.unstable_batchedUpdates(() => {
           setIsLoading(false);
           setShouldReload(false); // Reset even on error
@@ -430,7 +415,7 @@ export function useTransactions(initialBudgetId?: string) {
   const updateTransaction = useCallback(async (index: number, updatedFields: Partial<Transaction>) => {
     // Ensure the index is valid
     if (index < 0 || index >= transactions.length) {
-      console.error(`Invalid transaction index: ${index}`);
+      // Error handling without console.error
       setAlertMessage({
         type: 'error',
         message: 'Could not update transaction: Invalid index'
@@ -463,20 +448,12 @@ export function useTransactions(initialBudgetId?: string) {
         try {
           updatedTransaction.date = new Date(updatedFields.date);
         } catch (e) {
-          console.error('Invalid date format:', updatedFields.date, e);
+          // Error handling without console.error
         }
       }
     }
     
     try {
-      // Log category changes for debugging
-      if (updatedFields.category !== undefined && updatedFields.category !== transaction.category) {
-        console.log(`[DEBUG] Changing transaction category: 
-          ID: ${transaction.id}, 
-          Description: ${transaction.description}
-          From: ${transaction.category} -> To: ${updatedFields.category}`);
-      }
-      
       // If authenticated and transaction has an ID, update in Firestore
       if (isAuthenticated && user?.id && transaction.id) {
         setIsLoading(true);
@@ -507,7 +484,7 @@ export function useTransactions(initialBudgetId?: string) {
       
       return updatedTransaction;
     } catch (error) {
-      console.error('Error updating transaction:', error);
+      // Error handling without console.error
       setAlertMessage({
         type: 'error',
         message: `Failed to update transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -539,8 +516,6 @@ export function useTransactions(initialBudgetId?: string) {
       categoryIdMap[category.id] = category.name;
     });
     
-    console.log('[DEBUG] Category ID map for transaction grouping:', categoryIdMap);
-    
     // Loop through transactions and group by category
     transactions.forEach(transaction => {
       // Skip income transactions as they are handled separately
@@ -553,7 +528,6 @@ export function useTransactions(initialBudgetId?: string) {
           mappedCategory = categoryList.find(c => c.id === transaction.categoryId);
           if (mappedCategory) {
             categoryName = mappedCategory.name;
-            console.log(`[DEBUG] Transaction "${transaction.description}" mapped by ID: ${transaction.categoryId} -> ${categoryName}`);
           }
         } 
         // Second priority: if category name exists, use case-insensitive matching
@@ -565,7 +539,6 @@ export function useTransactions(initialBudgetId?: string) {
           
           if (mappedCategory) {
             categoryName = mappedCategory.name; // Use the current category name (proper case)
-            console.log(`[DEBUG] Transaction "${transaction.description}" mapped by name: ${transaction.category} -> ${categoryName}`);
           } else {
             // No direct match by name, try to find by known category IDs
             // This handles the case of renamed categories
@@ -582,7 +555,6 @@ export function useTransactions(initialBudgetId?: string) {
                 const targetCategory = categoryList.find(c => c.id === categoryId);
                 if (targetCategory) {
                   categoryName = targetCategory.name;
-                  console.log(`[DEBUG] Transaction "${transaction.description}" mapped from "${transaction.category}" to "${categoryName}" via known category ID: ${categoryId}`);
                   break;
                 }
               }
@@ -621,7 +593,7 @@ export function useTransactions(initialBudgetId?: string) {
   const deleteTransaction = useCallback(async (index: number) => {
     // Ensure the index is valid
     if (index < 0 || index >= transactions.length) {
-      console.error(`Invalid transaction index: ${index}`);
+      // Error handling without console.error
       setAlertMessage({
         type: 'error',
         message: 'Could not delete transaction: Invalid index'
@@ -696,14 +668,14 @@ export function useTransactions(initialBudgetId?: string) {
           message: 'Transaction deleted successfully!'
         });
       } catch (error) {
-        console.error('[useTransactions] Error recalculating budget after deletion:', error);
+        // Error handling without console.error
         setAlertMessage({
           type: 'error',
           message: 'Error updating budget calculations. Please try again.'
         });
       }
     } catch (error) {
-      console.error('[useTransactions] Error deleting transaction:', error);
+      // Error handling without console.error
       setAlertMessage({
         type: 'error',
         message: `Error deleting transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -778,7 +750,7 @@ export function useTransactions(initialBudgetId?: string) {
         message: 'All transactions have been cleared.'
       });
     } catch (error) {
-      console.error('[useTransactions] Error resetting transactions:', error);
+      // Error handling without console.error
       setAlertMessage({
         type: 'error',
         message: `Error resetting budget: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -800,13 +772,13 @@ export function useTransactions(initialBudgetId?: string) {
   const moveTransaction = useCallback(async (index: number, targetCategory: string) => {
     // Ensure the index is valid
     if (index < 0 || index >= transactions.length) {
-      console.error(`Invalid transaction index: ${index}`);
+      // Error handling without console.error
       return;
     }
     
     // Validate the target category
     if (!['Income', 'Essentials', 'Wants', 'Savings'].includes(targetCategory)) {
-      console.error(`Invalid target category: ${targetCategory}`);
+      // Error handling without console.error
       return;
     }
 
@@ -829,7 +801,7 @@ export function useTransactions(initialBudgetId?: string) {
         category: targetCategory as 'Income' | 'Essentials' | 'Wants' | 'Savings' 
       });
     } catch (error) {
-      console.error('Error moving transaction:', error);
+      // Error handling without console.error
       setAlertMessage({
         type: 'error',
         message: `Error moving transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -881,7 +853,7 @@ export function useTransactions(initialBudgetId?: string) {
         message: 'Transaction order updated successfully!'
       });
     } catch (error) {
-      console.error('[useTransactions] Error reordering transactions:', error);
+      // Error handling without console.error
       setAlertMessage({
         type: 'error',
         message: 'Failed to reorder transactions. Please try again.'
@@ -965,7 +937,8 @@ export function useTransactions(initialBudgetId?: string) {
       setTransactions(prev => [...prev]);
       
       // Dispatch custom events for different components to react to the change
-      const affectedCategories = [...new Set(transactionsToUpdate.map(item => item.transaction.category))];
+      const categoriesSet = new Set(transactionsToUpdate.map(item => item.transaction.category));
+      const affectedCategories = Array.from(categoriesSet);
       
       affectedCategories.forEach(category => {
         // Dispatch events for each affected category
@@ -983,14 +956,14 @@ export function useTransactions(initialBudgetId?: string) {
             });
             document.dispatchEvent(event2);
           } catch (error) {
-            console.error(`Error dispatching events for category ${category}:`, error);
+            // Error handling without console.error
           }
         }
       });
       
       return transactionsToUpdate.length;
     } catch (error) {
-      console.error('Error updating transactions with same name:', error);
+      // Error handling without console.error
       // Still dispatch events even if there was an error with some updates
       try {
         const refreshEvent = new CustomEvent('transactionIconsUpdated', {
@@ -998,7 +971,7 @@ export function useTransactions(initialBudgetId?: string) {
         });
         document.dispatchEvent(refreshEvent);
       } catch (e) {
-        console.error('Error dispatching fallback event:', e);
+        // Error handling without console.error
       }
       return undefined;
     }

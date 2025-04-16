@@ -228,7 +228,6 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
         if (editedName !== category) {
           const oldCategoryName = category;
           const categoryId = foundCategory.id;
-          console.log(`[DEBUG] Saving category edit: ${oldCategoryName} -> ${editedName.trim()}, ID: ${categoryId}`);
           
           // Update the category name only, preserving all other properties like color and icon
           await updateCategory(foundCategory.id, {
@@ -245,11 +244,9 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
           
           // Update all transactions with the new category name
           if (window.updateAllTransactionsWithNewCategory) {
-            console.log(`[DEBUG] Starting transaction update for category name change`);
             try {
               // Pass the old category name, new category name, and category ID
               await window.updateAllTransactionsWithNewCategory(oldCategoryName, editedName.trim(), categoryId);
-              console.log(`[DEBUG] Transaction update complete`);
               
               // Force refresh UI by dispatching a custom event
               const refreshEvent = new CustomEvent('forceTransactionRefresh', {
@@ -298,7 +295,6 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
             }
           }
         } else {
-          console.log(`[DEBUG] No change in category name, skipping update`);
         }
         
         setIsEditing(false);

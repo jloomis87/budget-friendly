@@ -39,7 +39,6 @@ async function getBudgetCategories(userId: string, budgetId: string): Promise<Ca
     
     return categories;
   } catch (error) {
-    console.error('Error fetching budget categories:', error);
     throw error;
   }
 }
@@ -52,33 +51,25 @@ async function main() {
   const args = process.argv.slice(2);
   
   if (args.length < 2) {
-    console.error('Usage: ts-node updateTransactions.ts <userId> <budgetId>');
     process.exit(1);
   }
   
   const userId = args[0];
   const budgetId = args[1];
   
-  console.log(`Updating transactions for user ${userId} and budget ${budgetId}`);
-  
   try {
     // Get categories for this budget
     const categories = await getBudgetCategories(userId, budgetId);
     
     if (!categories || categories.length === 0) {
-      console.error('No categories found for this budget');
       process.exit(1);
     }
-    
-    console.log(`Found ${categories.length} categories for budget ${budgetId}`);
     
     // Update transactions with categoryId
     const updatedCount = await updateTransactionsWithCategoryId(userId, budgetId, categories);
     
-    console.log(`Successfully updated ${updatedCount} transactions with categoryId`);
     process.exit(0);
   } catch (error) {
-    console.error('Error updating transactions:', error);
     process.exit(1);
   }
 }
