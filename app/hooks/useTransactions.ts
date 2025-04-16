@@ -53,8 +53,16 @@ export function useTransactions(initialBudgetId?: string) {
   // Get the categorizing function
   const { categorizeTransaction } = useCategorizer();
 
+  // Cache for storing transactions by budget ID
+  const [transactionCache, setTransactionCache] = useState<Record<string, {
+    transactions: Transaction[],
+    summary: BudgetSummary | null,
+    plan: BudgetPlan | null,
+    suggestions: string[]
+  }>>({});
+
   // Helper function to show toast notifications
-  const showToast = useCallback((message: string, type: 'error' | 'warning' | 'success' = 'success') => {
+  const showToast = useCallback((message: string, type: 'error' | 'warning' | 'success' | 'info' = 'success') => {
     // Create a temporary notification element
     const notification = document.createElement('div');
     notification.style.position = 'fixed';
@@ -63,11 +71,20 @@ export function useTransactions(initialBudgetId?: string) {
     notification.style.transform = 'translateX(-50%)';
     
     // Set color based on type
-    const bgColor = type === 'error' 
-      ? 'rgba(244, 67, 54, 0.9)'  // Red for errors
-      : type === 'warning' 
-        ? 'rgba(255, 152, 0, 0.9)'  // Orange for warnings
-        : 'rgba(76, 175, 80, 0.9)'; // Green for success
+    let bgColor;
+    switch (type) {
+      case 'error':
+        bgColor = 'rgba(244, 67, 54, 0.9)';  // Red for errors
+        break;
+      case 'warning':
+        bgColor = 'rgba(255, 152, 0, 0.9)';  // Orange for warnings
+        break;
+      case 'info':
+        bgColor = 'rgba(33, 150, 243, 0.9)'; // Blue for info
+        break;
+      default:
+        bgColor = 'rgba(76, 175, 80, 0.9)'; // Green for success
+    }
     
     notification.style.backgroundColor = bgColor;
     notification.style.color = 'white';
@@ -82,26 +99,64 @@ export function useTransactions(initialBudgetId?: string) {
     // Add to DOM
     document.body.appendChild(notification);
     
-    // Remove after 3 seconds
-    setTimeout(() => {
-      document.body.removeChild(notification);
+    // Create a timeout for automatic removal
+    let timeoutId = setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
     }, 3000);
+    
+    // Return a function that can be used to manually dismiss the toast
+    return () => {
+      clearTimeout(timeoutId);
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    };
   }, []);
 
   // Update currentBudgetId when initialBudgetId changes
   useEffect(() => {
     // Only update if initialBudgetId is defined and different from currentBudgetId
     if (initialBudgetId && initialBudgetId !== currentBudgetId) {
-      // Immediately clear all data when budget changes
-      setTransactions([]);
-      setBudgetSummary(null);
-      setBudgetPlan(null);
-      setSuggestions([]);
+      // Indicate loading state immediately
+      setIsLoading(true);
       
-      // Set the new budget ID
-      setCurrentBudgetId(initialBudgetId);
-      // Force a reload of transactions
-      setShouldReload(true);
+      // Check if we have cached data for this budget
+      if (transactionCache[initialBudgetId]) {
+        // Use cached data for immediate display
+        const cachedData = transactionCache[initialBudgetId];
+        
+        // Update states with cached data for immediate feedback
+        ReactDOM.unstable_batchedUpdates(() => {
+          setTransactions(cachedData.transactions);
+          setBudgetSummary(cachedData.summary);
+          setBudgetPlan(cachedData.plan);
+          setSuggestions(cachedData.suggestions);
+          
+          // Set the new budget ID
+          setCurrentBudgetId(initialBudgetId);
+          
+          // We still want to reload fresh data, but user can see cached data immediately
+          setShouldReload(true);
+          
+          // Briefly delay turning off loading to prevent flicker
+          setTimeout(() => setIsLoading(false), 100);
+        });
+      } else {
+        // No cached data, clear all data when budget changes
+        ReactDOM.unstable_batchedUpdates(() => {
+          setTransactions([]);
+          setBudgetSummary(null);
+          setBudgetPlan(null);
+          setSuggestions([]);
+          
+          // Set the new budget ID
+          setCurrentBudgetId(initialBudgetId);
+          // Force a reload of transactions
+          setShouldReload(true);
+        });
+      }
     }
   }, [initialBudgetId]); // Only depend on initialBudgetId changes
 
@@ -288,6 +343,27 @@ export function useTransactions(initialBudgetId?: string) {
         
         // Force a refresh of transactions from the server if authenticated
         if (isAuthenticated && user?.id && currentBudgetId) {
+          // Remove this category's transactions from the cache first
+          if (transactionCache[currentBudgetId]) {
+            const cachedData = transactionCache[currentBudgetId];
+            const filteredTransactions = cachedData.transactions.filter(t => 
+              (t.category ?? '') !== categoryName && (t.categoryId ?? '') !== categoryId
+            );
+            
+            // Update the cache with filtered transactions
+            setTransactionCache(prevCache => ({
+              ...prevCache,
+              [currentBudgetId]: {
+                ...cachedData,
+                transactions: filteredTransactions
+              }
+            }));
+            
+            // Update local state immediately for better UX while we reload
+            setTransactions(filteredTransactions);
+          }
+          
+          // Then trigger a reload to get fresh data
           setShouldReload(true);
         } else {
           // For non-authenticated users, remove transactions with the deleted category
@@ -329,6 +405,7 @@ export function useTransactions(initialBudgetId?: string) {
     currentBudgetId, 
     transactions, 
     setShouldReload,
+    transactionCache,
     setTransactions,
     setLocalTransactions,
     setBudgetSummary,
@@ -376,7 +453,7 @@ export function useTransactions(initialBudgetId?: string) {
       setIsLoading(true);
       
       // Track transaction ID for return value
-      let transactionId: string = updatedTransaction.id;
+      let transactionId = updatedTransaction.id || '';
       
       // If authenticated, save to Firestore
       if (isAuthenticated && user?.id) {
@@ -575,7 +652,13 @@ export function useTransactions(initialBudgetId?: string) {
       }
       
       try {
+        // Set loading state
         setIsLoading(true);
+        
+        // Show a loading indicator
+        const progressToast = showToast('Loading transactions...', 'info');
+        
+        // Fetch transactions from Firestore
         const userTransactions = await transactionService.getUserTransactions(user.id, currentBudgetId);
         
         // Sort transactions by category and order
@@ -591,6 +674,17 @@ export function useTransactions(initialBudgetId?: string) {
         const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
         const budgetSuggestions = getBudgetSuggestions(plan);
         
+        // Store in cache for quick future access
+        setTransactionCache(prevCache => ({
+          ...prevCache,
+          [currentBudgetId]: {
+            transactions: sortedTransactions,
+            summary,
+            plan,
+            suggestions: budgetSuggestions
+          }
+        }));
+        
         // Update all states in a single batch
         ReactDOM.unstable_batchedUpdates(() => {
           setTransactions(sortedTransactions);
@@ -602,6 +696,11 @@ export function useTransactions(initialBudgetId?: string) {
           // Reset shouldReload flag after loading completes
           if (shouldReload) {
             setShouldReload(false);
+          }
+          
+          // Clear loading toast if it exists
+          if (progressToast && typeof progressToast === 'function') {
+            progressToast();
           }
         });
       } catch (error) {
@@ -622,7 +721,7 @@ export function useTransactions(initialBudgetId?: string) {
     if ((currentBudgetId && !isLoading) || shouldReload) {
       loadTransactions();
     }
-  }, [currentBudgetId, isAuthenticated, user?.id, shouldReload]); // Remove isLoading from dependencies to prevent infinite loop
+  }, [currentBudgetId, isAuthenticated, user?.id, shouldReload]);
 
   // Update a transaction
   const updateTransaction = useCallback(async (index: number, updatedFields: Partial<Transaction>) => {
