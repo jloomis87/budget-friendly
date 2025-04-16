@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Stack, IconButton, Tooltip, Card } from '@mui/material';
-import { Add as AddIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material';
+import { Add as AddIcon, ArrowForward as ArrowForwardIcon, ContentCopy as ContentCopyIcon } from '@mui/icons-material';
 import { TransactionCard } from './TransactionCard';
 import type { MonthColumnProps } from './types';
 import type { Transaction } from '../../services/fileParser';
@@ -179,21 +179,50 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
         >
           {month}
         </Typography>
-        <Tooltip title={`Copy ${month} ${category} to ${getNextMonth(month)}`}>
-          <IconButton
-            size="small"
-            onClick={() => handleCopyMonthClick(month, monthTransactions as Transaction[])}
-            sx={{
-              color: textColorWithOpacity,
-              '&:hover': {
-                color: textColor,
-                backgroundColor: 'rgba(0, 0, 0, 0.04)'
-              }
-            }}
-          >
-            <ContentCopyIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          {/* Copy to all months button */}
+          {handleCopyToAllMonths && monthTransactions.length > 0 && (
+            <Tooltip title={`Copy ${month} ${category} to all months`}>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  // Copy each transaction to all other months
+                  (monthTransactions as Transaction[]).forEach(transaction => {
+                    if (handleCopyToAllMonths) {
+                      handleCopyToAllMonths(transaction);
+                    }
+                  });
+                }}
+                sx={{
+                  color: textColorWithOpacity,
+                  '&:hover': {
+                    color: textColor,
+                    backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                  }
+                }}
+              >
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          
+          {/* Copy to next month button */}
+          <Tooltip title={`Copy ${month} ${category} to ${getNextMonth(month)}`}>
+            <IconButton
+              size="small"
+              onClick={() => handleCopyMonthClick(month, monthTransactions as Transaction[])}
+              sx={{
+                color: textColorWithOpacity,
+                '&:hover': {
+                  color: textColor,
+                  backgroundColor: 'rgba(0, 0, 0, 0.04)'
+                }
+              }}
+            >
+              <ArrowForwardIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
       <Typography
         sx={{
