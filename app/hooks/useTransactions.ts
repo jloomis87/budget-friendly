@@ -53,6 +53,41 @@ export function useTransactions(initialBudgetId?: string) {
   // Get the categorizing function
   const { categorizeTransaction } = useCategorizer();
 
+  // Helper function to show toast notifications
+  const showToast = useCallback((message: string, type: 'error' | 'warning' | 'success' = 'success') => {
+    // Create a temporary notification element
+    const notification = document.createElement('div');
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.left = '50%';
+    notification.style.transform = 'translateX(-50%)';
+    
+    // Set color based on type
+    const bgColor = type === 'error' 
+      ? 'rgba(244, 67, 54, 0.9)'  // Red for errors
+      : type === 'warning' 
+        ? 'rgba(255, 152, 0, 0.9)'  // Orange for warnings
+        : 'rgba(76, 175, 80, 0.9)'; // Green for success
+    
+    notification.style.backgroundColor = bgColor;
+    notification.style.color = 'white';
+    notification.style.padding = '10px 20px';
+    notification.style.borderRadius = '4px';
+    notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+    notification.style.zIndex = '9999';
+    notification.style.fontFamily = 'Arial, sans-serif';
+    notification.style.fontSize = '14px';
+    notification.textContent = message;
+    
+    // Add to DOM
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+      document.body.removeChild(notification);
+    }, 3000);
+  }, []);
+
   // Update currentBudgetId when initialBudgetId changes
   useEffect(() => {
     // Only update if initialBudgetId is defined and different from currentBudgetId
@@ -307,11 +342,17 @@ export function useTransactions(initialBudgetId?: string) {
         setBudgetPlan(plan);
         setSuggestions(budgetSuggestions);
         setIsLoading(false);
+        
+        // Show success message as a toast notification
+        const message = transactions.length === 0 
+          ? 'First transaction added! Continue adding transactions to see your budget plan.'
+          : 'Transaction added successfully!';
+        showToast(message, 'success');
+        
+        // Also set the alert message for components that use it
         setAlertMessage({
           type: 'success',
-          message: transactions.length === 0 
-            ? 'First transaction added! Continue adding transactions to see your budget plan.'
-            : 'Transaction added successfully!'
+          message: message
         });
         
         // Update localStorage if needed
@@ -327,9 +368,11 @@ export function useTransactions(initialBudgetId?: string) {
       // Error handling without console.error
       ReactDOM.unstable_batchedUpdates(() => {
         setIsLoading(false);
+        const errorMessage = `Error adding transaction: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        showToast(errorMessage, 'error');
         setAlertMessage({
           type: 'error',
-          message: `Error adding transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
+          message: errorMessage
         });
       });
     }
@@ -345,7 +388,8 @@ export function useTransactions(initialBudgetId?: string) {
     setShouldReload,
     categorizeTransaction,
     budgetPreferences,
-    getCategoryByName
+    getCategoryByName,
+    showToast
   ]);
 
   // Load transactions from Firestore when authenticated or when budget changes
@@ -594,9 +638,11 @@ export function useTransactions(initialBudgetId?: string) {
     // Ensure the index is valid
     if (index < 0 || index >= transactions.length) {
       // Error handling without console.error
+      const errorMessage = 'Could not delete transaction: Invalid index';
+      showToast(errorMessage, 'error');
       setAlertMessage({
         type: 'error',
-        message: 'Could not delete transaction: Invalid index'
+        message: errorMessage
       });
       return;
     }
@@ -663,22 +709,29 @@ export function useTransactions(initialBudgetId?: string) {
           }
         }
         
+        // Show success message as toast
+        showToast('Transaction deleted successfully!', 'success');
+        
         setAlertMessage({
           type: 'success',
           message: 'Transaction deleted successfully!'
         });
       } catch (error) {
         // Error handling without console.error
+        const errorMessage = 'Error updating budget calculations. Please try again.';
+        showToast(errorMessage, 'error');
         setAlertMessage({
           type: 'error',
-          message: 'Error updating budget calculations. Please try again.'
+          message: errorMessage
         });
       }
     } catch (error) {
       // Error handling without console.error
+      const errorMessage = `Error deleting transaction: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      showToast(errorMessage, 'error');
       setAlertMessage({
         type: 'error',
-        message: `Error deleting transaction: ${error instanceof Error ? error.message : 'Unknown error'}`
+        message: errorMessage
       });
     } finally {
       if (isAuthenticated && user?.id) {
@@ -693,8 +746,9 @@ export function useTransactions(initialBudgetId?: string) {
     setLocalBudgetSummary, 
     setLocalBudgetPlan, 
     setLocalSuggestions,
-    currentBudgetId,  // Add currentBudgetId dependency
-    budgetPreferences
+    currentBudgetId,
+    budgetPreferences,
+    showToast
   ]);
 
   // Reset all transactions
@@ -848,15 +902,20 @@ export function useTransactions(initialBudgetId?: string) {
         setLocalTransactions(updatedTransactions);
       }
       
+      // Show success message as toast
+      showToast('Transaction order updated successfully!', 'success');
+      
       setAlertMessage({
         type: 'success',
         message: 'Transaction order updated successfully!'
       });
     } catch (error) {
       // Error handling without console.error
+      const errorMessage = 'Failed to reorder transactions. Please try again.';
+      showToast(errorMessage, 'error');
       setAlertMessage({
         type: 'error',
-        message: 'Failed to reorder transactions. Please try again.'
+        message: errorMessage
       });
     } finally {
       setIsLoading(false);
@@ -867,7 +926,8 @@ export function useTransactions(initialBudgetId?: string) {
     user, 
     setLocalTransactions, 
     setAlertMessage,
-    currentBudgetId  // Add currentBudgetId dependency
+    currentBudgetId,
+    showToast
   ]);
 
   // Update all transactions with the same name to have the same icon
