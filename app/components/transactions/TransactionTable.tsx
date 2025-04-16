@@ -735,6 +735,8 @@ export const TransactionTableContent: React.FC = () => {
           categoryData={categoryData}
           isExpanded={isExpanded}
           onToggleExpand={toggleExpand}
+          hasItems={filteredTransactions.length > 0}
+          transactions={filteredTransactions}
         />
         
         {/* Transaction content with smooth animation */}

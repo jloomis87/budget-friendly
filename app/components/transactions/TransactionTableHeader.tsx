@@ -1055,9 +1055,7 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                     py: 0.25,
                   }}
                 >
-                  {hasItems ? 
-                    (transactions?.length || 0) : 
-                    0}
+                  {transactions?.length || 0}
                 </Box>
               </Typography>
             </Tooltip>
