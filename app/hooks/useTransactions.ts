@@ -275,6 +275,71 @@ export function useTransactions(initialBudgetId?: string) {
     };
   }, [transactions, isAuthenticated, setLocalTransactions]);
 
+  // Listen for category deleted events to refresh transactions
+  useEffect(() => {
+    const handleCategoryDeleted = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        categoryId: string,
+        categoryName: string
+      }>;
+      
+      if (customEvent.detail) {
+        const { categoryId, categoryName } = customEvent.detail;
+        
+        // Force a refresh of transactions from the server if authenticated
+        if (isAuthenticated && user?.id && currentBudgetId) {
+          setShouldReload(true);
+        } else {
+          // For non-authenticated users, remove transactions with the deleted category
+          const updatedTransactions = transactions.filter(transaction => 
+            (transaction.category ?? '') !== categoryName && 
+            (transaction.categoryId ?? '') !== categoryId
+          );
+          
+          // Update local state if there were changes
+          if (updatedTransactions.length !== transactions.length) {
+            setTransactions(updatedTransactions);
+            setLocalTransactions(updatedTransactions);
+            
+            // Recalculate budget summaries
+            const summary = calculateBudgetSummary(updatedTransactions);
+            setBudgetSummary(summary);
+            setLocalBudgetSummary(summary);
+            
+            const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
+            setBudgetPlan(plan);
+            setLocalBudgetPlan(plan);
+            
+            const budgetSuggestions = getBudgetSuggestions(plan);
+            setSuggestions(budgetSuggestions);
+            setLocalSuggestions(budgetSuggestions);
+          }
+        }
+      }
+    };
+    
+    document.addEventListener('categoryDeleted', handleCategoryDeleted);
+    
+    return () => {
+      document.removeEventListener('categoryDeleted', handleCategoryDeleted);
+    };
+  }, [
+    isAuthenticated, 
+    user, 
+    currentBudgetId, 
+    transactions, 
+    setShouldReload,
+    setTransactions,
+    setLocalTransactions,
+    setBudgetSummary,
+    setLocalBudgetSummary,
+    setBudgetPlan,
+    setLocalBudgetPlan,
+    setSuggestions,
+    setLocalSuggestions,
+    budgetPreferences
+  ]);
+
   // Add a transaction
   const addTransaction = useCallback(async (newTransaction: Omit<Transaction, 'id'>) => {
     try {

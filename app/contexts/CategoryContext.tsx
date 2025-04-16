@@ -265,13 +265,45 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         throw new Error(`Cannot delete default category "${categoryToDelete.name}"`);
       }
 
+      // First delete all transactions for this category to ensure clean deletion
+      if (user) {
+        try {
+          await deleteTransactionsByCategory(user.id, id, currentBudgetId);
+          
+          // Dispatch an event to notify transaction components to refresh
+          const event = new CustomEvent('categoryDeleted', {
+            detail: {
+              categoryId: id,
+              categoryName: categoryToDelete.name
+            }
+          });
+          document.dispatchEvent(event);
+        } catch (error) {
+          console.error('Error deleting category transactions:', error);
+          // Continue with category deletion even if transaction deletion fails
+        }
+      }
+
+      // Then remove the category from the categories list
       const newCategories = categories.filter(cat => cat.id !== id);
       setCategories(newCategories);
       await saveCategories(newCategories);
-
-      // Delete transactions for the category
-      if (user) {
-        await deleteTransactionsByCategory(user.id, id, currentBudgetId);
+      
+      // Show a notification that the category was deleted
+      // Try to use toast utility or just alert if not available
+      try {
+        if (typeof window !== 'undefined') {
+          // Dispatch a toast notification event
+          const toastEvent = new CustomEvent('showToast', {
+            detail: {
+              message: `Category "${categoryToDelete.name}" and all its transactions have been deleted.`,
+              type: 'success'
+            }
+          });
+          document.dispatchEvent(toastEvent);
+        }
+      } catch (e) {
+        // Silent fail if toast notification isn't available
       }
     } catch (error) {
       console.error('Error deleting category:', error);

@@ -389,37 +389,63 @@ export const deleteTransactionsByCategory = async (
       transactionsRef = getUserTransactionsRef(userId);
     }
     
-    // Query for all transactions with the given category
-    // First try matching by ID (lowercase for case-insensitive matching)
-    let categoryQuery = query(
-      transactionsRef,
-      where('category', '==', categoryId.toLowerCase())
-    );
+    // First try to get the category name from the categories collection
+    // to ensure we delete transactions both by ID and name
+    const categoryName = await getCategoryNameById(userId, categoryId, budgetId);
     
-    let querySnapshot = await getDocs(categoryQuery);
+    // Array to hold all matching transactions
+    let matchingTransactions: QueryDocumentSnapshot[] = [];
     
-    // If no results, try matching by category name (for backward compatibility)
-    if (querySnapshot.empty) {
-      // Try with the original case
-      categoryQuery = query(
+    // Find transactions using category name (primary identifier in most transactions)
+    if (categoryName) {
+      const categoryNameQuery = query(
         transactionsRef,
-        where('category', '==', categoryId)
+        where('category', '==', categoryName)
       );
       
-      querySnapshot = await getDocs(categoryQuery);
+      const categoryNameSnapshot = await getDocs(categoryNameQuery);
+      matchingTransactions = [...categoryNameSnapshot.docs];
     }
     
-    if (querySnapshot.empty) {
+    // Find transactions using categoryId
+    const categoryIdQuery = query(
+      transactionsRef,
+      where('categoryId', '==', categoryId)
+    );
+    
+    const categoryIdSnapshot = await getDocs(categoryIdQuery);
+    // Use Set to avoid duplicate transactions
+    const docIdsSet = new Set(matchingTransactions.map(doc => doc.id));
+    for (const doc of categoryIdSnapshot.docs) {
+      if (!docIdsSet.has(doc.id)) {
+        matchingTransactions.push(doc);
+      }
+    }
+    
+    // Try with lowercase id as fallback for older transactions
+    const lowercaseIdQuery = query(
+      transactionsRef,
+      where('categoryId', '==', categoryId.toLowerCase())
+    );
+    
+    const lowercaseIdSnapshot = await getDocs(lowercaseIdQuery);
+    for (const doc of lowercaseIdSnapshot.docs) {
+      if (!docIdsSet.has(doc.id)) {
+        matchingTransactions.push(doc);
+      }
+    }
+    
+    // If no results, it's possible there are no transactions for this category
+    if (matchingTransactions.length === 0) {
       return;
     }
-    
     
     // Delete all transactions in batches (Firestore has a limit of 500 operations per batch)
     const batchSize = 450; // Keep under the 500 limit for safety
     let batch = writeBatch(db);
     let operationCount = 0;
     
-    for (const document of querySnapshot.docs) {
+    for (const document of matchingTransactions) {
       batch.delete(document.ref);
       operationCount++;
       
@@ -438,6 +464,29 @@ export const deleteTransactionsByCategory = async (
     
   } catch (error) {
     throw error;
+  }
+};
+
+// Helper function to get category name from categoryId
+const getCategoryNameById = async (
+  userId: string,
+  categoryId: string,
+  budgetId?: string
+): Promise<string | null> => {
+  try {
+    if (!budgetId) return null;
+    
+    const budgetDocRef = doc(db, 'users', userId, 'budgets', budgetId);
+    const budgetDoc = await getDoc(budgetDocRef);
+    
+    if (!budgetDoc.exists()) return null;
+    
+    const categories = budgetDoc.data()?.categories || [];
+    const category = categories.find((cat: any) => cat.id === categoryId);
+    
+    return category ? category.name : null;
+  } catch (error) {
+    return null; // Fail silently and continue with the category ID
   }
 };
 
