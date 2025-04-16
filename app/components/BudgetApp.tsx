@@ -884,9 +884,6 @@ const BudgetAppContent = (): JSX.Element => {
     }
   );
   
-  // Load user preferences from Firebase when component mounts or user changes
-  const { user, isAuthenticated } = useAuth();
-  
   // Use the transactions hook with the initial budget ID
   const {
     transactions,
@@ -907,8 +904,12 @@ const BudgetAppContent = (): JSX.Element => {
     currentBudgetId,
     setCurrentBudgetId,
     updateAllTransactionsWithSameName,
-    setShouldReload
+    setShouldReload,
+    isLoading: transactionsLoading
   } = useTransactions();
+
+  // Load user preferences from Firebase when component mounts or user changes
+  const { user, isAuthenticated } = useAuth();
 
   // Load months from Firebase only when budget changes
   useEffect(() => {
@@ -1242,7 +1243,12 @@ const BudgetAppContent = (): JSX.Element => {
           {/* Conditional content based on active tab */}
           {activeStep === 0 && (
             <>
-              {transactions.length > 0 ? (
+              {transactionsLoading ? (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+                  <CircularProgress />
+                  <Typography variant="body2" sx={{ mt: 2 }}>Loading transactions...</Typography>
+                </Box>
+              ) : transactions.length > 0 ? (
                 /* Render the transaction tables */
                 <Box>
                   {/* Income transactions */}
@@ -1310,12 +1316,14 @@ const BudgetAppContent = (): JSX.Element => {
                     ))}
                 </Box>
               ) : (
-                <Typography variant="body1" sx={{ p: 2, textAlign: 'center' }}>
-                  No transactions found. Add your first transaction!
+                <Box sx={{ p: 2, textAlign: 'center' }}>
+                  <Typography variant="body1">
+                    No transactions found. Add your first transaction!
+                  </Typography>
                   <Button 
                     variant="contained" 
                     color="primary"
-                    sx={{ ml: 2 }}
+                    sx={{ mt: 2, ml: 2 }}
                     onClick={() => {
                       // Add example transaction
                       const transaction: Transaction = {
@@ -1330,7 +1338,17 @@ const BudgetAppContent = (): JSX.Element => {
                   >
                     Add Example Transaction
                   </Button>
-                </Typography>
+                  <Button 
+                    variant="outlined"
+                    sx={{ mt: 2, ml: 2 }}
+                    onClick={() => {
+                      // Force reload of transactions
+                      setShouldReload(true);
+                    }}
+                  >
+                    Reload Transactions
+                  </Button>
+                </Box>
               )}
               
               {/* Add Category Button */}

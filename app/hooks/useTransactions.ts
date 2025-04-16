@@ -640,88 +640,142 @@ export function useTransactions(initialBudgetId?: string) {
 
   // Load transactions from Firestore when authenticated or when budget changes
   useEffect(() => {
-    const loadTransactions = async () => {
-      // Skip if missing requirements
-      if (!isAuthenticated || !user?.id || !currentBudgetId) {
-        return;
-      }
-
-      // Skip if already loading
-      if (isLoading) {
-        return;
-      }
+    // Set initial loading state
+    if ((isAuthenticated && user?.id && currentBudgetId) || shouldReload) {
+      setIsLoading(true);
       
-      try {
-        // Set loading state
-        setIsLoading(true);
-        
-        // Show a loading indicator
-        const progressToast = showToast('Loading transactions...', 'info');
-        
-        // Fetch transactions from Firestore
-        const userTransactions = await transactionService.getUserTransactions(user.id, currentBudgetId);
-        
-        // Sort transactions by category and order
-        const sortedTransactions = [...userTransactions].sort((a, b) => {
-          if (a.category !== b.category) {
-            return (a.category || '').localeCompare(b.category || '');
-          }
-          return (a.order || 0) - (b.order || 0);
-        });
-
-        // Calculate all updates at once
-        const summary = calculateBudgetSummary(sortedTransactions);
-        const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
-        const budgetSuggestions = getBudgetSuggestions(plan);
-        
-        // Store in cache for quick future access
-        setTransactionCache(prevCache => ({
-          ...prevCache,
-          [currentBudgetId]: {
-            transactions: sortedTransactions,
-            summary,
-            plan,
-            suggestions: budgetSuggestions
-          }
-        }));
-        
-        // Update all states in a single batch
-        ReactDOM.unstable_batchedUpdates(() => {
-          setTransactions(sortedTransactions);
-          setBudgetSummary(summary);
-          setBudgetPlan(plan);
-          setSuggestions(budgetSuggestions);
-          setIsLoading(false);
-          
-          // Reset shouldReload flag after loading completes
-          if (shouldReload) {
-            setShouldReload(false);
+      // Clean up function will help prevent race conditions
+      let isMounted = true;
+      
+      const loadTransactions = async () => {
+        try {
+          // Check if we have cached data for this budget and not forcing reload
+          if (currentBudgetId && transactionCache[currentBudgetId] && !shouldReload) {
+            // Use cached data for immediate display
+            const cachedData = transactionCache[currentBudgetId];
+            
+            // Only update state if component is still mounted
+            if (isMounted) {
+              // Update states with cached data for immediate feedback
+              ReactDOM.unstable_batchedUpdates(() => {
+                setTransactions(cachedData.transactions);
+                setBudgetSummary(cachedData.summary);
+                setBudgetPlan(cachedData.plan);
+                setSuggestions(cachedData.suggestions);
+                setIsLoading(false);
+              });
+            }
+            
+            // Return early - no need to fetch from Firebase if we have cached data
+            return;
           }
           
-          // Clear loading toast if it exists
-          if (progressToast && typeof progressToast === 'function') {
-            progressToast();
+          // Ensure we have a valid user ID and budget ID
+          if (!user?.id || !currentBudgetId) {
+            throw new Error('Missing user ID or budget ID');
           }
-        });
-      } catch (error) {
-        // Error handling without console.error
-        ReactDOM.unstable_batchedUpdates(() => {
-          setIsLoading(false);
-          setShouldReload(false); // Reset even on error
-          setAlertMessage({
-            type: 'error',
-            message: 'Failed to load transactions. Please try again.'
+          
+          // No cache or forced reload, fetch from Firebase
+          const userTransactions = await transactionService.getUserTransactions(user.id, currentBudgetId);
+          
+          // Sort transactions by category and order
+          const sortedTransactions = [...userTransactions].sort((a, b) => {
+            if (a.category !== b.category) {
+              return (a.category || '').localeCompare(b.category || '');
+            }
+            return (a.order || 0) - (b.order || 0);
           });
-        });
-      }
-    };
-    
-    // Load transactions immediately when the budget ID is set and we're not already loading
-    // or when shouldReload is true
-    if ((currentBudgetId && !isLoading) || shouldReload) {
+
+          // Only proceed if component is still mounted
+          if (isMounted) {
+            // Calculate all updates at once
+            const summary = calculateBudgetSummary(sortedTransactions);
+            const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
+            const budgetSuggestions = getBudgetSuggestions(plan);
+            
+            // Store in cache for quick future access
+            if (currentBudgetId) {
+              setTransactionCache(prevCache => ({
+                ...prevCache,
+                [currentBudgetId]: {
+                  transactions: sortedTransactions,
+                  summary,
+                  plan,
+                  suggestions: budgetSuggestions
+                }
+              }));
+            }
+            
+            // Update all states in a single batch
+            ReactDOM.unstable_batchedUpdates(() => {
+              setTransactions(sortedTransactions);
+              setBudgetSummary(summary);
+              setBudgetPlan(plan);
+              setSuggestions(budgetSuggestions);
+              
+              // Reset shouldReload flag after loading completes
+              if (shouldReload) {
+                setShouldReload(false);
+              }
+              
+              // Set loading to false only at the very end
+              setIsLoading(false);
+            });
+          }
+        } catch (error) {
+          // Only update state if component is still mounted
+          if (isMounted) {
+            // Error handling without console.error
+            ReactDOM.unstable_batchedUpdates(() => {
+              // Check if we have data in localStorage as a fallback
+              if (localTransactions && localTransactions.length > 0) {
+                setTransactions(localTransactions);
+                setBudgetSummary(localBudgetSummary || null);
+                setBudgetPlan(localBudgetPlan || null);
+                setSuggestions(localSuggestions || []);
+              } else {
+                // No local data either, make sure transaction list is empty
+                setTransactions([]);
+                setBudgetSummary(null);
+                setBudgetPlan(null);
+                setSuggestions([]);
+                setAlertMessage({
+                  type: 'error',
+                  message: 'Failed to load transactions. Please try again.'
+                });
+              }
+              
+              // Always reset loading and reload flags
+              setIsLoading(false);
+              setShouldReload(false);
+            });
+          }
+        }
+      };
+
+      // Execute the function without delay
       loadTransactions();
+      
+      // Return cleanup function to prevent state updates after unmount
+      return () => {
+        isMounted = false;
+      };
+    } else {
+      // If not authenticated or no budget ID, set loading to false
+      setIsLoading(false);
     }
-  }, [currentBudgetId, isAuthenticated, user?.id, shouldReload]);
+  }, [
+    currentBudgetId, 
+    isAuthenticated, 
+    user?.id, 
+    shouldReload, 
+    transactionCache,
+    budgetPreferences,
+    localTransactions,
+    localBudgetSummary,
+    localBudgetPlan,
+    localSuggestions
+  ]);
 
   // Update a transaction
   const updateTransaction = useCallback(async (index: number, updatedFields: Partial<Transaction>) => {
