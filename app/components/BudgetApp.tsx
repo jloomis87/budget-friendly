@@ -1173,8 +1173,8 @@ const BudgetAppContent = (): JSX.Element => {
         mt: 2,
         mb: 3
       }}>
-        <Tabs 
-          value={activeStep} 
+        <Tabs
+          value={activeStep}
           onChange={(e, newValue) => setActiveStep(newValue)}
           variant="fullWidth"
           sx={{
@@ -1224,17 +1224,6 @@ const BudgetAppContent = (): JSX.Element => {
           />
         </Tabs>
       </Box>
-      
-      {/* Alert Messages */}
-      {alertMessage && (
-        <Alert 
-          severity={alertMessage.type} 
-          sx={{ mb: 3, mx: 3 }}
-          onClose={() => setAlertMessage(null)}
-        >
-          {alertMessage.message}
-        </Alert>
-      )}
       
       {/* Main Content */}
       <Box sx={{ px: 0 }}>
