@@ -174,7 +174,10 @@ export function useTransactionUtils(): TransactionUtilsHook {
           return;
         }
 
+        // Make sure to normalize the transaction description for comparison
         const transactionDescription = transaction.description.trim().toLowerCase();
+        
+        // Check if descriptions match (case-insensitive) and icons are different
         if (transactionDescription === normalizedDescription && transaction.icon !== icon) {
           indicesToUpdate.push(index);
           console.log(`Found transaction with same name at index ${index}`, {

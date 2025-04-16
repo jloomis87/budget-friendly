@@ -350,6 +350,21 @@ export const TransactionTableProvider = ({
     const [year, month, day] = newDate.split('-').map(Number);
     const date = new Date(year, month - 1, day);
 
+    // First check if there are existing transactions with the same description
+    // If so, use their icon for consistency
+    let iconToUse = newIcon;
+    const normalizedNewDescription = newDescription.trim().toLowerCase();
+    
+    const existingTransactionsWithSameName = allTransactions.filter(
+      t => t.description.trim().toLowerCase() === normalizedNewDescription
+    );
+    
+    if (existingTransactionsWithSameName.length > 0 && existingTransactionsWithSameName[0].icon) {
+      // Use the icon from existing transactions
+      iconToUse = existingTransactionsWithSameName[0].icon;
+      console.log(`Using existing icon ${iconToUse} for transaction with description "${newDescription}"`);
+    }
+
     const transaction: Transaction = {
       description: newDescription.trim(),
       amount: parseFloat(newAmount) * (props.category === 'Income' ? 1 : -1),
@@ -357,24 +372,29 @@ export const TransactionTableProvider = ({
       category: props.category as 'Income' | 'Essentials' | 'Wants' | 'Savings',
       id: uuidv4(),
       type: props.category === 'Income' ? 'income' : 'expense',
-      icon: newIcon || undefined
+      icon: iconToUse || undefined
     };
 
     props.onAddTransaction(transaction);
     
-    // Update all transactions with the same description to have the same icon
-    if (newIcon) {
+    // If we have an icon (either from input or from existing transactions),
+    // update all other transactions with the same name to have this icon
+    if (iconToUse) {
       const indicesToUpdate = utils.updateTransactionsWithSameName(
         newDescription.trim(),
-        newIcon,
+        iconToUse,
         allTransactions,
         transaction.id
       );
       
       // Update each transaction with the same description to have the same icon
-      indicesToUpdate.forEach(idx => {
-        props.onUpdateTransaction(idx, { icon: newIcon });
-      });
+      if (indicesToUpdate.length > 0) {
+        console.log(`Updating ${indicesToUpdate.length} transactions with description "${newDescription}" to have icon "${iconToUse}"`);
+        
+        indicesToUpdate.forEach(idx => {
+          props.onUpdateTransaction(idx, { icon: iconToUse });
+        });
+      }
     }
 
     setNewDescription('');
@@ -508,7 +528,7 @@ export const TransactionTableProvider = ({
         description: transaction.description,
         amount: props.category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount),
         date: newDate,
-        category: props.category as 'Income' | 'Essentials' | 'Wants' | 'Savings',
+        category: props.category === 'Income' ? 'Income' : 'Expense',
         id: uuidv4(), // Generate new ID for the copy
         type: props.category === 'Income' ? 'income' : 'expense'
       };
