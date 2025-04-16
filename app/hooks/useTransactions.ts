@@ -338,6 +338,12 @@ export function useTransactions(initialBudgetId?: string) {
     }
 
     const transaction = transactions[index];
+    
+    // Fix for FirebaseError: Ensure icon is never undefined by replacing with empty string
+    if (updatedFields.icon === undefined && 'icon' in updatedFields) {
+      updatedFields.icon = '';
+    }
+    
     const updatedTransaction = {
       ...transaction,
       ...updatedFields
@@ -365,8 +371,19 @@ export function useTransactions(initialBudgetId?: string) {
       // If authenticated and transaction has an ID, update in Firestore
       if (isAuthenticated && user?.id && transaction.id) {
         setIsLoading(true);
+        // Clean updatedFields to ensure no undefined values are sent to Firestore
+        const cleanUpdatedFields = Object.fromEntries(
+          Object.entries(updatedFields).map(([key, value]) => {
+            // Replace undefined values with empty strings for string fields like icon
+            if (value === undefined && (key === 'icon' || key === 'description')) {
+              return [key, ''];
+            }
+            return [key, value];
+          })
+        );
+        
         // Pass the budgetId for updating in the specific budget collection
-        await transactionService.updateTransaction(transaction.id, updatedFields, user.id, currentBudgetId);
+        await transactionService.updateTransaction(transaction.id, cleanUpdatedFields, user.id, currentBudgetId);
       } 
       
       // Update local state
@@ -766,30 +783,150 @@ export function useTransactions(initialBudgetId?: string) {
 
   // Update all transactions with the same name to have the same icon
   const updateAllTransactionsWithSameName = useCallback(async (description: string, icon: string, excludeId?: string) => {
-    if (!description) return;
+    if (!description) {
+      console.log('[DEBUG] updateAllTransactionsWithSameName called with empty description');
+      return;
+    }
+    
+    // Ensure icon is never undefined - always use empty string as fallback
+    const safeIcon = icon || '';
+    
+    console.log(`[DEBUG] Starting updateAllTransactionsWithSameName for "${description}" with icon "${safeIcon}"`);
+    console.log(`[DEBUG] Total transactions before filtering: ${transactions.length}`);
     
     const normalizedDescription = description.trim().toLowerCase();
     const transactionsToUpdate: { index: number, transaction: Transaction }[] = [];
     
     // Find all transactions with the same description
     transactions.forEach((transaction, index) => {
-      if (excludeId && transaction.id === excludeId) return;
+      if (excludeId && transaction.id === excludeId) {
+        console.log(`[DEBUG] Skipping transaction with excludeId: ${excludeId}`);
+        return;
+      }
       
       const transactionDescription = transaction.description.trim().toLowerCase();
-      if (transactionDescription === normalizedDescription && transaction.icon !== icon) {
-        transactionsToUpdate.push({ index, transaction });
+      
+      console.log(`[DEBUG] Checking transaction: "${transactionDescription}" against "${normalizedDescription}"`);
+      console.log(`[DEBUG] Current icon: "${transaction.icon}", New icon: "${safeIcon}"`);
+      
+      if (transactionDescription === normalizedDescription) {
+        console.log(`[DEBUG] Found matching description`);
+        
+        if (transaction.icon !== safeIcon) {
+          console.log(`[DEBUG] Icons differ, will update`);
+          transactionsToUpdate.push({ index, transaction });
+        } else {
+          console.log(`[DEBUG] Icons are the same, skipping update`);
+        }
       }
     });
     
-    console.log(`Found ${transactionsToUpdate.length} transactions with name "${description}" to update icon`);
+    console.log(`[DEBUG] Found ${transactionsToUpdate.length} transactions with name "${description}" to update icon`);
     
-    // Update each transaction
-    for (const { index, transaction } of transactionsToUpdate) {
-      await updateTransaction(index, { icon });
+    if (transactionsToUpdate.length === 0) {
+      console.log(`[DEBUG] No transactions to update for "${description}"`);
+      return 0;
     }
     
-    return transactionsToUpdate.length;
-  }, [transactions, updateTransaction]);
+    // Print detailed info about transactions to be updated
+    console.log('[DEBUG] Transactions to update:', transactionsToUpdate.map(({ transaction }) => ({
+      id: transaction.id,
+      description: transaction.description,
+      category: transaction.category,
+      icon: transaction.icon,
+      newIcon: safeIcon
+    })));
+    
+    // Create a deep copy of transactions to ensure state changes properly reflect in UI
+    const updatedTransactions = [...transactions];
+    
+    // First, immediately update all transactions in local state for a quick UI refresh
+    transactionsToUpdate.forEach(({ index, transaction }) => {
+      updatedTransactions[index] = {
+        ...transaction,
+        icon: safeIcon
+      };
+      console.log(`[DEBUG] Updated transaction at index ${index} in local state`);
+    });
+    
+    // Force a state update immediately to refresh the UI with the new icons
+    console.log('[DEBUG] Setting transactions state with updated icons');
+    setTransactions([...updatedTransactions]);
+    
+    // For synchronized updates that include Firestore/database updates, process in parallel
+    try {
+      console.log('[DEBUG] Starting database updates for matching transactions');
+      
+      const updatePromises = transactionsToUpdate.map(async ({ index, transaction }) => {
+        // Return a promise for the database update
+        if (isAuthenticated && user?.id && transaction.id && currentBudgetId) {
+          console.log(`[DEBUG] Updating transaction in Firestore: ${transaction.id}`);
+          return transactionService.updateTransaction(
+            transaction.id, 
+            { icon: safeIcon }, 
+            user.id, 
+            currentBudgetId
+          );
+        }
+        console.log('[DEBUG] Skipping database update - not authenticated or missing ID');
+        return Promise.resolve();
+      });
+      
+      // Wait for all database updates to complete
+      await Promise.all(updatePromises);
+      console.log('[DEBUG] All database updates completed');
+      
+      // After database updates, trigger another state refresh for good measure
+      console.log('[DEBUG] Refreshing state after database updates');
+      setTransactions(prev => [...prev]);
+      
+      // Dispatch custom events for different components to react to the change
+      const affectedCategories = [...new Set(transactionsToUpdate.map(item => item.transaction.category))];
+      console.log(`[DEBUG] Affected categories: ${JSON.stringify(affectedCategories)}`);
+      
+      affectedCategories.forEach(category => {
+        // Dispatch events for each affected category
+        if (category) {
+          try {
+            console.log(`[DEBUG] Dispatching events for category ${category}`);
+            
+            // First event for TransactionTable
+            const event1 = new CustomEvent('transactionIconsUpdated', {
+              detail: { category, icon: safeIcon, description }
+            });
+            document.dispatchEvent(event1);
+            console.log(`[DEBUG] Dispatched transactionIconsUpdated event`);
+            
+            // Second event for general UI refresh
+            const event2 = new CustomEvent('forceTransactionRefresh', {
+              detail: { category, icon: safeIcon, description, timestamp: Date.now() }
+            });
+            document.dispatchEvent(event2);
+            console.log(`[DEBUG] Dispatched forceTransactionRefresh event`);
+            
+            console.log(`[DEBUG] Dispatched refresh events for category ${category}`);
+          } catch (error) {
+            console.error(`[DEBUG] Error dispatching events for category ${category}:`, error);
+          }
+        }
+      });
+      
+      return transactionsToUpdate.length;
+    } catch (error) {
+      console.error('[DEBUG] Error updating transactions with same name:', error);
+      // Still dispatch events even if there was an error with some updates
+      try {
+        const refreshEvent = new CustomEvent('transactionIconsUpdated', {
+          detail: { category: 'all', icon: safeIcon, description, timestamp: Date.now() }
+        });
+        document.dispatchEvent(refreshEvent);
+        console.log('[DEBUG] Dispatched fallback event after error');
+      } catch (e) {
+        console.error('[DEBUG] Error dispatching fallback event:', e);
+      }
+      return undefined;
+    }
+  }, [transactions, isAuthenticated, user, currentBudgetId, setTransactions]);
 
   return {
     transactions,

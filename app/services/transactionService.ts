@@ -231,7 +231,24 @@ export const updateTransaction = async (
       transactionRef = doc(getUserTransactionsRef(userId), transactionId);
     }
     
-    await updateDoc(transactionRef, { ...updates, updatedAt: new Date().toISOString() });
+    // Clean the updates object to prevent sending undefined values to Firestore
+    // which would cause an error for fields like 'icon'
+    const cleanUpdates: Record<string, any> = { updatedAt: new Date().toISOString() };
+    
+    // Process each field in the updates object
+    for (const [key, value] of Object.entries(updates)) {
+      // Skip undefined values completely
+      if (value === undefined) continue;
+      
+      // For string fields that could be undefined but should be empty strings
+      if ((key === 'icon' || key === 'description') && value === undefined) {
+        cleanUpdates[key] = '';
+      } else {
+        cleanUpdates[key] = value;
+      }
+    }
+    
+    await updateDoc(transactionRef, cleanUpdates);
    
   } catch (error) {
     console.error('[transactionService] Error updating transaction:', error);

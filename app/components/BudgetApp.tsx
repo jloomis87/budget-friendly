@@ -2335,7 +2335,72 @@ const BudgetAppContent: React.FC = () => {
   );
 };
 
+// Add TypeScript declaration for window.updateAllTransactionsWithIcon
+declare global {
+  interface Window {
+    updateAllTransactionsWithIcon?: (category: string, icon: string) => Promise<void>;
+  }
+}
+
 export default function BudgetApp() {
+  const { 
+    transactions, 
+    addTransaction, 
+    updateTransaction, 
+    deleteTransaction,
+    moveTransaction,
+    reorderTransactions,
+    budgetSummary,
+    isLoading,
+    budgetPlan,
+    suggestions,
+    alertMessage,
+    setAlertMessage,
+    currentBudgetId,
+    setCurrentBudgetId,
+    updateAllTransactionsWithSameName
+  } = useTransactions();
+
+  // Create a global function to update all transactions with the same name to have the same icon
+  // This is needed for component communication between TransactionTableHeader and TransactionTable
+  React.useEffect(() => {
+    if (updateAllTransactionsWithSameName) {
+      window.updateAllTransactionsWithIcon = async (category: string, icon: string) => {
+        // Find all transactions in the specified category
+        const categoryTransactions = transactions.filter(t => t.category === category);
+        
+        if (categoryTransactions.length === 0) {
+          console.log(`No transactions found in category ${category}`);
+          return;
+        }
+        
+        console.log(`Updating icons for all transactions in category ${category} to ${icon}`);
+        
+        // For each transaction in the category, update all with the same description
+        const updatePromises = categoryTransactions.map(transaction => {
+          return updateAllTransactionsWithSameName(transaction.description, icon);
+        });
+        
+        // Wait for all updates to complete
+        await Promise.all(updatePromises);
+        console.log(`Icon updates completed for category ${category}`);
+        
+        // Dispatch a custom event to force UI refreshes
+        const refreshEvent = new CustomEvent('transactionIconsUpdated', {
+          detail: { category, icon }
+        });
+        document.dispatchEvent(refreshEvent);
+      };
+    }
+    
+    // Clean up when unmounting
+    return () => {
+      if (window.updateAllTransactionsWithIcon) {
+        delete window.updateAllTransactionsWithIcon;
+      }
+    };
+  }, [updateAllTransactionsWithSameName, transactions]);
+  
   return (
     <AuthProvider>
       <ThemeProvider>

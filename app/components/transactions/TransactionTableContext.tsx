@@ -324,25 +324,37 @@ export const TransactionTableProvider = ({
       
       const globalIndex = utils.findGlobalIndex(mobileEditTransaction.transaction, allTransactions);
       
-      // Update all transactions with the same description to have the same icon
+      // Check if icon was changed
       if (editingRow.icon !== mobileEditTransaction.transaction.icon) {
-        const indicesToUpdate = utils.updateTransactionsWithSameName(
-          editingRow.description,
-          editingRow.icon,
-          allTransactions,
-          mobileEditTransaction.transaction.id
-        );
+        // First update the specific transaction
+        props.onUpdateTransaction(globalIndex, updatedTransaction);
         
-        // Update each transaction with the same description to have the same icon
-        indicesToUpdate.forEach(idx => {
-          props.onUpdateTransaction(idx, { icon: editingRow.icon });
-        });
+        // Then use the specialized function to update all transactions with the same name
+        if (props.onUpdateAllTransactionsWithSameName) {
+          console.log(`Updating all transactions with description "${editingRow.description}" to have icon "${editingRow.icon}"`);
+          props.onUpdateAllTransactionsWithSameName(editingRow.description, editingRow.icon, mobileEditTransaction.transaction.id);
+        } else {
+          // Fallback to the old method if the specialized function is not available
+          const indicesToUpdate = utils.updateTransactionsWithSameName(
+            editingRow.description,
+            editingRow.icon,
+            allTransactions,
+            mobileEditTransaction.transaction.id
+          );
+          
+          // Update each transaction with the same description to have the same icon
+          indicesToUpdate.forEach(idx => {
+            props.onUpdateTransaction(idx, { icon: editingRow.icon });
+          });
+        }
+      } else {
+        // No icon change, just update the transaction normally
+        props.onUpdateTransaction(globalIndex, updatedTransaction);
       }
       
-      props.onUpdateTransaction(globalIndex, updatedTransaction);
       handleCloseMobileEdit();
     }
-  }, [mobileEditTransaction, editingRow, props.category, utils, allTransactions, props.onUpdateTransaction]);
+  }, [mobileEditTransaction, editingRow, props.category, utils, allTransactions, props.onUpdateTransaction, props.onUpdateAllTransactionsWithSameName]);
   
   const handleAddTransaction = useCallback(() => {
     if (!newDescription.trim() || !newAmount.trim()) return;
@@ -369,7 +381,7 @@ export const TransactionTableProvider = ({
       description: newDescription.trim(),
       amount: parseFloat(newAmount) * (props.category === 'Income' ? 1 : -1),
       date: date,
-      category: props.category as 'Income' | 'Essentials' | 'Wants' | 'Savings',
+      category: props.category as any,
       id: uuidv4(),
       type: props.category === 'Income' ? 'income' : 'expense',
       icon: iconToUse || undefined
@@ -528,7 +540,7 @@ export const TransactionTableProvider = ({
         description: transaction.description,
         amount: props.category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount),
         date: newDate,
-        category: props.category === 'Income' ? 'Income' : 'Expense',
+        category: props.category as any,
         id: uuidv4(), // Generate new ID for the copy
         type: props.category === 'Income' ? 'income' : 'expense'
       };
@@ -601,6 +613,29 @@ export const TransactionTableProvider = ({
     ];
     return months.indexOf(month);
   }, []);
+  
+  // Listen for transaction icons updated event
+  React.useEffect(() => {
+    const handleTransactionIconsUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{category: string, icon: string}>;
+      const { category: updatedCategory } = customEvent.detail;
+      
+      // Only proceed if this is our category
+      if (updatedCategory === category) {
+        console.log(`TransactionTableContext caught transactionIconsUpdated event for ${updatedCategory}`);
+        // Force re-render to update icons in the UI
+        forceRefresh();
+      }
+    };
+    
+    // Listen for the custom event
+    document.addEventListener('transactionIconsUpdated', handleTransactionIconsUpdated);
+    
+    // Clean up when the component unmounts
+    return () => {
+      document.removeEventListener('transactionIconsUpdated', handleTransactionIconsUpdated);
+    };
+  }, [category, forceRefresh]);
   
   // Clean up any timeouts when component unmounts
   React.useEffect(() => {

@@ -8,12 +8,21 @@ import { AccountSettings } from './components/AccountSettings';
 import { PrivacyAndSecurity } from './components/PrivacyAndSecurity';
 import { HelpAndSupport } from './components/HelpAndSupport';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { DashboardPage } from './pages/DashboardPage';
 import { createBrowserRouter } from 'react-router-dom';
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: <BudgetApp />,
+  },
+  {
+    path: "/dashboard",
+    element: (
+      <ProtectedRoute>
+        <DashboardPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/settings",

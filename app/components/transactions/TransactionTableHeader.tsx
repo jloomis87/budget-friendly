@@ -12,6 +12,13 @@ import PercentIcon from '@mui/icons-material/Percent';
 import { useCategories } from '../../contexts/CategoryContext';
 import { EmojiPicker, emojiOptions, emojiKeywords } from '../../components/EmojiPicker';
 
+// Extend the Window interface to include our global function
+declare global {
+  interface Window {
+    updateAllTransactionsWithIcon?: (category: string, icon: string) => Promise<void>;
+  }
+}
+
 export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
   category,
   totalAmount,
@@ -263,10 +270,23 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
       
       // Only update if the icon has changed
       if (iconToUse !== categoryInfo.icon) {
+        // First update the category itself
         await updateCategory(categoryInfo.id, {
           icon: iconToUse
         });
-        console.log('Icon updated successfully to:', iconToUse);
+        console.log('Category icon updated successfully to:', iconToUse);
+        
+        // Then find all transactions in this category from the parent component
+        // We need to access the parent component that has access to all transactions
+        // This is accessible through a global function that we'll expose on the window object
+        
+        // Check if there's a global function to update all transactions
+        if (window.updateAllTransactionsWithIcon) {
+          // Call the global function with category, icon
+          await window.updateAllTransactionsWithIcon(category, iconToUse);
+        } else {
+          console.warn('No global function found to update transaction icons. Icons will update on page reload.');
+        }
       }
     } catch (error) {
       console.error('Error updating category icon:', error);

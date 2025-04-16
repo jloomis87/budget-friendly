@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, Grid, Typography, Box, Tooltip } from '@mui/material';
 import { DragIndicatorIcon } from '../../utils/materialIcons';
 import type { MobileTransactionCardProps } from './types';
+import { isColorDark } from '../../utils/colorUtils';
 
 export function MobileTransactionCard({
   transaction,
@@ -12,6 +13,75 @@ export function MobileTransactionCard({
   onDragStart,
   globalIndex
 }: MobileTransactionCardProps) {
+  // Use state to track the current icon to allow for reactive updates
+  const [currentIcon, setCurrentIcon] = useState(transaction.icon);
+  // Reference to the card element
+  const cardRef = useRef<HTMLDivElement>(null);
+  
+  // Listen for icon updates
+  useEffect(() => {
+    const handleIconUpdate = (event: CustomEvent) => {
+      const { category: updatedCategory, icon } = event.detail;
+      
+      // Update if this card's category matches the updated category or if 'all' categories are being updated
+      if (updatedCategory === 'all' || updatedCategory === transaction.category) {
+        if (transaction.description) {
+          // Look for all cards with this description
+          const normalizedTransactionDescription = transaction.description.trim().toLowerCase();
+          const normalizedUpdatedDescription = event.detail.description?.trim().toLowerCase();
+          
+          // Check if either we're updating all transactions in a category or this specific transaction description
+          const shouldUpdate = 
+            // Update if the description in the event matches this transaction's description
+            (normalizedUpdatedDescription && normalizedTransactionDescription === normalizedUpdatedDescription) ||
+            // Or if no specific description was provided in the event (category-wide update)
+            !normalizedUpdatedDescription;
+          
+          if (shouldUpdate) {
+            // Set icon state (react-based update)
+            setCurrentIcon(icon);
+            console.log(`MobileTransactionCard "${transaction.description}" received icon update event for "${event.detail.description || 'all in category'}", icon: ${icon}`);
+          }
+        }
+      }
+    };
+    
+    const handleForceRefresh = (event: CustomEvent) => {
+      // Force rerender if our transaction matches criteria
+      setCurrentIcon(transaction.icon); // Reset to force React update cycle
+      
+      // Small delay to ensure the DOM has time to update
+      setTimeout(() => {
+        if (cardRef.current) {
+          // Apply a small animation to show the update
+          cardRef.current.style.transition = 'transform 0.2s ease';
+          cardRef.current.style.transform = 'scale(1.02)';
+          
+          setTimeout(() => {
+            if (cardRef.current) {
+              cardRef.current.style.transform = 'none';
+            }
+          }, 200);
+        }
+      }, 50);
+    };
+    
+    // Add event listeners
+    document.addEventListener('transactionIconsUpdated', handleIconUpdate as EventListener);
+    document.addEventListener('forceTransactionRefresh', handleForceRefresh as EventListener);
+    
+    // Update icon from prop changes
+    if (transaction.icon !== currentIcon) {
+      setCurrentIcon(transaction.icon);
+    }
+    
+    // Cleanup event listeners on unmount
+    return () => {
+      document.removeEventListener('transactionIconsUpdated', handleIconUpdate as EventListener);
+      document.removeEventListener('forceTransactionRefresh', handleForceRefresh as EventListener);
+    };
+  }, [transaction, transaction.category, currentIcon]);
+
   // Create a custom drag handler for the card
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation(); // Prevent card click event
@@ -89,12 +159,25 @@ export function MobileTransactionCard({
     document.body.classList.remove('dragging-active');
   };
 
+  // Get the background color of this card
+  const cardBgColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.5)';
+  
+  // Determine if the background is dark or light to set text color
+  const cardIsDark = isColorDark(cardBgColor);
+  
+  // Use black text on light backgrounds, white text on dark backgrounds
+  const textColor = cardIsDark ? '#ffffff' : '#000000';
+  const textColorWithOpacity = cardIsDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)';
+
   return (
     <Card 
+      ref={cardRef}
+      key={transaction.id}
+      data-transaction-description={transaction.description?.trim().toLowerCase()}
       sx={{ 
         mb: '5px',
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.5)',
+        bgcolor: cardBgColor,
         borderRadius: 2,
         mx: '5px',
         position: 'relative',
@@ -111,20 +194,33 @@ export function MobileTransactionCard({
       onDragEnd={handleDragEnd}
     >
       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-        {/* Remove drag indicator */}
-        
         <Grid container spacing={1}>
           <Grid item xs={8}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 500, color: isDark ? '#fff' : 'text.primary' }}>
-              {transaction.description}
-            </Typography>
-            <Typography variant="body2" sx={{ color: isDark ? 'rgba(255,255,255,0.7)' : 'text.secondary' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              {currentIcon && (
+                <Box 
+                  className="transaction-icon"
+                  data-icon={currentIcon}
+                  sx={{ 
+                    fontSize: '1rem',
+                    lineHeight: 1,
+                  }}
+                >
+                  {currentIcon}
+                </Box>
+              )}
+              <Typography variant="subtitle1" sx={{ fontWeight: 500, color: textColor }}>
+                {transaction.description}
+              </Typography>
+            </Box>
+            <Typography variant="body2" sx={{ color: textColorWithOpacity }}>
               {formatDateForDisplay(transaction.date)}
             </Typography>
           </Grid>
           <Grid item xs={4} sx={{ textAlign: 'right' }}>
             <Typography variant="subtitle1" sx={{ 
-              color: isDark ? '#fff' : 'text.primary' 
+              color: transaction.amount < 0 ? '#FF5252' : textColor,
+              fontWeight: 600
             }}>
               ${Math.abs(transaction.amount).toFixed(2)}
             </Typography>
@@ -138,7 +234,7 @@ export function MobileTransactionCard({
             bottom: '4px',
             left: '50%',
             transform: 'translateX(-50%)',
-            color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)',
+            color: textColorWithOpacity,
             fontSize: '0.7rem',
             width: 'auto',
             textAlign: 'center',

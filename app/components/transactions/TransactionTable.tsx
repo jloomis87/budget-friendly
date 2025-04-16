@@ -178,6 +178,41 @@ export const TransactionTableContent: React.FC = () => {
   
   const totalBudget = calculateTotalBudget();
   
+  // Listen for category icon update events and update all transaction icons
+  useEffect(() => {
+    const handleCategoryIconUpdated = async (event: Event) => {
+      // Cast the event to CustomEvent with the correct type
+      const customEvent = event as CustomEvent<{category: string, icon: string}>;
+      const { category: updatedCategory, icon } = customEvent.detail;
+      
+      // Only proceed if this is our category
+      if (updatedCategory === category && props.onUpdateAllTransactionsWithSameName) {
+        console.log(`Caught categoryIconUpdated event for ${updatedCategory} with icon ${icon}`);
+        
+        // Filter transactions to find all that belong to this category
+        const categoryTransactions = transactions.filter(t => t.category === category);
+        
+        // Update all transactions in the category with the new icon
+        for (const transaction of categoryTransactions) {
+          // For each description in the category, update all transactions with that description
+          try {
+            await props.onUpdateAllTransactionsWithSameName(transaction.description, icon);
+          } catch (error) {
+            console.error('Error updating transaction icons:', error);
+          }
+        }
+      }
+    };
+    
+    // Listen for the custom event
+    document.addEventListener('categoryIconUpdated', handleCategoryIconUpdated);
+    
+    // Clean up when the component unmounts
+    return () => {
+      document.removeEventListener('categoryIconUpdated', handleCategoryIconUpdated);
+    };
+  }, [category, transactions, props.onUpdateAllTransactionsWithSameName]);
+  
   // Load sort preference from Firebase
   useEffect(() => {
     const loadSortPreference = async () => {
@@ -657,6 +692,35 @@ export const TransactionTableContent: React.FC = () => {
     // Reset drag state completely
     resetDragState();
   };
+
+  // Listen for transaction icons updated events to force UI refresh
+  useEffect(() => {
+    const handleTransactionIconsUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{category: string, icon: string}>;
+      const { category: updatedCategory } = customEvent.detail;
+      
+      // Only proceed if this is our category
+      if (updatedCategory === category) {
+        console.log(`TransactionTable caught transactionIconsUpdated event for ${updatedCategory}`);
+        
+        // Force a refresh of the component using the context's forceRefresh function
+        context.forceRefresh();
+        
+        // If there's a callback to notify parent, call it
+        if (props.onTransactionsChange) {
+          props.onTransactionsChange(transactions);
+        }
+      }
+    };
+    
+    // Listen for the custom event
+    document.addEventListener('transactionIconsUpdated', handleTransactionIconsUpdated);
+    
+    // Clean up when the component unmounts
+    return () => {
+      document.removeEventListener('transactionIconsUpdated', handleTransactionIconsUpdated);
+    };
+  }, [category, transactions, props.onTransactionsChange, context]);
 
   return (
     <Box sx={{ position: 'relative', mb: 2}}>
