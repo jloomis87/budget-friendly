@@ -565,3 +565,93 @@ export const updateTransactionsWithCategoryId = async (
     throw error;
   }
 };
+
+// Add multiple transactions at once using a batch
+export const addTransactionBatch = async (
+  userId: string,
+  transactionsData: Omit<Transaction, 'id'>[],
+  budgetId?: string
+): Promise<string[]> => {
+  if (!userId) {
+    throw new Error('User ID is required to add transactions');
+  }
+
+  if (!transactionsData || transactionsData.length === 0) {
+    return [];
+  }
+
+  try {
+    let transactionsRef;
+    
+    if (budgetId) {
+      // If budgetId is provided, add to the budget's transactions collection
+      transactionsRef = getBudgetTransactionsRef(userId, budgetId);
+    } else {
+      // Otherwise use the legacy path (for backward compatibility)
+      transactionsRef = getUserTransactionsRef(userId);
+    }
+
+    // Get the current timestamp for all transactions
+    const now = new Date().toISOString();
+
+    // Create the batch for Firestore
+    const batch = writeBatch(db);
+    
+    // Get existing transactions to determine proper order values
+    const categoriesSnapshot = await getDocs(transactionsRef);
+    
+    // Group existing transactions by category to find highest order
+    const categoryOrderMap: Record<string, number> = {};
+    categoriesSnapshot.forEach(doc => {
+      const data = doc.data();
+      const category = data.category || 'Uncategorized';
+      const order = data.order || 0;
+      
+      if (!categoryOrderMap[category] || order > categoryOrderMap[category]) {
+        categoryOrderMap[category] = order;
+      }
+    });
+    
+    // Store the new document references to return their IDs
+    const newDocRefs: string[] = [];
+    
+    // Process each transaction
+    for (const transactionData of transactionsData) {
+      // Default to 'Uncategorized' if category is undefined
+      const category = transactionData.category || 'Uncategorized';
+      
+      // Get the next order for this category
+      const nextOrder = (categoryOrderMap[category] || 0) + 1;
+      categoryOrderMap[category] = nextOrder; // Update for the next transaction
+      
+      // Create a new document reference
+      const newDocRef = doc(transactionsRef);
+      newDocRefs.push(newDocRef.id);
+      
+      // Create the document data, ensuring we don't include undefined values
+      const docData = {
+        ...transactionData,
+        category, // Use the category with fallback
+        userId,
+        order: nextOrder, // Set the order field
+        createdAt: now
+      } as any; // Use type assertion to avoid TypeScript error
+
+      // Only add budgetId to the document if it exists
+      if (budgetId) {
+        docData.budgetId = budgetId;
+      }
+      
+      // Add the document to the batch
+      batch.set(newDocRef, docData);
+    }
+    
+    // Commit the batch
+    await batch.commit();
+    
+    return newDocRefs;
+  } catch (error) {
+    console.error('Error in batch adding transactions:', error);
+    throw error;
+  }
+};

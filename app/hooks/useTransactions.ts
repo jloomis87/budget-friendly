@@ -276,119 +276,223 @@ export function useTransactions(initialBudgetId?: string) {
   }, [transactions, isAuthenticated, setLocalTransactions]);
 
   // Add a transaction
-  const addTransaction = useCallback(async (transaction: Transaction) => {
+  const addTransaction = useCallback(async (newTransaction: Omit<Transaction, 'id'>) => {
     try {
       // If no category is provided, categorize the transaction
-      if (!transaction.category) {
-        const categoryInfo = getCategoryWithId(transaction.description, transaction.amount);
-        transaction.category = categoryInfo.category;
-        transaction.categoryId = categoryInfo.categoryId;
-      } else if (!transaction.categoryId) {
+      if (!newTransaction.category) {
+        const categoryInfo = getCategoryWithId(newTransaction.description, newTransaction.amount);
+        newTransaction.category = categoryInfo.category;
+        newTransaction.categoryId = categoryInfo.categoryId;
+      } else if (!newTransaction.categoryId) {
         // If category is provided but categoryId is not, try to get categoryId from CategoryContext
-        const category = getCategoryByName(transaction.category);
+        const category = getCategoryByName(newTransaction.category);
         if (category) {
-          transaction.categoryId = category.id;
+          newTransaction.categoryId = category.id;
         } else {
           // Fall back to default categoryId mapping if not found in context
           const defaultCategoryMapping: Record<string, string> = {
             'Income': 'income',
             'Essentials': 'essentials',
-            'Wants': 'wants', 
+            'Wants': 'wants',
             'Savings': 'savings'
           };
-          transaction.categoryId = defaultCategoryMapping[transaction.category] || 'uncategorized';
+          newTransaction.categoryId = defaultCategoryMapping[newTransaction.category] || 'uncategorized';
         }
       }
       
-      // Ensure the transaction has an ID
-      if (!transaction.id) {
-        transaction.id = uuidv4();
-      }
-      
-      // Determine if this is an income or expense
-      if (!transaction.type) {
-        transaction.type = transaction.amount > 0 ? 'income' : 'expense';
-      }
-      
-      setIsLoading(true);
-      const newTransaction = {
-        ...transaction,
-        date: transaction.date instanceof Date ? transaction.date : new Date(transaction.date)
+      // Create a complete transaction object with an ID
+      const updatedTransaction: Transaction = {
+        ...newTransaction,
+        id: uuidv4(),
+        date: newTransaction.date instanceof Date ? newTransaction.date : new Date(newTransaction.date),
+        type: newTransaction.type || (newTransaction.amount > 0 ? 'income' : 'expense')
       };
       
-      let transactionId: string | undefined;
+      setIsLoading(true);
+      
+      // Track transaction ID for return value
+      let transactionId: string = updatedTransaction.id;
       
       // If authenticated, save to Firestore
       if (isAuthenticated && user?.id) {
-        transactionId = await transactionService.addTransaction(user.id, newTransaction, currentBudgetId);
-        newTransaction.id = transactionId;
+        const newId = await transactionService.addTransaction(user.id, updatedTransaction, currentBudgetId);
+        if (newId) {
+          transactionId = newId;
+          updatedTransaction.id = newId;
+        }
         
         // Set shouldReload to true after successful Firestore save
         setShouldReload(true);
       }
-
+      
       // Update all states in a single batch
       ReactDOM.unstable_batchedUpdates(() => {
-        const updatedTransactions = [...transactions, newTransaction];
+        const updatedTransactions = [...transactions, updatedTransaction];
         
         // Calculate all updates at once
         const summary = calculateBudgetSummary(updatedTransactions);
         const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
         const budgetSuggestions = getBudgetSuggestions(plan);
         
-        // Update all states together
+        // Update state for each
         setTransactions(updatedTransactions);
         setBudgetSummary(summary);
         setBudgetPlan(plan);
         setSuggestions(budgetSuggestions);
-        setIsLoading(false);
         
-        // Show success message as a toast notification
-        const message = transactions.length === 0 
-          ? 'First transaction added! Continue adding transactions to see your budget plan.'
-          : 'Transaction added successfully!';
-        showToast(message, 'success');
-        
-        // Also set the alert message for components that use it
-        setAlertMessage({
-          type: 'success',
-          message: message
-        });
-        
-        // Update localStorage if needed
+        // If not authenticated, update localStorage
         if (!isAuthenticated || !user?.id) {
           setLocalTransactions(updatedTransactions);
           setLocalBudgetSummary(summary);
           setLocalBudgetPlan(plan);
           setLocalSuggestions(budgetSuggestions);
         }
+        
+        // Show success message as toast
+        showToast('Transaction added successfully!', 'success');
+        
+        setAlertMessage({
+          type: 'success',
+          message: 'Transaction added successfully!'
+        });
+        
+        setIsLoading(false);
       });
       
+      return transactionId;
     } catch (error) {
       // Error handling without console.error
-      ReactDOM.unstable_batchedUpdates(() => {
-        setIsLoading(false);
-        const errorMessage = `Error adding transaction: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        showToast(errorMessage, 'error');
-        setAlertMessage({
-          type: 'error',
-          message: errorMessage
-        });
+      const errorMessage = `Error adding transaction: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      showToast(errorMessage, 'error');
+      setAlertMessage({
+        type: 'error',
+        message: errorMessage
       });
+      setIsLoading(false);
+      return null;
     }
   }, [
-    transactions,
-    isAuthenticated,
-    user,
+    isAuthenticated, 
+    user, 
+    transactions, 
+    setTransactions, 
+    setLocalTransactions, 
+    setAlertMessage,
     currentBudgetId,
-    setLocalTransactions,
-    setLocalBudgetSummary,
-    setLocalBudgetPlan,
-    setLocalSuggestions,
-    setShouldReload,
-    categorizeTransaction,
+    showToast,
     budgetPreferences,
     getCategoryByName,
+    setShouldReload
+  ]);
+
+  // Add multiple transactions in a batch for better performance
+  const addTransactionBatch = useCallback(async (newTransactions: Omit<Transaction, 'id'>[]) => {
+    if (!newTransactions || newTransactions.length === 0) {
+      return;
+    }
+
+    try {
+      let addedTransactions: Transaction[] = [];
+
+      // If authenticated and has a budget ID, use Firebase batch
+      if (isAuthenticated && user?.id && currentBudgetId) {
+        setIsLoading(true);
+        
+        // Show immediate feedback
+        showToast(`Adding ${newTransactions.length} transactions...`, 'success');
+
+        // Add transactions using batch
+        const transactionIds = await transactionService.addTransactionBatch(
+          user.id, 
+          newTransactions, 
+          currentBudgetId
+        );
+        
+        // Map the returned IDs to the transactions
+        addedTransactions = newTransactions.map((transaction, index) => ({
+          ...transaction,
+          id: transactionIds[index],
+          type: transaction.type || (transaction.amount > 0 ? 'income' : 'expense')
+        }));
+      } else {
+        // For non-authenticated users, use local state
+        // Generate random IDs for each transaction
+        addedTransactions = newTransactions.map(transaction => ({
+          ...transaction,
+          id: uuidv4(),
+          type: transaction.type || (transaction.amount > 0 ? 'income' : 'expense')
+        }));
+      }
+      
+      // Update local state with all the new transactions
+      const updatedTransactions = [...transactions, ...addedTransactions];
+      setTransactions(updatedTransactions);
+      
+      // If not authenticated, update in localStorage
+      if (!isAuthenticated || !user?.id) {
+        setLocalTransactions(updatedTransactions);
+      }
+      
+      // Recalculate budget
+      try {
+        const summary = calculateBudgetSummary(updatedTransactions);
+        setBudgetSummary(summary);
+        
+        // Save to localStorage if not authenticated
+        if (!isAuthenticated || !user?.id) {
+          setLocalBudgetSummary(summary);
+        }
+        
+        // Calculate the budget plan
+        const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
+        setBudgetPlan(plan);
+        
+        // Save to localStorage if not authenticated
+        if (!isAuthenticated || !user?.id) {
+          setLocalBudgetPlan(plan);
+        }
+        
+        // Generate budget suggestions
+        const budgetSuggestions = getBudgetSuggestions(plan);
+        setSuggestions(budgetSuggestions);
+        
+        // Save to localStorage if not authenticated
+        if (!isAuthenticated || !user?.id) {
+          setLocalSuggestions(budgetSuggestions);
+        }
+      } catch (error) {
+        // Error handling without console.error
+        setAlertMessage({
+          type: 'error',
+          message: 'Error updating budget calculations. Please try again.'
+        });
+      }
+      
+      // Show success message
+      showToast(`Successfully added ${addedTransactions.length} transactions!`, 'success');
+      
+      return addedTransactions;
+    } catch (error) {
+      // Error handling without console.error
+      setAlertMessage({
+        type: 'error',
+        message: `Error adding transactions: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    isAuthenticated, 
+    user, 
+    currentBudgetId, 
+    transactions, 
+    setTransactions, 
+    setLocalTransactions, 
+    setLocalBudgetSummary, 
+    setLocalBudgetPlan, 
+    setLocalSuggestions, 
+    setAlertMessage,
+    budgetPreferences,
     showToast
   ]);
 
@@ -1048,6 +1152,7 @@ export function useTransactions(initialBudgetId?: string) {
     setCurrentBudgetId,
     setAlertMessage,
     addTransaction,
+    addTransactionBatch,
     updateTransaction,
     deleteTransaction,
     updateTransactionByDescription,

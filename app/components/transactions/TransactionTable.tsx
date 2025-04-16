@@ -29,6 +29,7 @@ interface TransactionTableProps {
   onUpdateTransaction: (index: number, updatedTransaction: Partial<Transaction>) => void;
   onDeleteTransaction: (index: number) => void;
   onAddTransaction: (transaction: Transaction) => void;
+  onAddTransactionBatch?: (transactions: Transaction[]) => void;
   onUpdateAllTransactionsWithSameName?: (description: string, icon: string, excludeId?: string) => Promise<number | undefined>;
   onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
   onDragOver?: (e: React.DragEvent, category: string) => void;

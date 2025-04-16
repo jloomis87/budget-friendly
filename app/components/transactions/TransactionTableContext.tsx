@@ -82,7 +82,7 @@ const TransactionTableContext = createContext<{
   handleCopyMonthConfirm: () => void;
   // Utility functions
   forceRefresh: () => void;
-  showNotification: (message: string, type?: 'error' | 'warning' | 'success') => void;
+  showNotification: (message: string, type?: 'error' | 'warning' | 'success' | 'info') => void;
   // Styling functions
   getBackgroundStyles: () => Record<string, any>;
   getCategoryBackgroundColor: () => string | undefined;
@@ -504,77 +504,13 @@ export const TransactionTableProvider = ({
     setCopyMonthDialogOpen(true);
   }, [getNextMonth]);
   
-  const handleCopyMonthConfirm = useCallback(() => {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    const targetMonthIndex = months.indexOf(copyTargetMonth);
-
-    const targetMonthTransactions = transactions.filter(t => {
-      const date = new Date(t.date);
-      const month = date.toLocaleString('default', { month: 'long' });
-      return month === copyTargetMonth && t.category === props.category;
-    });
-
-    let duplicateCount = 0;
-    let addedCount = 0;
-
-    copyTransactions.forEach(transaction => {
-      const date = new Date(transaction.date);
-      const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
-      
-      // Check if a transaction with the same description and amount already exists in the target month
-      const existingTransaction = targetMonthTransactions.find(t => 
-        t.description === transaction.description && 
-        Math.abs(t.amount) === Math.abs(transaction.amount)
-      );
-
-      if (existingTransaction) {
-        // Skip this transaction as it's a duplicate
-        duplicateCount++;
-        return;
-      }
-
-      // If no matching transaction exists, create a new one
-      // Create a clean object without any undefined values to avoid Firestore errors
-      const newTransaction: Transaction = {
-        description: transaction.description,
-        amount: props.category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount),
-        date: newDate,
-        category: props.category as any,
-        id: uuidv4(), // Generate new ID for the copy
-        type: props.category === 'Income' ? 'income' : 'expense'
-      };
-      
-      // Only include icon if it exists and is not undefined
-      if (transaction.icon) {
-        newTransaction.icon = transaction.icon;
-      }
-
-      // Add the new transaction
-      props.onAddTransaction(newTransaction);
-      
-      // Force refresh the component
-      forceRefresh();
-      addedCount++;
-    });
-
-    // Show notification about duplicates if any were skipped
-    if (duplicateCount > 0) {
-      showNotification(`Copied ${addedCount} transactions. Skipped ${duplicateCount} duplicate transactions.`, 'success');
-    }
-
-    setCopyMonthDialogOpen(false);
-  }, [copyTargetMonth, copyTransactions, props.category, props.onAddTransaction]);
-  
   // Force a refresh of the component
   const forceRefresh = useCallback(() => {
     setRefreshCounter(prev => prev + 1);
   }, []);
   
   // Helper function to show notifications
-  const showNotification = useCallback((message: string, type: 'error' | 'warning' | 'success' = 'error') => {
+  const showNotification = useCallback((message: string, type: 'error' | 'warning' | 'success' | 'info' = 'error') => {
     // Create a temporary notification element
     const notification = document.createElement('div');
     notification.style.position = 'fixed';
@@ -587,7 +523,9 @@ export const TransactionTableProvider = ({
       ? 'rgba(244, 67, 54, 0.9)'  // Red for errors
       : type === 'warning' 
         ? 'rgba(255, 152, 0, 0.9)'  // Orange for warnings
-        : 'rgba(76, 175, 80, 0.9)'; // Green for success
+        : type === 'info'
+          ? 'rgba(33, 150, 243, 0.9)' // Blue for info
+          : 'rgba(76, 175, 80, 0.9)'; // Green for success
     
     notification.style.backgroundColor = bgColor;
     notification.style.color = 'white';
@@ -607,6 +545,182 @@ export const TransactionTableProvider = ({
       document.body.removeChild(notification);
     }, 3000);
   }, []);
+  
+  const handleCopyMonthConfirm = useCallback(() => {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const targetMonthIndex = months.indexOf(copyTargetMonth);
+
+    // Show feedback immediately
+    showNotification(`Copying transactions to ${copyTargetMonth}...`, 'info');
+
+    // Get existing transactions in the target month for duplicate checking
+    const targetMonthTransactions = transactions.filter(t => {
+      const date = new Date(t.date);
+      const month = date.toLocaleString('default', { month: 'long' });
+      return month === copyTargetMonth && t.category === props.category;
+    });
+
+    let duplicateCount = 0;
+    let addedCount = 0;
+    
+    // Prepare batch of transactions to add
+    const transactionsToAdd: Transaction[] = [];
+
+    copyTransactions.forEach(transaction => {
+      const date = new Date(transaction.date);
+      const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
+      
+      // Check for duplicates
+      const existingTransaction = targetMonthTransactions.find(t => 
+        t.description === transaction.description && 
+        Math.abs(t.amount) === Math.abs(transaction.amount)
+      );
+
+      if (existingTransaction) {
+        duplicateCount++;
+        return;
+      }
+
+      // Create a clean transaction object
+      const newTransaction: Transaction = {
+        description: transaction.description,
+        amount: props.category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount),
+        date: newDate,
+        category: props.category as any,
+        id: uuidv4(),
+        type: props.category === 'Income' ? 'income' : 'expense'
+      };
+      
+      // Only include icon if it exists
+      if (transaction.icon) {
+        newTransaction.icon = transaction.icon;
+      }
+
+      // Add to batch instead of adding immediately
+      transactionsToAdd.push(newTransaction);
+      addedCount++;
+    });
+
+    // Add all transactions at once if possible
+    if (typeof props.onAddTransactionBatch === 'function' && transactionsToAdd.length > 0) {
+      props.onAddTransactionBatch(transactionsToAdd);
+    } else {
+      // Fall back to adding one by one
+      transactionsToAdd.forEach(transaction => {
+        props.onAddTransaction(transaction);
+      });
+    }
+    
+    // Force refresh the component only once after all transactions are added
+    if (addedCount > 0) {
+      forceRefresh();
+    }
+
+    // Show final notification
+    if (duplicateCount > 0) {
+      showNotification(`Copied ${addedCount} transactions. Skipped ${duplicateCount} duplicate transactions.`, 'success');
+    } else if (addedCount > 0) {
+      showNotification(`Successfully copied ${addedCount} transactions.`, 'success');
+    } else {
+      showNotification('No transactions were copied (all were duplicates).', 'warning');
+    }
+
+    setCopyMonthDialogOpen(false);
+  }, [copyTargetMonth, copyTransactions, transactions, props.category, props.onAddTransaction, props.onAddTransactionBatch, forceRefresh, showNotification]);
+  
+  // Add a function to copy a transaction to all months
+  const handleCopyToAllMonths = useCallback((transaction: Transaction) => {
+    // Get all available months
+    const allMonths = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    // Get the current month of the transaction
+    const transactionMonth = new Date(transaction.date).toLocaleString('default', { month: 'long' });
+    
+    // Show immediate feedback
+    showNotification(`Copying transaction to other months...`, 'info');
+    
+    // Create a count for successful copies
+    let copyCount = 0;
+    
+    // Prepare transactions to add in batch
+    const transactionsToAdd: Transaction[] = [];
+    
+    // Copy to all other months
+    allMonths.forEach(month => {
+      // Skip the month that already has this transaction
+      if (month === transactionMonth) {
+        return;
+      }
+      
+      // Check if the transaction already exists in this month
+      const monthTransactions = props.allTransactions.filter(t => {
+        const tMonth = new Date(t.date).toLocaleString('default', { month: 'long' });
+        return tMonth === month && t.category === transaction.category;
+      });
+      
+      // Check for duplicates in the target month
+      const isDuplicate = monthTransactions.some(
+        t => 
+          t.description === transaction.description && 
+          Math.abs(t.amount) === Math.abs(transaction.amount)
+      );
+      
+      if (isDuplicate) {
+        // Skip if duplicate exists
+        return;
+      }
+      
+      // Convert the target month to a date
+      const targetMonthIndex = new Date(`${month} 1`).getMonth();
+      
+      // Create a new date for the copied transaction
+      const currentDate = new Date(transaction.date);
+      const newDate = new Date(
+        currentDate.getFullYear(),
+        targetMonthIndex,
+        currentDate.getDate()
+      );
+      
+      // Create a copy of the transaction with the new date and a new ID
+      const transactionCopy: Transaction = {
+        ...transaction,
+        date: newDate,
+        id: uuidv4() // Generate a new ID
+      };
+      
+      // Add to batch instead of adding immediately
+      transactionsToAdd.push(transactionCopy);
+      copyCount++;
+    });
+    
+    // Add all transactions at once if possible
+    if (typeof props.onAddTransactionBatch === 'function' && transactionsToAdd.length > 0) {
+      props.onAddTransactionBatch(transactionsToAdd);
+    } else {
+      // Fall back to adding one by one
+      transactionsToAdd.forEach(transaction => {
+        props.onAddTransaction(transaction);
+      });
+    }
+    
+    // Only trigger a refresh once after all transactions are added
+    if (copyCount > 0) {
+      forceRefresh();
+    }
+    
+    // Show a notification about the result
+    if (copyCount > 0) {
+      showNotification(`Copied "${transaction.description}" to ${copyCount} other months`, 'success');
+    } else {
+      showNotification('No additional months to copy to (duplicate check)', 'warning');
+    }
+  }, [props.allTransactions, props.category, props.onAddTransaction, props.onAddTransactionBatch, forceRefresh, showNotification]);
   
   const getMonthOrder = useCallback((month: string): number => {
     const months = [
@@ -790,6 +904,7 @@ export const TransactionTableProvider = ({
     getNextMonth,
     handleCopyMonthClick,
     handleCopyMonthConfirm,
+    handleCopyToAllMonths,
     forceRefresh,
     showNotification,
     getBackgroundStyles,
@@ -869,6 +984,7 @@ export const TransactionTableProvider = ({
         onConfirm={handleCopyMonthConfirm}
         sourceMonth={copySourceMonth}
         targetMonth={copyTargetMonth}
+        category={props.category}
         transactionCount={copyTransactions.length}
         onTargetMonthChange={setCopyTargetMonth}
       />
