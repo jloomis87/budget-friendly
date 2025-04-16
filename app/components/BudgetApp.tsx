@@ -1086,7 +1086,11 @@ const BudgetAppContent = (): JSX.Element => {
           color: '#1a1a1a',
           position: 'relative',
           overflow: 'hidden',
-          mb: 0
+          mb: 0,
+          height: '280px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center'
         }}
       >
         <Box
@@ -1129,7 +1133,6 @@ const BudgetAppContent = (): JSX.Element => {
               src="/logo/friendlybudgetslogo.svg" 
               alt="Friendly Budgets Logo" 
               style={{
-                marginTop: '-90px',
                 clipPath: 'inset(50px 0)',
                 width: 800,
                 height: 400,
@@ -1407,4 +1410,4 @@ const BudgetAppContent = (): JSX.Element => {
       </Box>
     </Box>
   );
-}; 
+};
