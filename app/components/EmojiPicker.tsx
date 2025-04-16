@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Box, TextField, Typography, Paper, Popover, Tooltip, InputAdornment, Divider, Button } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 
@@ -266,12 +266,123 @@ export const getCategoryKeywords = () => {
   };
 };
 
+// Function to create search index - moved outside of hook
+const createSearchIndex = (emojiKeywords: Record<string, string>, emojiCategories: any[]) => {
+  const index: Record<string, string[]> = {};
+  
+  // Index emojis by keywords
+  Object.entries(emojiKeywords).forEach(([emoji, keywords]) => {
+    const terms = keywords.toLowerCase().split(' ');
+    terms.forEach(term => {
+      if (!index[term]) index[term] = [];
+      if (!index[term].includes(emoji)) index[term].push(emoji);
+    });
+  });
+  
+  // Index by category keywords
+  const categoryKeywords = getCategoryKeywords();
+  Object.entries(categoryKeywords).forEach(([category, terms]) => {
+    const categoryEmojis = emojiCategories.find(c => 
+      c.title.toLowerCase().includes(category) || 
+      category.includes(c.title.toLowerCase().replace('&', ''))
+    )?.emojis || [];
+    
+    terms.forEach(term => {
+      if (!index[term]) index[term] = [];
+      categoryEmojis.forEach(emoji => {
+        if (!index[term].includes(emoji)) index[term].push(emoji);
+      });
+    });
+  });
+  
+  return index;
+};
+
 interface EmojiPickerProps {
   anchorEl: HTMLElement | null;
   onClose: () => void;
   onSelect: (emoji: string) => void;
   isDark?: boolean;
 }
+
+// Memoized emoji button to prevent unnecessary re-renders
+const MemoizedEmojiButton = memo(({ 
+  emoji, 
+  description, 
+  onSelect, 
+  isDark 
+}: { 
+  emoji: string; 
+  description: string; 
+  onSelect: (emoji: string) => void;
+  isDark: boolean;
+}) => (
+  <Tooltip key={emoji} title={description}>
+    <Button
+      onClick={() => onSelect(emoji)}
+      sx={{
+        minWidth: 'auto',
+        fontSize: '1.2rem',
+        p: 1,
+        '&:hover': { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'action.hover' }
+      }}
+    >
+      {emoji}
+    </Button>
+  </Tooltip>
+));
+
+// Memoized emoji category for better performance
+const MemoizedEmojiCategory = memo(({ 
+  title, 
+  emojis, 
+  onSelect, 
+  getEmojiDescription,
+  isDark
+}: { 
+  title: string; 
+  emojis: string[]; 
+  onSelect: (emoji: string) => void;
+  getEmojiDescription: (emoji: string) => string;
+  isDark: boolean;
+}) => (
+  <div key={title}>
+    <Typography 
+      variant="subtitle2" 
+      sx={{ 
+        mb: 1, 
+        fontWeight: 'bold', 
+        color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'
+      }}
+    >
+      {title}
+    </Typography>
+    <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: 1 }}>
+      {emojis.slice(0, 30).map(emoji => (
+        <MemoizedEmojiButton 
+          key={emoji} 
+          emoji={emoji} 
+          description={getEmojiDescription(emoji)}
+          onSelect={onSelect}
+          isDark={isDark}
+        />
+      ))}
+      {emojis.length > 30 && (
+        <Button
+          size="small"
+          sx={{ 
+            fontSize: '0.75rem', 
+            color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary',
+            '&:hover': { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'action.hover' } 
+          }}
+        >
+          {emojis.length - 30} more...
+        </Button>
+      )}
+    </div>
+    <Divider sx={{ my: 1, borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : undefined }} />
+  </div>
+));
 
 export const EmojiPicker: React.FC<EmojiPickerProps> = ({
   anchorEl,
@@ -281,8 +392,13 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredEmojis, setFilteredEmojis] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showAllCategories, setShowAllCategories] = useState(false);
 
-  // Update the getEmojiDescription to incorporate enhanced keywords
+  // Create search index with useMemo inside the component
+  const searchIndex = useMemo(() => createSearchIndex(emojiKeywords, emojiCategories), []);
+
+  // Update the getEmojiDescription to incorporate enhanced keywords - memoize for performance
   const getEmojiDescription = useCallback((emoji: string): string => {
     // Check for enhanced keywords first, then fall back to basic keywords
     if (enhancedEmojiKeywords[emoji]) {
@@ -294,94 +410,113 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
     return emojiKeywords[emoji] || emoji;
   }, []);
 
-  // Modify the handleSearchChange function in the component to enhance search by category
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value.toLowerCase();
-    setSearchQuery(query);
+  // Optimize the search function with debounce and memoization
+  const debouncedSearch = useCallback((query: string) => {
+    setIsLoading(true);
     
-    if (!query) {
-      setFilteredEmojis([]);
-      return;
-    }
-    
-    // Results array with scoring system (higher score = better match)
-    const results: Array<{emoji: string, score: number}> = [];
-    
-    // Check for category matches first (e.g., searching "car" should find transportation emojis)
-    const categoryKeywords = getCategoryKeywords();
-    let matchedCategories: string[] = [];
-    
-    // Find categories that match the search query
-    Object.entries(categoryKeywords).forEach(([category, keywords]) => {
-      if (keywords.some(keyword => keyword.includes(query) || query.includes(keyword))) {
-        matchedCategories.push(category);
+    // Use setTimeout to prevent UI freezing
+    setTimeout(() => {
+      if (!query.trim()) {
+        setFilteredEmojis([]);
+        setIsLoading(false);
+        return;
       }
-    });
-    
-    // Add emojis from matched categories
-    if (matchedCategories.length > 0) {
-      emojiCategories.forEach(category => {
-        // Check if this category name matches any of our matched keyword categories
-        const categoryLower = category.title.toLowerCase();
-        const matchesKeywordCategory = matchedCategories.some(c => 
-          categoryLower.includes(c) || c.includes(categoryLower.replace('&', ''))
-        );
-        
-        if (matchesKeywordCategory) {
-          // Add all emojis from this category with a medium score
-          category.emojis.forEach(emoji => {
-            results.push({emoji, score: 50});
-          });
-        }
-      });
-    }
-    
-    // Then search through individual emoji descriptions
-    emojiOptions.forEach(emoji => {
-      const description = getEmojiDescription(emoji).toLowerCase();
-      const exactMatch = description === query;
-      const startsWithMatch = description.startsWith(query);
-      const containsMatch = description.includes(query);
       
-      if (exactMatch) {
-        results.push({emoji, score: 100});
-      } else if (startsWithMatch) {
-        results.push({emoji, score: 80});
-      } else if (containsMatch) {
-        results.push({emoji, score: 60});
-      }
-    });
+      const searchTerms = query.toLowerCase().split(' ');
+      
+      // Use the precomputed index for faster lookups
+      const matchedEmojis: Record<string, number> = {};
+      
+      // Look up each search term in the index
+      searchTerms.forEach(term => {
+        // Find exact matches first
+        const exactMatches = searchIndex[term] || [];
+        exactMatches.forEach(emoji => {
+          matchedEmojis[emoji] = (matchedEmojis[emoji] || 0) + 10; // Higher score for exact matches
+        });
+        
+        // Then find partial matches
+        Object.entries(searchIndex).forEach(([indexTerm, emojis]) => {
+          if (indexTerm.includes(term)) {
+            emojis.forEach(emoji => {
+              matchedEmojis[emoji] = (matchedEmojis[emoji] || 0) + 5; // Lower score for partial matches
+            });
+          }
+        });
+      });
+      
+      // Convert to array and sort by score
+      const results = Object.entries(matchedEmojis)
+        .sort((a, b) => b[1] - a[1])
+        .map(([emoji]) => emoji)
+        .slice(0, 50); // Limit results for performance
+      
+      setFilteredEmojis(results);
+      setIsLoading(false);
+    }, 20); // Small delay to not block rendering
+  }, [searchIndex]);
+
+  // Use debounce for search to prevent too many updates
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      debouncedSearch(searchQuery);
+    }, 150); // Debounce delay
     
-    // Sort results by score (highest first)
-    results.sort((a, b) => b.score - a.score);
-    
-    // Remove duplicates by creating a Set of unique emojis while preserving order
-    const uniqueEmojis: string[] = [];
-    results.forEach(({emoji}) => {
-      if (!uniqueEmojis.includes(emoji)) {
-        uniqueEmojis.push(emoji);
-      }
-    });
-    
-    setFilteredEmojis(uniqueEmojis);
-  };
+    return () => clearTimeout(timer);
+  }, [searchQuery, debouncedSearch]);
 
   // Reset search when popover closes or opens
   useEffect(() => {
     if (!anchorEl) {
       setSearchQuery('');
       setFilteredEmojis([]);
+      setIsLoading(false);
+      setShowAllCategories(false);
     }
   }, [anchorEl]);
 
   // Add a utility function to find which category an emoji belongs to
-  const getEmojiCategory = (emoji: string): string => {
+  const getEmojiCategory = useCallback((emoji: string): string => {
     for (const category of emojiCategories) {
       if (category.emojis.includes(emoji)) {
         return category.title;
       }
     }
     return "Other";
+  }, []);
+
+  // Memoize the grouped results for better performance
+  const groupedResults = useMemo(() => {
+    if (filteredEmojis.length === 0) return {};
+    
+    const groups: Record<string, string[]> = {};
+    
+    filteredEmojis.forEach(emoji => {
+      const category = getEmojiCategory(emoji);
+      if (!groups[category]) {
+        groups[category] = [];
+      }
+      groups[category].push(emoji);
+    });
+    
+    return groups;
+  }, [filteredEmojis, getEmojiCategory]);
+
+  // Memoize visible categories to improve rendering performance
+  const visibleCategories = useMemo(() => {
+    if (searchQuery) return [];
+    // Show all categories if showAllCategories is true, otherwise just show first 5
+    return showAllCategories ? emojiCategories : emojiCategories.slice(0, 5);
+  }, [searchQuery, showAllCategories]);
+
+  // Handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  // Handle showing all categories
+  const handleShowAllCategories = () => {
+    setShowAllCategories(true);
   };
 
   return (
@@ -431,7 +566,18 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
         />
         
         <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-          {searchQuery ? (
+          {isLoading ? (
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                textAlign: 'center', 
+                color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary', 
+                py: 2 
+              }}
+            >
+              Searching...
+            </Typography>
+          ) : searchQuery ? (
             <div>
               <Typography 
                 variant="subtitle2" 
@@ -446,51 +592,31 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
               {filteredEmojis.length > 0 ? (
                 <div>
                   {/* Group search results by category */}
-                  {(() => {
-                    // Group emojis by category
-                    const groupedResults: Record<string, string[]> = {};
-                    
-                    filteredEmojis.forEach(emoji => {
-                      const category = getEmojiCategory(emoji);
-                      if (!groupedResults[category]) {
-                        groupedResults[category] = [];
-                      }
-                      groupedResults[category].push(emoji);
-                    });
-                    
-                    // Render grouped results
-                    return Object.entries(groupedResults).map(([category, emojis]) => (
-                      <div key={category}>
-                        <Typography 
-                          variant="caption" 
-                          sx={{ 
-                            ml: 1, 
-                            color: isDark ? 'rgba(255, 255, 255, 0.6)' : 'text.secondary'
-                          }}
-                        >
-                          {category}
-                        </Typography>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: 1 }}>
-                          {emojis.map(emoji => (
-                            <Tooltip key={emoji} title={getEmojiDescription(emoji)}>
-                              <Button
-                                onClick={() => onSelect(emoji)}
-                                sx={{
-                                  minWidth: 'auto',
-                                  fontSize: '1.2rem',
-                                  p: 1,
-                                  '&:hover': { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'action.hover' }
-                                }}
-                              >
-                                {emoji}
-                              </Button>
-                            </Tooltip>
-                          ))}
-                        </div>
-                        <Divider sx={{ my: 1, borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : undefined }} />
+                  {Object.entries(groupedResults).map(([category, emojis]) => (
+                    <div key={category}>
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          ml: 1, 
+                          color: isDark ? 'rgba(255, 255, 255, 0.6)' : 'text.secondary'
+                        }}
+                      >
+                        {category}
+                      </Typography>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: 1 }}>
+                        {emojis.map(emoji => (
+                          <MemoizedEmojiButton 
+                            key={emoji} 
+                            emoji={emoji} 
+                            description={getEmojiDescription(emoji)}
+                            onSelect={onSelect}
+                            isDark={isDark}
+                          />
+                        ))}
                       </div>
-                    ));
-                  })()}
+                      <Divider sx={{ my: 1, borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : undefined }} />
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <Typography 
@@ -507,38 +633,29 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
             </div>
           ) : (
             <div>
-              {emojiCategories.map((category) => (
-                <div key={category.title}>
-                  <Typography 
-                    variant="subtitle2" 
-                    sx={{ 
-                      mb: 1, 
-                      fontWeight: 'bold', 
-                      color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'
-                    }}
-                  >
-                    {category.title}
-                  </Typography>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: 1 }}>
-                    {category.emojis.map(emoji => (
-                      <Tooltip key={emoji} title={getEmojiDescription(emoji)}>
-                        <Button
-                          onClick={() => onSelect(emoji)}
-                          sx={{
-                            minWidth: 'auto',
-                            fontSize: '1.2rem',
-                            p: 1,
-                            '&:hover': { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'action.hover' }
-                          }}
-                        >
-                          {emoji}
-                        </Button>
-                      </Tooltip>
-                    ))}
-                  </div>
-                  <Divider sx={{ my: 1, borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : undefined }} />
-                </div>
+              {visibleCategories.map((category) => (
+                <MemoizedEmojiCategory
+                  key={category.title}
+                  title={category.title}
+                  emojis={category.emojis}
+                  onSelect={onSelect}
+                  getEmojiDescription={getEmojiDescription}
+                  isDark={isDark}
+                />
               ))}
+              {!showAllCategories && emojiCategories.length > 5 && (
+                <Button 
+                  variant="text" 
+                  fullWidth
+                  onClick={handleShowAllCategories}
+                  sx={{ 
+                    mt: 1, 
+                    color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'primary.main'
+                  }}
+                >
+                  Show More Categories...
+                </Button>
+              )}
             </div>
           )}
         </div>
