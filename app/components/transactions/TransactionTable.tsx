@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { Box, Paper, Typography, useTheme, useMediaQuery } from '@mui/material';
+import { Box, Paper, Typography, useTheme, useMediaQuery, TableContainer, Table, TableHead, TableBody, TableRow, TableCell, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, IconButton, Tooltip } from '@mui/material';
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
 import { MobileEditDialog } from './MobileEditDialog';
 import { MobileAddDialog } from './MobileAddDialog';
@@ -16,6 +16,11 @@ import { db } from '../../firebase/firebaseConfig';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCategories } from '../../contexts/CategoryContext';
 import { useTableColors } from '../../hooks/useTableColors';
+import { EditIcon, DeleteIcon, AddIcon } from '@mui/icons-material';
+import { EditTransactionDialog } from './EditTransactionDialog';
+import { AddTransactionDialog } from './AddTransactionDialog';
+import { EmptyTable } from './EmptyTable';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 
 interface TransactionTableProps {
   category: string;
@@ -52,6 +57,32 @@ export const TransactionTableContent: React.FC = () => {
   const { categories } = useCategories();
   const [tableColors] = useTableColors();
   const [sortOption, setSortOption] = useState<SortOption>('date');
+  const [isExpanded, setIsExpanded] = useState<boolean>(true);
+  
+  // Load initial expanded state from localStorage and save changes
+  useEffect(() => {
+    try {
+      const savedState = localStorage.getItem(`category_${context.props.category}_expanded`);
+      if (savedState !== null) {
+        setIsExpanded(JSON.parse(savedState));
+      }
+    } catch (error) {
+      console.error('Error loading expanded state:', error);
+    }
+  }, [context.props.category]);
+  
+  // Toggle expand/collapse function
+  const toggleExpand = () => {
+    const newExpandedState = !isExpanded;
+    setIsExpanded(newExpandedState);
+    
+    // Save to localStorage
+    try {
+      localStorage.setItem(`category_${context.props.category}_expanded`, JSON.stringify(newExpandedState));
+    } catch (error) {
+      console.error('Error saving expanded state:', error);
+    }
+  };
   
   const { 
     props, 
@@ -232,7 +263,8 @@ export const TransactionTableContent: React.FC = () => {
   }, [user?.id, props.category]);
 
   // Save sort preference to Firebase
-  const handleSortChange = async (newSortOption: SortOption) => {
+  const handleSortChange = async (field: string, direction: 'asc' | 'desc') => {
+    const newSortOption = { field, direction } as SortOption;
     setSortOption(newSortOption);
     
     if (!user?.id || !props.category) return;
@@ -250,13 +282,13 @@ export const TransactionTableContent: React.FC = () => {
   // Sort transactions
   const sortTransactions = (transactions: Transaction[]) => {
     return [...transactions].sort((a, b) => {
-      switch (sortOption) {
+      switch (sortOption.field) {
         case 'amount':
-          return Math.abs(b.amount) - Math.abs(a.amount);
+          return direction === 'desc' ? Math.abs(b.amount) - Math.abs(a.amount) : Math.abs(a.amount) - Math.abs(b.amount);
         case 'date':
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
+          return direction === 'desc' ? new Date(b.date).getTime() - new Date(a.date).getTime() : new Date(a.date).getTime() - new Date(b.date).getTime();
         case 'description':
-          return a.description.localeCompare(b.description);
+          return direction === 'desc' ? a.description.localeCompare(b.description) : b.description.localeCompare(a.description);
         default:
           return 0;
       }
@@ -656,6 +688,21 @@ export const TransactionTableContent: React.FC = () => {
     };
   }, [category, transactions, props.onTransactionsChange, context]);
 
+  // Get the months in correct order for grouping
+  const sortedMonths = selectedMonths ? [...selectedMonths].sort(getMonthOrder) : [];
+  
+  // Group transactions by month for better organization
+  const transactionsByMonth = groupTransactionsByMonth(filteredTransactions);
+  
+  // Define more reusable styles
+  const tableStyles = {
+    width: '100%',
+    borderCollapse: 'separate',
+    borderSpacing: 0,
+    position: 'relative',
+    mt: 1
+  };
+
   return (
     <Box sx={{ position: 'relative', mb: 2}}>
       {/* Drag mode indicator */}
@@ -668,7 +715,7 @@ export const TransactionTableContent: React.FC = () => {
       
       <Paper 
         elevation={3}
-        sx={{ 
+        sx={{
           ...backgroundStyles,
           overflow: 'hidden',
           transition: 'all 0.3s ease',
@@ -686,90 +733,96 @@ export const TransactionTableContent: React.FC = () => {
           sortOption={sortOption}
           onSortChange={handleSortChange}
           categoryData={categoryData}
-          onAlertMessage={props.onAlertMessage}
+          isExpanded={isExpanded}
+          onToggleExpand={toggleExpand}
         />
         
-        {/* Instructions for dragging - show even if no transactions */}
-        <Typography 
-          variant="caption"
-          sx={{ 
-            display: 'block',
-            textAlign: 'center',
-            mb: 1,
-            mt: -3,
-            color: hasCustomColor ? 
-              (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)') : 
-              (props.category === 'Income' ? 'rgba(0, 0, 0, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)')),
-          }}
-        >
-          {filteredTransactions.length > 0 
-            ? 'Drag to move transactions between months' 
-            : 'Add transactions using the + button in each month'}
-        </Typography>
-        
-        {/* Scrollable area for months */}
-        <Box 
-          sx={{ 
-            display: 'flex',
-            flexDirection: 'row',
-            overflowX: 'auto',
-            px: 2,
-            pb: 2,
-            pt: 1,
-            '&::-webkit-scrollbar': {
-              height: '8px',
-            },
-            '&::-webkit-scrollbar-track': {
-              backgroundColor: 'rgba(0,0,0,0.05)',
-            },
-            '&::-webkit-scrollbar-thumb': {
-              backgroundColor: hasCustomColor ? 
-                (hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)') : 
-                (props.category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
-              borderRadius: '4px',
-              '&:hover': {
-                backgroundColor: hasCustomColor ? 
-                  (hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)') : 
-                  (props.category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
-              }
-            }
-          }}
-        >
-          {months.map((month) => (
-            <MonthColumn
-              key={month}
-              month={month}
-              monthTransactions={groupedTransactions[month] || []}
-              category={props.category}
-              isDark={isDark}
-              hasCustomColor={hasCustomColor}
-              hasCustomDarkColor={hasCustomDarkColor}
-              isDragging={isDragging}
-              draggedTransaction={draggedTransaction}
-              draggedIndex={draggedIndex}
-              dragSourceMonth={dragSourceMonth}
-              dragOverMonth={dragOverMonth}
-              dragOverIndex={dragOverIndex}
-              isIntraMonthDrag={isIntraMonthDrag}
-              isCopyMode={isCopyMode}
-              getCardBackgroundColor={getCategoryBackgroundColor}
-              getTextColor={getTextColor}
-              handleMonthDragOver={handleMonthDragOver}
-              handleMonthDragLeave={handleMonthDragLeave}
-              handleMonthDrop={handleMonthDrop}
-              handleTransactionDragStart={handleTransactionDragStart}
-              handleTransactionDragOver={handleTransactionDragOver}
-              handleTransactionDrop={handleTransactionDrop}
-              handleDragEnd={handleDragEnd}
-              handleOpenMobileEdit={handleOpenMobileEdit}
-              handleOpenMobileAdd={handleOpenMobileAdd}
-              handleCopyMonthClick={handleCopyMonthClick}
-              getNextMonth={getNextMonth}
-              getMonthOrder={getMonthOrder}
-              tableColors={tableColors}
-            />
-          ))}
-        </Box>
+        {/* Only show content if expanded */}
+        {isExpanded && (
+          <>
+            {/* Instructions for dragging - show even if no transactions */}
+            <Typography 
+              variant="caption"
+              sx={{
+                display: 'block',
+                textAlign: 'center',
+                mb: 1,
+                mt: -3,
+                color: hasCustomColor ? 
+                  (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)') : 
+                  (props.category === 'Income' ? 'rgba(0, 0, 0, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)')),
+              }}
+            >
+              {filteredTransactions.length > 0 
+                ? 'Drag to move transactions between months' 
+                : 'Add transactions using the + button in each month'}
+            </Typography>
+            
+            {/* Scrollable area for months */}
+            <Box 
+              sx={{ 
+                display: 'flex',
+                flexDirection: 'row',
+                overflowX: 'auto',
+                px: 2,
+                pb: 2,
+                pt: 1,
+                '&::-webkit-scrollbar': {
+                  height: '8px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  backgroundColor: 'rgba(0,0,0,0.05)',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: hasCustomColor ? 
+                    (hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)') : 
+                    (props.category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
+                  borderRadius: '4px',
+                  '&:hover': {
+                    backgroundColor: hasCustomColor ? 
+                      (hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)') : 
+                      (props.category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
+                  }
+                }
+              }}
+            >
+              {months.map((month) => (
+                <MonthColumn
+                  key={month}
+                  month={month}
+                  monthTransactions={groupedTransactions[month] || []}
+                  category={props.category}
+                  isDark={isDark}
+                  hasCustomColor={hasCustomColor}
+                  hasCustomDarkColor={hasCustomDarkColor}
+                  isDragging={isDragging}
+                  draggedTransaction={draggedTransaction}
+                  draggedIndex={draggedIndex}
+                  dragSourceMonth={dragSourceMonth}
+                  dragOverMonth={dragOverMonth}
+                  dragOverIndex={dragOverIndex}
+                  isIntraMonthDrag={isIntraMonthDrag}
+                  isCopyMode={isCopyMode}
+                  getCardBackgroundColor={getCategoryBackgroundColor}
+                  getTextColor={getTextColor}
+                  handleMonthDragOver={handleMonthDragOver}
+                  handleMonthDragLeave={handleMonthDragLeave}
+                  handleMonthDrop={handleMonthDrop}
+                  handleTransactionDragStart={handleTransactionDragStart}
+                  handleTransactionDragOver={handleTransactionDragOver}
+                  handleTransactionDrop={handleTransactionDrop}
+                  handleDragEnd={handleDragEnd}
+                  handleOpenMobileEdit={handleOpenMobileEdit}
+                  handleOpenMobileAdd={handleOpenMobileAdd}
+                  handleCopyMonthClick={handleCopyMonthClick}
+                  getNextMonth={getNextMonth}
+                  getMonthOrder={getMonthOrder}
+                  tableColors={tableColors}
+                />
+              ))}
+            </Box>
+          </>
+        )}
       </Paper>
 
       {/* Dialogs */}
@@ -835,7 +888,7 @@ export const TransactionTableContent: React.FC = () => {
             case 3: return 'rd';
             default: return 'th';
           }
-        }}
+        }} 
       />
 
       <CopyMonthConfirmationDialog

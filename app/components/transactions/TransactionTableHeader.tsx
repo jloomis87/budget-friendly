@@ -9,6 +9,8 @@ import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import EmojiEmotionsIcon from '@mui/icons-material/EmojiEmotions';
 import PercentIcon from '@mui/icons-material/Percent';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useCategories } from '../../contexts/CategoryContext';
 import { EmojiPicker, emojiOptions, emojiKeywords } from '../../components/EmojiPicker';
 import type { Category } from '../../contexts/CategoryContext';
@@ -42,6 +44,8 @@ interface TransactionTableHeaderProps extends ImportedTransactionTableHeaderProp
     isIncome?: boolean;
   };
   onAlertMessage?: (message: { type: 'error' | 'warning' | 'info' | 'success', message: string }) => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
@@ -55,7 +59,9 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
   onSortChange,
   totalBudget,
   categoryData,
-  onAlertMessage
+  onAlertMessage,
+  isExpanded,
+  onToggleExpand
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(category);
@@ -926,6 +932,25 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
           category={category}
         />
         <CategoryColorPicker category={category} />
+        
+        {/* Expand/Collapse Toggle Button */}
+        {onToggleExpand && (
+          <Tooltip title={isExpanded ? "Collapse transactions" : "Expand transactions"}>
+            <IconButton 
+              onClick={onToggleExpand}
+              sx={{ 
+                color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.8)' : (isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.7)'),
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
 
       {/* Emoji Picker Component */}

@@ -232,6 +232,8 @@ export interface TransactionTableHeaderProps {
     percentage?: number;
     isIncome?: boolean;
   };
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 export interface TransactionTableContextProps {
