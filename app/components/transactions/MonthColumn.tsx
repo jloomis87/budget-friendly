@@ -152,7 +152,6 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
         );
 
         if (isDuplicate) {
-          console.log('Duplicate transaction found in month - drop prevented');
           handleMonthDragLeave(e);
           return;
         }
@@ -274,7 +273,6 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           );
 
           if (isDuplicate) {
-            console.log('Duplicate transaction found in stack - drop prevented');
             handleMonthDragLeave(e);
             return;
           }

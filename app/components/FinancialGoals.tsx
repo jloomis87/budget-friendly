@@ -129,7 +129,6 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome, curr
           
           // Update if the balance has changed
           if (newBalance !== goal.currentAmount) {
-            console.log(`[FinancialGoals] Updating debt balance for ${goal.name} from ${goal.currentAmount} to ${newBalance}`);
             
             // Calculate the amount of interest added
             const interestAdded = newBalance - goal.currentAmount;

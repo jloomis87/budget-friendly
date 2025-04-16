@@ -87,18 +87,15 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     const loadCategories = async () => {
       if (!user) {
-        console.log('[CategoryProvider] No user, using default categories');
         setCategories(defaultCategories.map(cat => ({ ...cat, budgetId: currentBudgetId || 'default' })));
         return;
       }
       
       if (!currentBudgetId) {
-        console.log('[CategoryProvider] No budget ID, using default categories without saving');
         setCategories(defaultCategories.map(cat => ({ ...cat, budgetId: 'default' })));
         return;
       }
 
-      console.log('[CategoryProvider] Loading categories for budget:', currentBudgetId);
       setIsLoading(true);
       setError(null);
 
@@ -109,7 +106,6 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         
         if (budgetDoc.exists() && budgetDoc.data()?.categories && budgetDoc.data().categories.length > 0) {
           // Budget has its own categories
-          console.log('[CategoryProvider] Found existing categories for budget');
           const loadedCategories = budgetDoc.data().categories as Category[];
           
           // Ensure all default categories exist
@@ -123,11 +119,9 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
           });
           
-          console.log('[CategoryProvider] Loaded categories:', mergedCategories.length);
           setCategories(mergedCategories);
         } else {
           // No categories found for this budget, create defaults
-          console.log('[CategoryProvider] No categories found, creating defaults for budget:', currentBudgetId);
           const categoriesWithBudgetId = defaultCategories.map(cat => ({
             ...cat,
             budgetId: currentBudgetId
@@ -138,7 +132,6 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             categories: categoriesWithBudgetId
           });
           
-          console.log('[CategoryProvider] Created and saved default categories');
           setCategories(categoriesWithBudgetId);
         }
       } catch (error) {
@@ -146,7 +139,6 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setError('Failed to load categories');
         
         // Use defaults as fallback
-        console.log('[CategoryProvider] Using defaults as fallback due to error');
         setCategories(defaultCategories.map(cat => ({
           ...cat,
           budgetId: currentBudgetId
@@ -279,7 +271,6 @@ export const CategoryProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       // Delete transactions for the category
       if (user) {
-        console.log(`[CategoryProvider] Deleting transactions for category: ${id}`);
         await deleteTransactionsByCategory(user.id, id, currentBudgetId);
       }
     } catch (error) {

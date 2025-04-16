@@ -22,15 +22,12 @@ const initPdfWorker = () => {
   if (pdfWorkerInitialized) return;
   
   try {
-    console.log('Initializing PDF.js worker');
     
     // Set the worker source to a CDN URL for the same version
     const workerUrl = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
       pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
-    console.log(`PDF.js worker source set to: ${workerUrl}`);
     
     pdfWorkerInitialized = true;
-    console.log('PDF.js worker initialized successfully');
   } catch (error) {
     console.error('Error initializing PDF.js worker:', error);
     throw new Error(`Setting up PDF.js worker failed: "${error}"`);
@@ -43,16 +40,13 @@ initPdfWorker();
 // Function to parse CSV files
 export const parseCSV = (file: File): Promise<Transaction[]> => {
   return new Promise((resolve, reject) => {
-    console.log('Starting CSV parsing...');
     
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
         try {
-          console.log('CSV parsing complete, processing data...');
-          console.log('CSV headers:', results.meta.fields);
-          console.log('CSV rows:', results.data.length);
+         
           
           if (!results.data || results.data.length === 0) {
             throw new Error('No data found in CSV file');
@@ -64,7 +58,7 @@ export const parseCSV = (file: File): Promise<Transaction[]> => {
           
           // Sample the first row to check structure
           const sampleRow = results.data[0];
-          console.log('Sample row:', sampleRow);
+      
           
           const transactions: Transaction[] = results.data.map((row: any, index: number) => {
             try {
@@ -115,8 +109,7 @@ export const parseCSV = (file: File): Promise<Transaction[]> => {
           if (transactions.length === 0) {
             throw new Error('Could not extract any valid transactions from CSV');
           }
-          
-          console.log(`Successfully extracted ${transactions.length} transactions from CSV`);
+
           resolve(transactions);
         } catch (error) {
           console.error('Error processing CSV data:', error);
@@ -133,12 +126,11 @@ export const parseCSV = (file: File): Promise<Transaction[]> => {
 
 // Function to parse PDF files
 export const parsePDF = async (file: File): Promise<Transaction[]> => {
-  console.log(`Starting to parse PDF file: ${file.name}`);
+
   
   try {
     // Initialize the PDF.js worker
     try {
-      console.log('Initializing PDF worker for parsing');
       initPdfWorker();
     } catch (workerError: unknown) {
       console.error('PDF worker initialization failed:', workerError);
@@ -148,9 +140,7 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
     // Load the PDF document
     let pdfDocument;
     try {
-      console.log('Converting file to ArrayBuffer');
       const arrayBuffer = await file.arrayBuffer();
-      console.log('ArrayBuffer created, loading PDF document');
       
       // Configure PDF.js to use less memory for large files
       const loadingTask = pdfjsLib.getDocument({
@@ -165,12 +155,9 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
       // Add progress monitoring
       loadingTask.onProgress = (progressData: { loaded: number, total: number }) => {
         const progress = (progressData.loaded / progressData.total * 100).toFixed(2);
-        console.log(`PDF loading progress: ${progress}%`);
       };
       
-      console.log('Awaiting PDF document loading');
       pdfDocument = await loadingTask.promise;
-      console.log(`PDF loaded successfully with ${pdfDocument.numPages} pages`);
     } catch (loadError: unknown) {
       console.error('Failed to load PDF document:', loadError);
       throw new Error(`Failed to load PDF document: ${loadError instanceof Error ? loadError.message : String(loadError)}`);
@@ -182,24 +169,19 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
     // Skip the first page for Chase statements as it's usually just a summary
     // Start from page 2 where the transaction details are
     const startPage = pdfDocument.numPages > 1 ? 2 : 1;
-    console.log(`Starting extraction from page ${startPage}`);
     
     // First, extract all text from the PDF
     for (let i = startPage; i <= pdfDocument.numPages; i++) {
       try {
-        console.log(`Extracting text from page ${i}...`);
         const page = await pdfDocument.getPage(i);
         const textContent = await page.getTextContent();
         const pageText = textContent.items.map((item: any) => item.str).join(' ');
         allText += pageText + ' ';
-        console.log(`Extracted ${pageText.length} characters from page ${i}`);
       } catch (pageError) {
         console.error(`Error extracting text from page ${i}:`, pageError);
       }
     }
     
-    console.log(`Total text extracted: ${allText.length} characters`);
-    console.log('Sample of extracted text:', allText.substring(0, 200) + '...');
     
     if (allText.length === 0) {
       throw new Error('Could not extract any text from the PDF');
@@ -211,7 +193,6 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
                             file.name.toLowerCase().includes('chase');
     
     if (isChaseStatement) {
-      console.log('Detected Chase bank statement, using specialized parsing');
       return parseChaseStatement(allText);
     }
     
@@ -273,8 +254,6 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
           const description = match[pattern.descIndex].trim();
           const amountStr = match[pattern.amountIndex];
           
-          console.log(`Found transaction: Date=${dateStr}, Desc=${description}, Amount=${amountStr}`);
-          
           const date = parseDate(dateStr);
           const amount = parseAmount(amountStr);
           
@@ -291,7 +270,6 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
       
       if (matchCount > 0) {
         matchFound = true;
-        console.log(`Found ${matchCount} transactions using pattern ${patterns.indexOf(pattern) + 1}`);
       }
     }
     
@@ -327,7 +305,6 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
         amounts = [...amounts, ...matches];
       }
       
-      console.log(`Found ${dates.length} dates and ${amounts.length} amounts with generic patterns`);
       
       // If we have both dates and amounts, try to pair them
       if (dates.length > 0 && amounts.length > 0) {
@@ -351,12 +328,10 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
           }
         }
         
-        console.log(`Added ${count} transactions using generic pattern matching`);
       }
       
       // If still no transactions, try to extract table-like structures
       if (transactions.length === 0) {
-        console.log('Attempting to extract table-like structures...');
         
         // Split text into lines and look for lines with both dates and amounts
         const lines = allText.split(/\r?\n|\r|\s{4,}/);
@@ -395,7 +370,6 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
           }
         }
         
-        console.log(`Added ${transactions.length} transactions from line-by-line analysis`);
       }
     }
     
@@ -403,7 +377,6 @@ export const parsePDF = async (file: File): Promise<Transaction[]> => {
       throw new Error('Could not extract any transactions from PDF. The file may not contain recognizable transaction data or may be in an unsupported format.');
     }
     
-    console.log(`Successfully extracted ${transactions.length} transactions from PDF`);
     return transactions;
   } catch (error) {
     console.error('Error parsing PDF:', error);
@@ -574,27 +547,21 @@ export const categorizeTransaction = (description: string, amount: number): stri
 
 // Main function to parse any supported file
 export const parseFile = async (file: File): Promise<Transaction[]> => {
-  console.log(`parseFile called for ${file.name} (${file.type})`);
-  console.log(`File size: ${(file.size / 1024).toFixed(2)} KB`);
   
   try {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
-    console.log(`File extension detected: ${fileExtension}`);
     
     // For PDF files
     if (fileExtension === 'pdf') {
-      console.log(`Parsing PDF file: ${file.name}`);
       
       // Check if it's a Chase statement based on filename
       const isChaseStatement = file.name.toLowerCase().includes('chase');
       if (isChaseStatement) {
-        console.log('Detected Chase bank statement from filename');
       }
       
       // Parse the PDF
       try {
         const transactions = await parsePDF(file);
-        console.log(`Successfully parsed PDF with ${transactions.length} transactions`);
         return transactions;
       } catch (pdfError) {
         console.error('Error parsing PDF:', pdfError);
@@ -603,10 +570,8 @@ export const parseFile = async (file: File): Promise<Transaction[]> => {
     } 
     // For CSV files
     else if (fileExtension === 'csv') {
-      console.log(`Parsing CSV file: ${file.name}`);
       try {
         const transactions = await parseCSV(file);
-        console.log(`Successfully parsed CSV with ${transactions.length} transactions`);
         return transactions;
       } catch (csvError) {
         console.error('Error parsing CSV:', csvError);
@@ -616,7 +581,6 @@ export const parseFile = async (file: File): Promise<Transaction[]> => {
     // For Excel files
     else if (['xlsx', 'xls'].includes(fileExtension || '')) {
       // For now, we'll just throw an error for Excel files
-      console.log(`Excel files not yet supported: ${file.name}`);
       throw new Error(`Excel files (${fileExtension}) are not yet supported.`);
     } 
     // For unsupported file types
@@ -632,9 +596,6 @@ export const parseFile = async (file: File): Promise<Transaction[]> => {
 
 // Add a specialized function for parsing Chase statements
 const parseChaseStatement = (text: string): Transaction[] => {
-  console.log('Parsing Chase statement with specialized function');
-  console.log('Text length:', text.length);
-  console.log('Sample of text for Chase parsing:', text.substring(0, 200) + '...');
   
   const transactions: Transaction[] = [];
   
@@ -656,7 +617,6 @@ const parseChaseStatement = (text: string): Transaction[] => {
       const description = match[2].trim();
       const amountStr = match[3].replace(',', '');
       
-      console.log(`Found income transaction: Date=${dateStr}, Desc=${description}, Amount=${amountStr}`);
       incomeMatchCount++;
       
       const date = parseDate(dateStr);
@@ -673,7 +633,6 @@ const parseChaseStatement = (text: string): Transaction[] => {
     }
   }
   
-  console.log(`Found ${incomeMatchCount} income transactions`);
   
   // Then extract regular transactions
   while ((match = chaseTransactionPattern.exec(text)) !== null) {
@@ -687,7 +646,6 @@ const parseChaseStatement = (text: string): Transaction[] => {
         continue;
       }
       
-      console.log(`Found transaction: Date=${dateStr}, Desc=${description}, Amount=${amountStr}`);
       transactionMatchCount++;
       
       const date = parseDate(dateStr);
@@ -721,11 +679,9 @@ const parseChaseStatement = (text: string): Transaction[] => {
     }
   }
   
-  console.log(`Found ${transactionMatchCount} regular transactions`);
   
   // If we didn't find any transactions with the specific patterns, fall back to more generic patterns
   if (transactions.length === 0) {
-    console.log('No transactions found with Chase-specific patterns, trying generic patterns');
     
     // Try a simpler pattern for Chase statements
     const simplePattern = /(\d{2}\/\d{2})\s+(.+?)\s+(-?\d+\.\d{2})/g;
@@ -742,8 +698,6 @@ const parseChaseStatement = (text: string): Transaction[] => {
         if (description.includes('Balance')) {
           continue;
         }
-        
-        console.log(`Found transaction with simple pattern: Date=${dateStr}, Desc=${description}, Amount=${amountStr}`);
         simpleMatchCount++;
         
         const date = parseDate(dateStr);
@@ -760,7 +714,6 @@ const parseChaseStatement = (text: string): Transaction[] => {
       }
     }
     
-    console.log(`Found ${simpleMatchCount} transactions with simple pattern`);
     
     // If still no transactions, try even more generic approach
     if (transactions.length === 0) {
@@ -783,7 +736,6 @@ const parseChaseStatement = (text: string): Transaction[] => {
         amounts.push(amountMatch[1]);
       }
       
-      console.log(`Found ${dates.length} dates and ${amounts.length} amounts with generic patterns`);
       
       // Try to pair dates with descriptions and amounts
       if (dates.length > 0 && amounts.length > 0) {
@@ -824,24 +776,16 @@ const parseChaseStatement = (text: string): Transaction[] => {
       }
     }
   }
-  
-  console.log(`Successfully extracted ${transactions.length} transactions from Chase statement`);
   return transactions;
 };
 
 // Add a simple test function to help debug PDF parsing
 export const testPdfParsing = async (file: File): Promise<string> => {
   try {
-    console.log('Testing PDF parsing for file:', file.name);
-    console.log(`PDF.js version: ${pdfjsLib.version}`);
-    console.log(`Worker initialized: ${pdfWorkerInitialized}`);
-    console.log(`Worker source: ${pdfjsLib.GlobalWorkerOptions.workerSrc}`);
     
     // Initialize the PDF.js worker
     try {
-      console.log('Attempting to initialize PDF worker for test');
       initPdfWorker();
-      console.log('Worker initialization successful');
     } catch (workerError) {
       console.error('Worker initialization error:', workerError);
       return `PDF worker initialization failed: ${workerError}`;
@@ -850,12 +794,8 @@ export const testPdfParsing = async (file: File): Promise<string> => {
     // Load the PDF document
     let pdfDocument;
     try {
-      console.log('Converting file to ArrayBuffer for test');
       const arrayBuffer = await file.arrayBuffer();
-      console.log(`ArrayBuffer created: ${arrayBuffer.byteLength} bytes`);
       
-      // Configure PDF.js to use less memory for large files
-      console.log('Creating PDF loading task');
       const loadingTask = pdfjsLib.getDocument({
         data: arrayBuffer,
         disableAutoFetch: true,
@@ -868,12 +808,9 @@ export const testPdfParsing = async (file: File): Promise<string> => {
       // Add progress monitoring
       loadingTask.onProgress = (progressData: { loaded: number, total: number }) => {
         const progress = (progressData.loaded / progressData.total * 100).toFixed(2);
-        console.log(`PDF test loading progress: ${progress}%`);
       };
       
-      console.log('Awaiting PDF document loading');
       pdfDocument = await loadingTask.promise;
-      console.log(`PDF test loaded successfully with ${pdfDocument.numPages} pages`);
     } catch (loadError) {
       console.error('PDF loading error in test:', loadError);
       return `Failed to load PDF document: ${loadError}`;
@@ -881,11 +818,8 @@ export const testPdfParsing = async (file: File): Promise<string> => {
     
     // Extract text from the first page
     try {
-      console.log('Getting first page for test');
       const page = await pdfDocument.getPage(1);
-      console.log('Getting text content from first page');
       const textContent = await page.getTextContent();
-      console.log(`Extracted ${textContent.items.length} text items from first page`);
       const pageText = textContent.items.map((item: any) => item.str).join(' ');
       
       // Return a sample of the text

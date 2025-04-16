@@ -328,17 +328,10 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
     // Enhanced savings insights
     if (totalIncome > 0) {
       // Calculate year-to-date income (from January to current month)
-      console.log('Calculating year-to-date income...');
-      console.log('Start of year:', startOfYear.toISOString());
-      console.log('End of current month:', endOfCurrentMonth.toISOString());
+     
       
       // Debug: Log all transactions
-      console.log('All transactions:', transactions.map(t => ({
-        date: t.date,
-        type: t.type,
-        amount: t.amount,
-        category: t.category
-      })));
+    
       
       // Debug: Log filtered income transactions
       const incomeTransactions = transactions.filter(t => {
@@ -346,28 +339,20 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
         // Check both type and category for income, and ensure amount is positive
         const isIncome = (t.type === 'income' || t.category === 'Income') && t.amount > 0;
         const isInDateRange = transactionDate >= startOfYear && transactionDate <= endOfCurrentMonth;
-        console.log('Transaction:', {
-          date: t.date,
-          type: t.type,
-          amount: t.amount,
-          isIncome,
-          isInDateRange
-        });
+       
         return isIncome && isInDateRange;
       });
       
-      console.log('Income transactions found:', incomeTransactions);
+     
       
       const yearToDateIncome = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
-      console.log('Year to date income calculated:', yearToDateIncome);
-
+      
       // If no income transactions found, use the totalIncome prop divided by months elapsed
       const effectiveIncome = yearToDateIncome > 0 ? yearToDateIncome : (totalIncome * monthsElapsed / 12);
 
       // Calculate actual savings rate based on year-to-date figures
       const actualSavingsRate = effectiveIncome > 0 ? (actualSavings / effectiveIncome) * 100 : 0;
-      console.log('Actual savings:', actualSavings);
-      console.log('Calculated savings rate:', actualSavingsRate);
+     
       
       if (savingsGoals.length === 0) {
         result.push({
@@ -459,7 +444,7 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
   useEffect(() => {
     const fetchGoals = async () => {
       if (!user?.id) {
-        console.log('No user ID available');
+      
         return;
       }
 
@@ -539,7 +524,7 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
 
   const handleSaveGoal = async () => {
     if (!user?.id) {
-      console.log('No user ID available');
+   
       return;
     }
 
@@ -572,7 +557,7 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
 
   const handleDeleteGoal = async (goalId: string) => {
     if (!user?.id) {
-      console.log('No user ID available');
+    
       return;
     }
 

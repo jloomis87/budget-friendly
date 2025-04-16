@@ -121,11 +121,9 @@ export const getUserTransactions = async (userId: string, budgetId?: string): Pr
     let transactionsRef;
     
     if (budgetId) {
-      console.log('[transactionService] Loading transactions for budget:', budgetId);
       // If budgetId is provided, get from the budget's transactions collection
       transactionsRef = getBudgetTransactionsRef(userId, budgetId);
     } else {
-      console.log('[transactionService] Loading transactions from legacy path (no budget ID)');
       // Otherwise use the legacy path (for backward compatibility)
       transactionsRef = getUserTransactionsRef(userId);
     }
@@ -136,14 +134,9 @@ export const getUserTransactions = async (userId: string, budgetId?: string): Pr
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.size === 0) {
-      console.log('[transactionService] No transactions found', { budgetId, userId });
       // No transactions found
     } else {
-      console.log('[transactionService] Found transactions:', { 
-        count: querySnapshot.size, 
-        budgetId, 
-        userId 
-      });
+
     }
     
     const transactions: Transaction[] = [];
@@ -379,7 +372,6 @@ export const reorderTransactions = async (
     
     // Commit the batch
     await batch.commit();
-    console.log(`[transactionService] Successfully reordered ${orderedTransactionIds.length} transactions`);
   } catch (error) {
     console.error('[transactionService] Error reordering transactions:', error);
     throw error;
@@ -428,11 +420,9 @@ export const deleteTransactionsByCategory = async (
     }
     
     if (querySnapshot.empty) {
-      console.log(`[transactionService] No transactions found for category: ${categoryId}`);
       return;
     }
     
-    console.log(`[transactionService] Deleting ${querySnapshot.size} transactions for category: ${categoryId}`);
     
     // Delete all transactions in batches (Firestore has a limit of 500 operations per batch)
     const batchSize = 450; // Keep under the 500 limit for safety
@@ -446,7 +436,6 @@ export const deleteTransactionsByCategory = async (
       // If we've reached the batch limit, commit and start a new batch
       if (operationCount >= batchSize) {
         await batch.commit();
-        console.log(`[transactionService] Committed batch of ${operationCount} deletes`);
         batch = writeBatch(db);
         operationCount = 0;
       }
@@ -455,10 +444,8 @@ export const deleteTransactionsByCategory = async (
     // Commit any remaining deletes
     if (operationCount > 0) {
       await batch.commit();
-      console.log(`[transactionService] Committed final batch of ${operationCount} deletes`);
     }
     
-    console.log(`[transactionService] Successfully deleted all transactions for category ${categoryId}`);
   } catch (error) {
     console.error('[transactionService] Error deleting category transactions:', error);
     throw error;

@@ -274,7 +274,6 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
         await updateCategory(categoryInfo.id, {
           icon: iconToUse
         });
-        console.log('Category icon updated successfully to:', iconToUse);
         
         // Then find all transactions in this category from the parent component
         // We need to access the parent component that has access to all transactions

@@ -49,7 +49,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Save theme to Firebase
   const saveThemeToFirebase = useCallback(async (themeMode: PaletteMode) => {
     if (isAuthenticated && user) {
-      console.log('Saving theme preference to Firebase:', themeMode, 'for user:', user.id);
       try {
         setFirebaseError(null);
         // Store theme preference directly in the user document
@@ -64,7 +63,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             updatedAt: new Date().toISOString() 
           }
         });
-        console.log('Theme preference saved to Firebase successfully');
       } catch (error) {
         console.error('Error saving theme preference to Firebase:', error);
         setFirebaseError('Failed to save theme preference to Firebase');
@@ -74,7 +72,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Function to toggle between light and dark mode
   const toggleColorMode = useCallback(() => {
-    console.log('Toggling theme mode from', mode, 'to', mode === 'light' ? 'dark' : 'light');
     const newMode = mode === 'light' ? 'dark' : 'light';
     setMode(newMode);
     
@@ -101,11 +98,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (userDoc.exists() && userDoc.data().preferences?.theme) {
             // User has a theme preference stored in Firebase
             const userTheme = userDoc.data().preferences.theme as PaletteMode;
-            console.log('Found theme preference in Firebase:', userTheme);
             setMode(userTheme);
           } else {
             // No theme preference in Firebase, use the local one and save it
-            console.log('No theme preference found in Firebase, saving current preference:', mode);
             await saveThemeToFirebase(mode);
           }
           

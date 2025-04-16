@@ -59,40 +59,32 @@ const updateCardsWithDescription = (description: string, newIcon: string) => {
   const normalizedDescription = description.trim().toLowerCase();
   
   // Log the update request
-  console.log(`[REGISTRY] Update requested for description "${description}" with new icon "${newIcon}"`);
   
   if (transactionIconRegistry[normalizedDescription]) {
     // Always update the stored icon, regardless of current value
     const previousIcon = transactionIconRegistry[normalizedDescription].icon;
     transactionIconRegistry[normalizedDescription].icon = newIcon;
     
-    console.log(`[REGISTRY] Changing icon for "${description}" from "${previousIcon}" to "${newIcon}"`);
     
     // Force update all registered callbacks
     const callbackCount = transactionIconRegistry[normalizedDescription].callbacks.length;
-    console.log(`[REGISTRY] Updating ${callbackCount} cards with description "${description}"`);
     
     // Call each callback with the new icon
     transactionIconRegistry[normalizedDescription].callbacks.forEach((callback, index) => {
-      console.log(`[REGISTRY] Updating card ${index + 1}/${callbackCount} for "${description}"`);
       callback(newIcon);
     });
     
-    console.log(`[REGISTRY] Updated ${callbackCount} cards with description "${description}" to icon "${newIcon}"`);
   } else {
-    console.log(`[REGISTRY] No cards registered for description "${description}"`);
   }
 };
 
 // Global event listener for transaction icon updates
 document.addEventListener('transactionIconsUpdated', ((event: CustomEvent) => {
   const { description, icon, forceUpdate } = event.detail;
-  console.log(`[REGISTRY] Received transactionIconsUpdated event:`, { description, icon, forceUpdate });
   
   if (description && icon !== undefined) {
     // If forceUpdate is present, force all cards to update regardless of current state
     if (forceUpdate) {
-      console.log(`[REGISTRY] Force update requested for "${description}"`);
       
       // We need to update all transaction cards with this description
       // First check if we already have entries in the registry
@@ -100,7 +92,6 @@ document.addEventListener('transactionIconsUpdated', ((event: CustomEvent) => {
       
       if (!transactionIconRegistry[normalizedDescription]) {
         // Create a new registry entry if one doesn't exist
-        console.log(`[REGISTRY] Creating new registry entry for "${description}"`);
         transactionIconRegistry[normalizedDescription] = {
           icon: icon,
           callbacks: []
@@ -114,7 +105,6 @@ document.addEventListener('transactionIconsUpdated', ((event: CustomEvent) => {
       updateCardsWithDescription(description, icon);
     }
   } else {
-    console.log(`[REGISTRY] Invalid event data:`, event.detail);
   }
 }) as EventListener);
 
@@ -150,14 +140,12 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
   // Setup event listeners
   useEffect(() => {
     const normalizedDescription = transaction.description.trim().toLowerCase();
-    console.log(`[Card] ${normalizedDescription} mounted, registering...`);
     
     // Register this card in the global registry
     const registryIcon = registerCard(
       normalizedDescription,
       transaction.icon || '',  // Make sure we pass the icon
       (newIcon: string) => {   // Add type for newIcon parameter
-        console.log(`[Card] Updating "${normalizedDescription}" to icon: ${newIcon}`);
         setCurrentIcon(newIcon);
         if (cardRef.current) {
           cardRef.current.classList.add('card-updated');
@@ -173,20 +161,17 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
     // If the registry has an icon that's different from our current state,
     // update our state to match the registry
     if (registryIcon && registryIcon !== currentIcon) {
-      console.log(`[Card] Initial sync - updating "${normalizedDescription}" icon from "${currentIcon}" to registry value: "${registryIcon}"`);
       setCurrentIcon(registryIcon);
     }
     
     // Force refresh listener
     const handleForceRefresh = () => {
-      console.log(`[Card] Force refresh received for "${normalizedDescription}"`);
       
       // Check if there's a registry entry for this transaction description
       if (transactionIconRegistry[normalizedDescription]) {
         const registryIcon = transactionIconRegistry[normalizedDescription].icon;
         
         if (registryIcon !== currentIcon) {
-          console.log(`[Card] Updating icon from ${currentIcon} to registry value: ${registryIcon}`);
           setCurrentIcon(registryIcon);
           
           // Add animation
@@ -201,7 +186,6 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
         }
       } else {
         // Make sure we're showing the icon from the transaction prop
-        console.log(`[Card] No registry entry, using transaction icon: ${transaction.icon}`);
         setCurrentIcon(transaction.icon || '');  // Add fallback empty string
       }
     };
@@ -216,7 +200,6 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
 
     // Cleanup on unmount
     return () => {
-      console.log(`[Card] ${normalizedDescription} unmounting, unregistering...`);
       unregisterCard(normalizedDescription, (newIcon: string) => {}); // Add dummy callback
       document.removeEventListener('forceTransactionRefresh', handleForceRefresh);
     };

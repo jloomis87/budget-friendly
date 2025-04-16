@@ -69,11 +69,6 @@ export function useTransactionUtils(): TransactionUtilsHook {
     findGlobalIndex: (transaction: Transaction, allTransactions: Transaction[]): number => {
       // Validate inputs
       if (!transaction || !allTransactions || !Array.isArray(allTransactions)) {
-        console.error('Invalid arguments to findGlobalIndex', { 
-          hasTransaction: !!transaction, 
-          hasAllTransactions: !!allTransactions,
-          isArray: Array.isArray(allTransactions)
-        });
         return -1;
       }
       
@@ -81,21 +76,9 @@ export function useTransactionUtils(): TransactionUtilsHook {
       if (transaction.id) {
         const idIndex = allTransactions.findIndex(t => t.id === transaction.id);
         if (idIndex !== -1) {
-          console.log(`Found transaction by ID at index ${idIndex}`, {
-            id: transaction.id,
-            description: transaction.description
-          });
           return idIndex;
         }
       }
-      
-      // Log the transaction we're trying to find
-      console.log('Finding transaction by properties:', {
-        description: transaction.description,
-        category: transaction.category,
-        amount: transaction.amount,
-        date: transaction.date
-      });
       
       // Otherwise, try to match by properties
       const index = allTransactions.findIndex(t => {
@@ -107,33 +90,8 @@ export function useTransactionUtils(): TransactionUtilsHook {
         const descriptionMatch = t.description === transaction.description;
         const amountMatch = t.amount === transaction.amount;
         
-        const isMatch = dateMatch && descriptionMatch && amountMatch;
-        
-        // Log potential matches for debugging
-        if (descriptionMatch && t.category === 'Income' && transaction.category === 'Income') {
-          console.log('Potential Income match:', {
-            description: t.description,
-            dateMatch,
-            amountMatch,
-            isMatch
-          });
-        }
-        
-        return isMatch;
+        return dateMatch && descriptionMatch && amountMatch;
       });
-      
-      if (index === -1) {
-        console.warn('Could not find transaction in allTransactions', {
-          description: transaction.description,
-          category: transaction.category,
-          totalTransactions: allTransactions.length
-        });
-      } else {
-        console.log(`Found transaction by properties at index ${index}`, {
-          description: transaction.description,
-          category: transaction.category
-        });
-      }
       
       return index;
     },
@@ -157,11 +115,6 @@ export function useTransactionUtils(): TransactionUtilsHook {
       excludeId?: string
     ): number[] => {
       if (!description || !allTransactions || !Array.isArray(allTransactions)) {
-        console.error('Invalid arguments to updateTransactionsWithSameName', {
-          hasDescription: !!description,
-          hasAllTransactions: !!allTransactions,
-          isArray: Array.isArray(allTransactions)
-        });
         return [];
       }
 
@@ -180,11 +133,6 @@ export function useTransactionUtils(): TransactionUtilsHook {
         // Check if descriptions match (case-insensitive) and icons are different
         if (transactionDescription === normalizedDescription && transaction.icon !== icon) {
           indicesToUpdate.push(index);
-          console.log(`Found transaction with same name at index ${index}`, {
-            description: transaction.description,
-            currentIcon: transaction.icon,
-            newIcon: icon
-          });
         }
       });
 

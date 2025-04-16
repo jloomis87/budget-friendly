@@ -56,7 +56,7 @@ export function MobileEditDialog({
   useEffect(() => {
     if (open && editingRow) {
       previousIconRef.current = editingRow.icon || '';
-      console.log(`MobileEditDialog opened with icon: ${previousIconRef.current}`);
+    
     }
   }, [open, editingRow]);
 
@@ -73,7 +73,7 @@ export function MobileEditDialog({
   // Select emoji
   const handleSelectEmoji = (emoji: string) => {
     if (editingRow) {
-      console.log(`Selected new emoji: ${emoji}, previous: ${editingRow.icon || 'none'}`);
+   
       handleEditingChange('icon', emoji);
     }
     handleCloseEmojiPicker();
@@ -82,7 +82,7 @@ export function MobileEditDialog({
   // Remove icon
   const handleRemoveIcon = () => {
     if (editingRow) {
-      console.log(`Removing icon, previous: ${editingRow.icon || 'none'}`);
+  
       handleEditingChange('icon', '');
     }
   };
@@ -114,7 +114,7 @@ export function MobileEditDialog({
           }
         });
         
-        console.log(`Directly updated ${updatedCount} transaction card icons in the DOM`);
+     
       }, 50);
     } catch (error) {
       console.error('Error updating transaction cards in DOM:', error);
@@ -132,11 +132,7 @@ export function MobileEditDialog({
     const hasIconChanged = previousIconRef.current !== currentIcon;
     const description = editingRow.description;
     
-    console.log(`[EDIT] Saving transaction: ${description}`, {
-      hasIconChanged,
-      previousIcon: previousIconRef.current,
-      currentIcon,
-    });
+
     
     // First save the transaction normally
     onSave();
@@ -144,7 +140,7 @@ export function MobileEditDialog({
     // Update all transactions with the same description, regardless of whether the icon changed
     // This ensures that icons are always consistent, even if there was a bug before
     if (description) {
-      console.log(`[EDIT] Updating icon for all "${description}" cards to "${currentIcon}"`);
+   
       
       // Force update even if icon didn't change (to fix inconsistencies)
       
@@ -158,11 +154,7 @@ export function MobileEditDialog({
         }
       });
       
-      console.log(`[EDIT] Dispatching transactionIconsUpdated event with:`, {
-        category,
-        icon: currentIcon,
-        description
-      });
+   
       
       // This will trigger our global registry to update all matching cards
       document.dispatchEvent(iconUpdateEvent);
@@ -171,11 +163,11 @@ export function MobileEditDialog({
       if (window.updateAllTransactionsWithIcon) {
         try {
           const iconWithDescription = `${currentIcon}|${description}`;
-          console.log(`[EDIT] Calling global updateAllTransactionsWithIcon with: ${iconWithDescription}`);
+      
           
           window.updateAllTransactionsWithIcon(category, iconWithDescription)
             .then(() => {
-              console.log(`[EDIT] Successfully updated all transactions with description "${description}"`);
+            
             })
             .catch(error => {
               console.error(`[EDIT] Error in global icon update:`, error);
@@ -196,7 +188,7 @@ export function MobileEditDialog({
             forceUpdate: true
           }
         });
-        console.log(`[EDIT] Dispatching forceTransactionRefresh event`);
+      
         document.dispatchEvent(refreshEvent);
       }, 100);
     }

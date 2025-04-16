@@ -131,9 +131,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
 
   // Log categories and current budget ID for debugging
   useEffect(() => {
-    console.log('[BudgetSummary] Current budget ID:', currentBudgetId);
-    console.log('[BudgetSummary] Categories count:', categories.length);
-    console.log('[BudgetSummary] Categories:', categories.map(c => c.name));
+ 
   }, [categories, currentBudgetId]);
 
   // Add new state variables for investment simulator
@@ -220,8 +218,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
             setSelectedHistoricalPeriod(settings.selectedHistoricalPeriod);
             setShowPortfolioDiversification(settings.showPortfolioDiversification);
             setPortfolioAllocation(settings.portfolioAllocation);
-            
-            console.log('[BudgetSummary] Loaded investment settings from Firebase');
+       
           }
         }
       } catch (error) {
@@ -275,7 +272,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
       });
       
       setLastSaved(new Date());
-      console.log('[BudgetSummary] Saved investment settings to Firebase');
+     
     } catch (error) {
       console.error('[BudgetSummary] Error saving investment settings:', error);
     } finally {
@@ -322,7 +319,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
   // Filter transactions for selected months
   const filteredTransactions = useMemo(() => {
     if (!transactions || !selectedMonths || selectedMonths.length === 0) {
-      console.log('No transactions or selected months');
+   
       return [];
     }
     
@@ -330,20 +327,14 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
       const transactionDate = new Date(transaction.date);
       const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
       const isIncluded = selectedMonths.includes(transactionMonth);
-      console.log('Transaction:', {
-        date: transactionDate,
-        month: transactionMonth,
-        amount: transaction.amount,
-        category: transaction.category,
-        isIncluded
-      });
+    
       return isIncluded;
     });
   }, [transactions, selectedMonths]);
 
   // Calculate totals for each category directly from transactions
   const categoryTotals = useMemo(() => {
-    console.log("Recalculating category totals from transactions");
+   
     const totals: Record<string, number> = { income: 0 };
     
     // Initialize all category IDs
@@ -363,7 +354,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
         
         // First try direct match by ID
         if (transactionCategory in totals) {
-          console.log(`Adding ${amount} to ${transactionCategory} (direct match)`);
+        
           totals[transactionCategory] += amount;
         } else {
           // Try to find by name
@@ -373,22 +364,22 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
           
           if (matchingCategory) {
             const categoryId = matchingCategory.id.toLowerCase();
-            console.log(`Adding ${amount} to ${categoryId} (matched ${transactionCategory} by name)`);
+
             totals[categoryId] += amount;
           } else {
             // No match, create a new category entry
             if (!(transactionCategory in totals)) {
               totals[transactionCategory] = 0;
-              console.log(`Created new category total for ${transactionCategory}`);
+  
             }
             totals[transactionCategory] += amount;
-            console.log(`Adding ${amount} to ${transactionCategory} (new category)`);
+          
           }
         }
       }
     });
     
-    console.log("Final category totals:", totals);
+  
     return totals;
   }, [filteredTransactions, categories]);
 
@@ -510,7 +501,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
             monthlyData[month][categoryId] += Math.abs(t.amount);
           } else {
             // If the category doesn't exist in our structure, add to "Other" or similar
-            console.log(`Skipping transaction with deleted category: ${category}`);
+           
             // Optional: create an "Other" category to capture these amounts
             // if (categoryIds.includes('other')) {
             //   monthlyData[month]['other'] += Math.abs(t.amount);
@@ -1085,7 +1076,7 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
                   if (matchingTransactions.length > 0) {
                     // Sum up all the matching transactions
                     const total = matchingTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-                    console.log(`[BudgetSummary] Category ${category.name}: ${matchingTransactions.length} transactions totaling ${total}`);
+                
                     return total;
                   }
                 }
@@ -1104,7 +1095,6 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
                 (preferences?.ratios ? preferences.ratios[categoryId as keyof typeof preferences.ratios] || 0 : 0);
               
               // Log values for debugging
-              console.log(`[BudgetSummary] Category ${category.name}: Firebase percentage=${category.percentage}, Preferences ratio=${preferences?.ratios ? preferences.ratios[categoryId] : 'undefined'}, Using=${categoryPercentage}%`);
               
               // Calculate target directly from income and percentage allocation
               const totalIncome = categoryTotals.income as number || 0;

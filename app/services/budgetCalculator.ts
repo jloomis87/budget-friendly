@@ -109,7 +109,6 @@ export const calculateBudgetSummary = (transactions: Transaction[]): BudgetSumma
             // Add this new category
             summary.categories[lowerCategory] = expenseAmount;
             summary.percentages[lowerCategory] = 0; // Initialize percentage
-            console.log(`Added new category to summary: ${lowerCategory}`);
           }
         }
       }
@@ -155,7 +154,6 @@ export const create503020Plan = (summary: BudgetSummary, preferences?: { ratios?
     // Skip if it's already one of our standard categories
     if (!['essentials', 'wants', 'savings'].includes(category)) {
       actual[category] = summary.categories[category];
-      console.log(`Added dynamic category to budget plan: ${category} - $${summary.categories[category]}`);
     }
   });
   

@@ -70,7 +70,6 @@ export function FileUpload({
     setError(null);
     
     const files = Array.from(e.dataTransfer.files);
-    console.log(`Dropped ${files.length} files:`, files.map(f => f.name));
     
     // Validate files
     const validFiles = validateFiles(files);
@@ -85,7 +84,6 @@ export function FileUpload({
       setTimeout(() => {
         try {
           // Call the callback with valid files
-          console.log('Calling onFilesUploaded with files:', validFiles.map(f => f.name));
           onFilesUploaded(validFiles);
         } catch (err) {
           console.error('Error in onFilesUploaded:', err);
@@ -98,12 +96,10 @@ export function FileUpload({
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('File selected event triggered');
     setError(null);
     
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files);
-      console.log(`Selected ${files.length} files:`, files.map(f => f.name));
       
       // Show loading state immediately
       setIsLoading(true);
@@ -111,9 +107,7 @@ export function FileUpload({
       // Test PDF parsing if it's a PDF file
       const pdfFile = files.find(f => f.name.toLowerCase().endsWith('.pdf'));
       if (pdfFile) {
-        console.log('Testing PDF parsing for debugging');
         testPdfParsing(pdfFile).then(result => {
-          console.log('PDF test result:', result);
         }).catch(err => {
           console.error('PDF test error:', err);
         });
@@ -126,13 +120,11 @@ export function FileUpload({
         setSelectedFiles(validFiles);
         
         // Add a visible message to the console
-        console.log('%c Processing files... Please wait.', 'background: #222; color: #bada55; font-size: 16px;');
         
         // Process files with a slight delay to allow UI to update
         setTimeout(() => {
           try {
             // Call the callback with valid files
-            console.log('Calling onFilesUploaded with files:', validFiles.map(f => f.name));
             onFilesUploaded(validFiles);
           } catch (err) {
             console.error('Error in onFilesUploaded:', err);
@@ -147,15 +139,12 @@ export function FileUpload({
       // Reset the input value so the same file can be selected again if needed
       e.target.value = '';
     } else {
-      console.log('No files selected');
     }
   };
 
   const handleBrowseClick = () => {
     // Programmatically click the hidden file input
-    console.log('Browse button clicked');
     if (fileInputRef.current) {
-      console.log('File input ref exists, clicking it');
       fileInputRef.current.click();
     } else {
       console.error('File input ref is null');
@@ -165,7 +154,6 @@ export function FileUpload({
 
   // New function to validate files and return only valid ones
   const validateFiles = (files: File[]): File[] => {
-    console.log('Validating files:', files.map(f => f.name));
     
     // Validate file types
     const invalidFiles = files.filter(file => {
@@ -186,20 +174,16 @@ export function FileUpload({
     }
 
     // Return valid files (don't set state here as it's now done in the caller)
-    console.log('Valid files:', files.map(f => f.name));
     return files;
   };
 
   // Add a useEffect to log when the component mounts
   React.useEffect(() => {
-    console.log('FileUpload component mounted');
-    console.log('fileInputRef exists:', !!fileInputRef.current);
     
     // Check if we're in development mode
     const isDev = process.env.NODE_ENV === 'development' || 
                  window.location.hostname === 'localhost' || 
                  window.location.hostname === '127.0.0.1';
-    console.log('Development mode:', isDev);
   }, []);
 
   return (
@@ -237,7 +221,6 @@ export function FileUpload({
           onDrop={handleDrop}
           onClick={(e) => {
             // Fallback click handler in case the label doesn't trigger the file input
-            console.log('Box clicked, triggering handleBrowseClick as fallback');
             e.preventDefault();
             handleBrowseClick();
           }}
@@ -336,14 +319,12 @@ export function FileUpload({
         size="small" 
         sx={{ mt: 2, display: 'block' }}
         onClick={() => {
-          console.log('Debug button clicked');
           // Create a sample file for testing
           const sampleFile = new File(
             ['Sample content for testing'], 
             'sample.txt', 
             { type: 'text/plain' }
           );
-          console.log('Calling onFilesUploaded with sample transaction');
           onFilesUploaded([sampleFile]);
         }}
       >

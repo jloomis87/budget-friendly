@@ -30,7 +30,6 @@ export function DashboardCard({
       if (description && 
           description.trim().toLowerCase() === transaction.description.trim().toLowerCase() &&
           icon !== undefined) {
-        console.log(`[DashboardCard] Updating icon for "${description}" to "${icon}"`);
         setCurrentIcon(icon);
         
         // Add animation
@@ -52,11 +51,9 @@ export function DashboardCard({
       
       // If the event has a description and it matches our transaction, update from event
       if (eventDescription && eventDescription === normalizedDescription && event.detail.icon) {
-        console.log(`[DashboardCard] Force refresh match from event for "${normalizedDescription}": ${event.detail.icon}`);
         setCurrentIcon(event.detail.icon);
       } else if (transaction.icon !== currentIcon) {
         // Otherwise fallback to transaction data
-        console.log(`[DashboardCard] Force refresh updating from transaction prop: ${transaction.icon}`);
         setCurrentIcon(transaction.icon);
       }
       

@@ -128,7 +128,7 @@ export function BudgetActions({ title = "Insights and Planning", onPreferencesCh
       if (!user || !currentBudgetId) return;
 
       try {
-        console.log(`[BudgetActions] Loading preferences for budget: ${currentBudgetId}`);
+    
         
         // First check if budget-specific preferences exist
         const budgetPrefsRef = doc(db, 'users', user.id, 'budgets', currentBudgetId);
@@ -136,7 +136,7 @@ export function BudgetActions({ title = "Insights and Planning", onPreferencesCh
         
         if (budgetDoc.exists() && budgetDoc.data()?.preferences) {
           // Budget has its own preferences
-          console.log('[BudgetActions] Found budget-specific preferences');
+       
           const savedPreferences = budgetDoc.data().preferences;
           setPreferences(savedPreferences);
           setTempPreferences(savedPreferences);
@@ -144,7 +144,7 @@ export function BudgetActions({ title = "Insights and Planning", onPreferencesCh
         }
         
         // Check for global preferences as fallback (for backward compatibility)
-        console.log('[BudgetActions] No budget-specific preferences, checking global preferences');
+     
         const userDocRef = doc(db, 'users', user.id);
         const userDoc = await getDoc(userDocRef);
         
@@ -157,7 +157,7 @@ export function BudgetActions({ title = "Insights and Planning", onPreferencesCh
             budgetId: currentBudgetId
           };
           
-          console.log('[BudgetActions] Found global preferences, migrating to budget-specific');
+       
           setPreferences(prefsWithBudgetId);
           setTempPreferences(prefsWithBudgetId);
           
@@ -169,7 +169,7 @@ export function BudgetActions({ title = "Insights and Planning", onPreferencesCh
         }
 
         // If no preferences found anywhere, use default with current budget categories
-        console.log('[BudgetActions] No preferences found, using defaults based on current categories');
+      
         
         // Initialize preferences based on current categories
         const categoryPrefs: Record<string, { name: string, color: string, icon: string }> = {};
@@ -287,7 +287,7 @@ export function BudgetActions({ title = "Insights and Planning", onPreferencesCh
         preferences: prefsToSave
       });
 
-      console.log(`[BudgetActions] Saved preferences for budget: ${currentBudgetId}`);
+    
 
       // Update local state
       setPreferences(prefsToSave);
@@ -311,8 +311,7 @@ export function BudgetActions({ title = "Insights and Planning", onPreferencesCh
             percentage: tempPreferences.ratios[cat.id] || 0
           }));
           
-        console.log('[BudgetActions] Updating category percentages:', categoryUpdates);
-        
+     
         // Use updateCategory from the CategoryContext
         // Don't use direct function calls inside loops to avoid race conditions
         for (const update of categoryUpdates) {

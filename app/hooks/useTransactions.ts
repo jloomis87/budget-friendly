@@ -51,19 +51,8 @@ export function useTransactions(initialBudgetId?: string) {
 
   // Update currentBudgetId when initialBudgetId changes
   useEffect(() => {
-    console.log('[useTransactions] Budget ID change detected:', {
-      currentBudgetId,
-      initialBudgetId,
-      hasExistingTransactions: transactions.length > 0
-    });
-
     // Only update if initialBudgetId is defined and different from currentBudgetId
     if (initialBudgetId && initialBudgetId !== currentBudgetId) {
-      console.log('[useTransactions] Budget ID changed:', {
-        from: currentBudgetId,
-        to: initialBudgetId
-      });
-      
       // Immediately clear all data when budget changes
       setTransactions([]);
       setBudgetSummary(null);
@@ -186,7 +175,6 @@ export function useTransactions(initialBudgetId?: string) {
       
       // If authenticated, save to Firestore
       if (isAuthenticated && user?.id) {
-        console.log('Saving to Firestore for user:', user.id);
         transactionId = await transactionService.addTransaction(user.id, newTransaction, currentBudgetId);
         newTransaction.id = transactionId;
         
@@ -254,25 +242,13 @@ export function useTransactions(initialBudgetId?: string) {
     const loadTransactions = async () => {
       // Skip if missing requirements
       if (!isAuthenticated || !user?.id || !currentBudgetId) {
-        console.log('[useTransactions] Skipping transaction load due to missing requirements:', {
-          isAuthenticated,
-          userId: user?.id,
-          currentBudgetId
-        });
         return;
       }
 
       // Skip if already loading
       if (isLoading) {
-        console.log('[useTransactions] Skipping load - already loading');
         return;
       }
-
-      console.log('[useTransactions] Loading transactions for budget:', {
-        userId: user.id,
-        currentBudgetId,
-        isAuthenticated
-      });
       
       try {
         setIsLoading(true);
@@ -304,7 +280,6 @@ export function useTransactions(initialBudgetId?: string) {
             setShouldReload(false);
           }
         });
-       
       } catch (error) {
         console.error('[useTransactions] Error loading transactions:', error);
         ReactDOM.unstable_batchedUpdates(() => {
@@ -467,8 +442,6 @@ export function useTransactions(initialBudgetId?: string) {
     // If the transaction exists, update it
     if (index !== -1) {
       updateTransaction(index, updates);
-    } else {
-      console.warn(`Transaction with description "${description}" not found`);
     }
   }, [transactions, updateTransaction]);
 
@@ -784,15 +757,11 @@ export function useTransactions(initialBudgetId?: string) {
   // Update all transactions with the same name to have the same icon
   const updateAllTransactionsWithSameName = useCallback(async (description: string, icon: string, excludeId?: string) => {
     if (!description) {
-      console.log('[DEBUG] updateAllTransactionsWithSameName called with empty description');
       return;
     }
     
     // Ensure icon is never undefined - always use empty string as fallback
     const safeIcon = icon || '';
-    
-    console.log(`[DEBUG] Starting updateAllTransactionsWithSameName for "${description}" with icon "${safeIcon}"`);
-    console.log(`[DEBUG] Total transactions before filtering: ${transactions.length}`);
     
     const normalizedDescription = description.trim().toLowerCase();
     const transactionsToUpdate: { index: number, transaction: Transaction }[] = [];
@@ -800,42 +769,21 @@ export function useTransactions(initialBudgetId?: string) {
     // Find all transactions with the same description
     transactions.forEach((transaction, index) => {
       if (excludeId && transaction.id === excludeId) {
-        console.log(`[DEBUG] Skipping transaction with excludeId: ${excludeId}`);
         return;
       }
       
       const transactionDescription = transaction.description.trim().toLowerCase();
       
-      console.log(`[DEBUG] Checking transaction: "${transactionDescription}" against "${normalizedDescription}"`);
-      console.log(`[DEBUG] Current icon: "${transaction.icon}", New icon: "${safeIcon}"`);
-      
       if (transactionDescription === normalizedDescription) {
-        console.log(`[DEBUG] Found matching description`);
-        
         if (transaction.icon !== safeIcon) {
-          console.log(`[DEBUG] Icons differ, will update`);
           transactionsToUpdate.push({ index, transaction });
-        } else {
-          console.log(`[DEBUG] Icons are the same, skipping update`);
         }
       }
     });
     
-    console.log(`[DEBUG] Found ${transactionsToUpdate.length} transactions with name "${description}" to update icon`);
-    
     if (transactionsToUpdate.length === 0) {
-      console.log(`[DEBUG] No transactions to update for "${description}"`);
       return 0;
     }
-    
-    // Print detailed info about transactions to be updated
-    console.log('[DEBUG] Transactions to update:', transactionsToUpdate.map(({ transaction }) => ({
-      id: transaction.id,
-      description: transaction.description,
-      category: transaction.category,
-      icon: transaction.icon,
-      newIcon: safeIcon
-    })));
     
     // Create a deep copy of transactions to ensure state changes properly reflect in UI
     const updatedTransactions = [...transactions];
@@ -846,21 +794,16 @@ export function useTransactions(initialBudgetId?: string) {
         ...transaction,
         icon: safeIcon
       };
-      console.log(`[DEBUG] Updated transaction at index ${index} in local state`);
     });
     
     // Force a state update immediately to refresh the UI with the new icons
-    console.log('[DEBUG] Setting transactions state with updated icons');
     setTransactions([...updatedTransactions]);
     
     // For synchronized updates that include Firestore/database updates, process in parallel
     try {
-      console.log('[DEBUG] Starting database updates for matching transactions');
-      
       const updatePromises = transactionsToUpdate.map(async ({ index, transaction }) => {
         // Return a promise for the database update
         if (isAuthenticated && user?.id && transaction.id && currentBudgetId) {
-          console.log(`[DEBUG] Updating transaction in Firestore: ${transaction.id}`);
           return transactionService.updateTransaction(
             transaction.id, 
             { icon: safeIcon }, 
@@ -868,61 +811,50 @@ export function useTransactions(initialBudgetId?: string) {
             currentBudgetId
           );
         }
-        console.log('[DEBUG] Skipping database update - not authenticated or missing ID');
         return Promise.resolve();
       });
       
       // Wait for all database updates to complete
       await Promise.all(updatePromises);
-      console.log('[DEBUG] All database updates completed');
       
       // After database updates, trigger another state refresh for good measure
-      console.log('[DEBUG] Refreshing state after database updates');
       setTransactions(prev => [...prev]);
       
       // Dispatch custom events for different components to react to the change
       const affectedCategories = [...new Set(transactionsToUpdate.map(item => item.transaction.category))];
-      console.log(`[DEBUG] Affected categories: ${JSON.stringify(affectedCategories)}`);
       
       affectedCategories.forEach(category => {
         // Dispatch events for each affected category
         if (category) {
           try {
-            console.log(`[DEBUG] Dispatching events for category ${category}`);
-            
             // First event for TransactionTable
             const event1 = new CustomEvent('transactionIconsUpdated', {
               detail: { category, icon: safeIcon, description }
             });
             document.dispatchEvent(event1);
-            console.log(`[DEBUG] Dispatched transactionIconsUpdated event`);
             
             // Second event for general UI refresh
             const event2 = new CustomEvent('forceTransactionRefresh', {
               detail: { category, icon: safeIcon, description, timestamp: Date.now() }
             });
             document.dispatchEvent(event2);
-            console.log(`[DEBUG] Dispatched forceTransactionRefresh event`);
-            
-            console.log(`[DEBUG] Dispatched refresh events for category ${category}`);
           } catch (error) {
-            console.error(`[DEBUG] Error dispatching events for category ${category}:`, error);
+            console.error(`Error dispatching events for category ${category}:`, error);
           }
         }
       });
       
       return transactionsToUpdate.length;
     } catch (error) {
-      console.error('[DEBUG] Error updating transactions with same name:', error);
+      console.error('Error updating transactions with same name:', error);
       // Still dispatch events even if there was an error with some updates
       try {
         const refreshEvent = new CustomEvent('transactionIconsUpdated', {
           detail: { category: 'all', icon: safeIcon, description, timestamp: Date.now() }
         });
         document.dispatchEvent(refreshEvent);
-        console.log('[DEBUG] Dispatched fallback event after error');
       } catch (e) {
-        console.error('[DEBUG] Error dispatching fallback event:', e);
+        console.error('Error dispatching fallback event:', e);
       }
       return undefined;
     }

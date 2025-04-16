@@ -184,10 +184,9 @@ export const TransactionTableContent: React.FC = () => {
       // Cast the event to CustomEvent with the correct type
       const customEvent = event as CustomEvent<{category: string, icon: string}>;
       const { category: updatedCategory, icon } = customEvent.detail;
-      
+
       // Only proceed if this is our category
       if (updatedCategory === category && props.onUpdateAllTransactionsWithSameName) {
-        console.log(`Caught categoryIconUpdated event for ${updatedCategory} with icon ${icon}`);
         
         // Filter transactions to find all that belong to this category
         const categoryTransactions = transactions.filter(t => t.category === category);
@@ -348,31 +347,19 @@ export const TransactionTableContent: React.FC = () => {
     if (isOverCopyZone) {
       setIsCopyMode(true);
       e.dataTransfer.dropEffect = 'copy';
-      console.log("Over Copy Zone: Setting copy mode");
     } else if (isOverMoveZone) {
       setIsCopyMode(false);
       e.dataTransfer.dropEffect = 'move';
-      console.log("Over Move Zone: Setting move mode");
     } else {
       // For regular areas, default to move mode
       setIsCopyMode(false);
       e.dataTransfer.dropEffect = 'move';
-      console.log("Over Regular Area: Setting move mode");
     }
 
     // Update drag over state
     setDragOverMonth(targetMonth);
     setDragOverIndex(targetIndex);
     setIsIntraMonthDrag(dragSourceMonth === targetMonth);
-
-    console.log("Drag State Updated:", {
-      targetMonth,
-      targetIndex,
-      isOverCopyZone,
-      isOverMoveZone,
-      isCopyMode: isOverCopyZone,
-      dropEffect: e.dataTransfer.dropEffect
-    });
   };
   
   const handleMonthDragOver = (e: React.DragEvent, targetMonth: string) => {
@@ -396,13 +383,6 @@ export const TransactionTableContent: React.FC = () => {
       window.clearTimeout(dragLeaveTimeout);
       setDragLeaveTimeout(null);
     }
-
-    console.log("Month Drag Over:", {
-      targetMonth,
-      dragOverIndex,
-      isCopyMode,
-      dropEffect: e.dataTransfer.dropEffect
-    });
   };
   
   const handleMonthDragLeave = (e: React.DragEvent) => {
@@ -420,23 +400,8 @@ export const TransactionTableContent: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     
-    console.log("Transaction Drop", {
-      targetMonth,
-      targetIndex,
-      draggedTransaction,
-      draggedIndex,
-      dragSourceMonth,
-      isCopyMode,
-      state: {
-        dragOverMonth,
-        dragOverIndex,
-        isIntraMonthDrag
-      }
-    });
-    
     // Only process if we have a dragged transaction
     if (!draggedTransaction || draggedIndex === null || !dragSourceMonth) {
-      console.log("Drop aborted: Missing required drag state");
       resetDragState();
       return;
     }
@@ -445,13 +410,6 @@ export const TransactionTableContent: React.FC = () => {
       // Check if we're dropping on the copy zone (-888) or move zone (-999)
       const isDropOnCopyZone = targetIndex === -888;
       const isDropOnMoveZone = targetIndex === -999;
-      
-      console.log("Drop Zone Check:", {
-        isDropOnCopyZone,
-        isDropOnMoveZone,
-        targetIndex,
-        isCopyMode
-      });
 
       // Get transactions for the target month
       const targetMonthTransactions = props.allTransactions.filter(t => {
@@ -468,7 +426,6 @@ export const TransactionTableContent: React.FC = () => {
       );
 
       if (isDuplicate) {
-        console.log("Duplicate transaction found - drop prevented");
         showNotification('Cannot create duplicate transaction in the same month', 'error');
         resetDragState();
         return;
@@ -476,7 +433,6 @@ export const TransactionTableContent: React.FC = () => {
       
       // Handle copy operations - either explicit copy zone or copy mode
       if (isDropOnCopyZone || (isCopyMode && !isDropOnMoveZone)) {
-        console.log("Copying transaction (Copy Zone Drop)");
         
         // Update the date to the target month while preserving the year and day
         const currentDate = new Date(draggedTransaction.date);
@@ -502,13 +458,6 @@ export const TransactionTableContent: React.FC = () => {
           transactionCopy.icon = draggedTransaction.icon;
         }
         
-        console.log("Adding copied transaction:", {
-          original: draggedTransaction,
-          copy: transactionCopy,
-          targetMonth,
-          targetMonthIndex
-        });
-        
         // Add the transaction to the target month
         props.onAddTransaction(transactionCopy);
         
@@ -522,7 +471,6 @@ export const TransactionTableContent: React.FC = () => {
       
       // Handle move operations - either move zone or regular move
       if (isDropOnMoveZone || (!isCopyMode && !isDropOnCopyZone)) {
-        console.log("Moving transaction (Move Zone Drop)");
         // Update the date to the target month
         const date = new Date(draggedTransaction.date);
         const targetMonthIndex = new Date(`${targetMonth} 1`).getMonth();
@@ -578,18 +526,8 @@ export const TransactionTableContent: React.FC = () => {
     
     // Don't handle if we're over the copy zone
     if (dragOverIndex === -888) {
-      console.log("Month Drop - Ignoring due to copy zone");
       return;
     }
-    
-    console.log("Month Drop", {
-      targetMonth,
-      draggedTransaction,
-      draggedIndex,
-      dragSourceMonth,
-      isCopyMode,
-      dragOverIndex
-    });
     
     // Only process if we have a dragged transaction
     if (draggedTransaction && draggedIndex !== null && dragSourceMonth) {
@@ -614,7 +552,6 @@ export const TransactionTableContent: React.FC = () => {
       );
 
       if (isDuplicate) {
-        console.log("Duplicate transaction found - drop prevented");
         showNotification('Cannot create duplicate transaction in the same month', 'error');
         resetDragState();
         return;
@@ -627,7 +564,6 @@ export const TransactionTableContent: React.FC = () => {
       
       // Determine if this is a copy operation based on copy mode
       if (isCopyMode) {
-        console.log('Copy operation via month drop');
         // Create a clean transaction object for copying
         const transactionCopy: Transaction = {
           description: draggedTransaction.description,
@@ -688,7 +624,6 @@ export const TransactionTableContent: React.FC = () => {
   };
   
   const handleDragEnd = (e: React.DragEvent) => {
-    console.log("Drag End, resetting copy mode");
     // Reset drag state completely
     resetDragState();
   };
@@ -701,8 +636,6 @@ export const TransactionTableContent: React.FC = () => {
       
       // Only proceed if this is our category
       if (updatedCategory === category) {
-        console.log(`TransactionTable caught transactionIconsUpdated event for ${updatedCategory}`);
-        
         // Force a refresh of the component using the context's forceRefresh function
         context.forceRefresh();
         

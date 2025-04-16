@@ -79,7 +79,7 @@ export function Dashboard() {
   
   // Handle card click - we could show a detailed view or edit screen
   const handleCardClick = (transaction: Transaction) => {
-    console.log('Card clicked:', transaction);
+   
     // Implement click handler as needed
   };
   
@@ -93,39 +93,32 @@ export function Dashboard() {
       let actualIcon = icon;
       let description = '';
       
-      console.log(`[DEBUG] updateAllTransactionsWithIcon called with:`, { category, icon });
+     
       
       // If the icon contains a pipe character, split it to get the description
       if (icon.includes('|')) {
         const parts = icon.split('|');
         actualIcon = parts[0];
         description = parts[1];
-        console.log(`[DEBUG] Parsed icon string: icon="${actualIcon}", description="${description}"`);
+      
       }
       
       if (!description) {
-        console.log(`[DEBUG] No global update performed - description is required`);
+      
         return;
       }
       
-      console.log(`[DEBUG] Updating all transactions with description "${description}" to have icon "${actualIcon}"`);
+    
       
       // This is the improved approach - use the hook's built-in function to update all transactions
       // with the same name at once, rather than doing individual updates
       try {
         // Use the dedicated hook function that's designed to update all matching transactions at once
         if (updateAllTransactionsWithSameName) {
-          console.log(`[DEBUG] Calling updateAllTransactionsWithSameName("${description}", "${actualIcon}")`);
-          
-          // Print information about all transactions to help debugging
-          console.log(`[DEBUG] Current transactions:`, transactions.map(t => ({
-            description: t.description.trim().toLowerCase(),
-            category: t.category,
-            icon: t.icon
-          })));
+        
           
           const count = await updateAllTransactionsWithSameName(description, actualIcon);
-          console.log(`[DEBUG] Updated ${count || 0} transactions with icon "${actualIcon}"`);
+       
           return;
         } else {
           console.error("[DEBUG] updateAllTransactionsWithSameName function not available");

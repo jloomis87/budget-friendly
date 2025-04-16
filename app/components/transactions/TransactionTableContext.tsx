@@ -331,7 +331,6 @@ export const TransactionTableProvider = ({
         
         // Then use the specialized function to update all transactions with the same name
         if (props.onUpdateAllTransactionsWithSameName) {
-          console.log(`Updating all transactions with description "${editingRow.description}" to have icon "${editingRow.icon}"`);
           props.onUpdateAllTransactionsWithSameName(editingRow.description, editingRow.icon, mobileEditTransaction.transaction.id);
         } else {
           // Fallback to the old method if the specialized function is not available
@@ -374,7 +373,6 @@ export const TransactionTableProvider = ({
     if (existingTransactionsWithSameName.length > 0 && existingTransactionsWithSameName[0].icon) {
       // Use the icon from existing transactions
       iconToUse = existingTransactionsWithSameName[0].icon;
-      console.log(`Using existing icon ${iconToUse} for transaction with description "${newDescription}"`);
     }
 
     const transaction: Transaction = {
@@ -401,7 +399,6 @@ export const TransactionTableProvider = ({
       
       // Update each transaction with the same description to have the same icon
       if (indicesToUpdate.length > 0) {
-        console.log(`Updating ${indicesToUpdate.length} transactions with description "${newDescription}" to have icon "${iconToUse}"`);
         
         indicesToUpdate.forEach(idx => {
           props.onUpdateTransaction(idx, { icon: iconToUse });
@@ -622,7 +619,6 @@ export const TransactionTableProvider = ({
       
       // Only proceed if this is our category
       if (updatedCategory === category) {
-        console.log(`TransactionTableContext caught transactionIconsUpdated event for ${updatedCategory}`);
         // Force re-render to update icons in the UI
         forceRefresh();
       }

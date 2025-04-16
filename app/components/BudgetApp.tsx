@@ -261,8 +261,7 @@ const BudgetSelector: React.FC<{
         return;
       }
 
-      console.log('[BudgetSelector] Deleting budget:', selectedBudget);
-      
+     
       // Delete all transactions for this budget
       const transactionsRef = collection(db, 'users', user.id, 'budgets', selectedBudget, 'transactions');
       const transactionsSnapshot = await getDocs(transactionsRef);
@@ -319,7 +318,7 @@ const BudgetSelector: React.FC<{
     const loadBudgets = async () => {
       if (user) {
         try {
-          console.log('[BudgetSelector] Loading budgets for user:', user.id);
+      
           const budgetsCollectionRef = collection(db, 'users', user.id, 'budgets');
           const budgetsSnapshot = await getDocs(budgetsCollectionRef);
           
@@ -341,7 +340,7 @@ const BudgetSelector: React.FC<{
               new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
             );
             
-            console.log('[BudgetSelector] Loaded budgets:', sortedBudgets);
+          
             setBudgets(sortedBudgets);
             
             // Set current budget to the last selected budget if it exists, otherwise use the first one
@@ -349,12 +348,12 @@ const BudgetSelector: React.FC<{
               ? lastSelectedBudget
               : sortedBudgets[0].id;
               
-            console.log('[BudgetSelector] Setting current budget to:', budgetToSelect);
+           
             setCurrentBudget(budgetToSelect);
             setCurrentBudgetId(budgetToSelect);
           } else {
             // If no budgets exist, create a default one
-            console.log('[BudgetSelector] No budgets found, creating default budget');
+          
             const defaultBudget = { 
               name: 'Main Budget',
               createdAt: new Date().toISOString()
@@ -363,7 +362,7 @@ const BudgetSelector: React.FC<{
               collection(db, 'users', user.id, 'budgets'), 
               defaultBudget
             );
-            console.log('[BudgetSelector] Created default budget with ID:', docRef.id);
+          
             setBudgets([{ id: docRef.id, name: defaultBudget.name, createdAt: defaultBudget.createdAt }]);
             setCurrentBudget(docRef.id);
             setCurrentBudgetId(docRef.id);
@@ -386,7 +385,7 @@ const BudgetSelector: React.FC<{
   const handleAddBudget = async () => {
     if (newBudgetName.trim() && user) {
       try {
-        console.log('[BudgetSelector] Creating new budget:', newBudgetName);
+
         const createdAt = new Date().toISOString();
         // Create a new budget document in Firebase
         const newBudgetRef = await addDoc(
@@ -402,7 +401,7 @@ const BudgetSelector: React.FC<{
         const transactionsCollectionRef = collection(db, 'users', user.id, 'budgets', newBudgetRef.id, 'transactions');
         // We don't need to add any documents, just ensuring the collection path exists
         
-        console.log('[BudgetSelector] Created new budget with empty transactions collection:', newBudgetRef.id);
+   
         
         const newBudget = {
           id: newBudgetRef.id,
@@ -415,7 +414,7 @@ const BudgetSelector: React.FC<{
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
         
-        console.log('[BudgetSelector] Created new budget:', newBudget);
+       
         setBudgets(updatedBudgets);
         setCurrentBudget(newBudget.id);
         setCurrentBudgetId(newBudget.id);
@@ -434,7 +433,7 @@ const BudgetSelector: React.FC<{
   };
 
   const handleBudgetChange = async (budgetId: string) => {
-    console.log('[BudgetSelector] Switching to budget:', budgetId);
+
     setCurrentBudget(budgetId);
     setCurrentBudgetId(budgetId);
     
@@ -456,11 +455,7 @@ const BudgetSelector: React.FC<{
     if (!user || !editName.trim()) return;
     
     try {
-      console.log('[BudgetSelector] Updating budget name:', {
-        budgetId,
-        newName: editName
-      });
-      
+     
       // Update the budget document
       await updateDoc(doc(db, 'users', user.id, 'budgets', budgetId), {
         name: editName.trim()
@@ -843,7 +838,7 @@ const BudgetAppContent: React.FC = () => {
     const loadInitialBudget = async () => {
       if (user) {
         try {
-          console.log('[BudgetAppContent] Loading initial budget for user:', user.id);
+        
           const budgetsCollectionRef = collection(db, 'users', user.id, 'budgets');
           const budgetsSnapshot = await getDocs(budgetsCollectionRef);
           
@@ -861,14 +856,14 @@ const BudgetAppContent: React.FC = () => {
               budgetId = budgetsSnapshot.docs[0].id;
             }
             
-            console.log('[BudgetAppContent] Setting initial budget ID to:', budgetId);
+       
             setInitialBudgetId(budgetId);
             
             // Initialize category context with budget ID right away
             setCategoriesBudgetId(budgetId);
           } else {
             // If no budgets exist, create a default one
-            console.log('[BudgetAppContent] No budgets found, creating default budget');
+          
             const defaultBudget = { 
               name: 'Main Budget',
               createdAt: new Date().toISOString()
@@ -877,7 +872,7 @@ const BudgetAppContent: React.FC = () => {
               collection(db, 'users', user.id, 'budgets'), 
               defaultBudget
             );
-            console.log('[BudgetAppContent] Created default budget with ID:', docRef.id);
+           
             setInitialBudgetId(docRef.id);
             
             // Initialize category context with budget ID right away
@@ -1317,7 +1312,7 @@ const BudgetAppContent: React.FC = () => {
         Math.abs(budgetPlan.recommended.savings - expectedSavings) > 0.01;
       
       if (needsUpdate) {
-        console.log('[BudgetApp] Budget plan does not match preferences, triggering update');
+     
         // Dispatch event to trigger a recalculation
         const event = new CustomEvent('budgetPreferencesChanged', { 
           detail: { preferences } 
@@ -2369,11 +2364,11 @@ export default function BudgetApp() {
         const categoryTransactions = transactions.filter(t => t.category === category);
         
         if (categoryTransactions.length === 0) {
-          console.log(`No transactions found in category ${category}`);
+        
           return;
         }
         
-        console.log(`Updating icons for all transactions in category ${category} to ${icon}`);
+     
         
         // For each transaction in the category, update all with the same description
         const updatePromises = categoryTransactions.map(transaction => {
@@ -2382,7 +2377,7 @@ export default function BudgetApp() {
         
         // Wait for all updates to complete
         await Promise.all(updatePromises);
-        console.log(`Icon updates completed for category ${category}`);
+    
         
         // Dispatch a custom event to force UI refreshes
         const refreshEvent = new CustomEvent('transactionIconsUpdated', {
@@ -2404,7 +2399,7 @@ export default function BudgetApp() {
   useEffect(() => {
     // Wait for component to fully mount and transactions to load
     const timer = setTimeout(() => {
-      console.log('Triggering initial icon refresh for all transactions');
+    
       // Dispatch a forceTransactionRefresh event to sync all cards
       const refreshEvent = new CustomEvent('forceTransactionRefresh', {
         detail: { 
