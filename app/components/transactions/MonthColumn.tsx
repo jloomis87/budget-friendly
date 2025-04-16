@@ -36,7 +36,8 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
   handleCopyToAllMonths,
   getNextMonth,
   getMonthOrder,
-  tableColors = {}
+  tableColors = {},
+  handleDeleteTransaction
 }) => {
   const [isCopyModeState, setIsCopyMode] = React.useState(isCopyMode);
   
@@ -348,6 +349,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
             handleDragEnd={handleDragEnd}
             handleOpenMobileEdit={handleOpenMobileEdit}
             handleCopyToAllMonths={handleCopyToAllMonths}
+            handleDeleteTransaction={handleDeleteTransaction}
           />
         ))}
 

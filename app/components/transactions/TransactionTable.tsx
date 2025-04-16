@@ -766,6 +766,22 @@ export const TransactionTableContent: React.FC = () => {
     }
   };
 
+  // Add a function to handle transaction deletion directly from the card
+  const handleDeleteTransaction = (transaction: Transaction, index: number) => {
+    // Find the global index of the transaction to remove
+    const globalIndex = utils.findGlobalIndex(transaction, props.allTransactions);
+    
+    if (globalIndex !== -1) {
+      // Delete the transaction
+      props.onDeleteTransaction(globalIndex);
+      
+      // Show a notification
+      showNotification(`Deleted "${transaction.description}"`, 'success');
+    } else {
+      showNotification('Error: Could not find transaction to delete', 'error');
+    }
+  };
+
   // Define more reusable styles
   const tableStyles = {
     width: '100%',
@@ -913,6 +929,7 @@ export const TransactionTableContent: React.FC = () => {
                 handleOpenMobileAdd={handleOpenMobileAdd}
                 handleCopyMonthClick={handleCopyMonthClick}
                 handleCopyToAllMonths={handleCopyToAllMonths}
+                handleDeleteTransaction={handleDeleteTransaction}
                 getNextMonth={getNextMonth}
                 getMonthOrder={getMonthOrder}
                 tableColors={tableColors}

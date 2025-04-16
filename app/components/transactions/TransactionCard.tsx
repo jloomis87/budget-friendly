@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Card, Typography, Box, IconButton, Tooltip } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import DeleteIcon from '@mui/icons-material/Delete';
 import type { TransactionCardProps } from './types';
 import { isColorDark } from '../../utils/colorUtils';
 
@@ -132,7 +133,8 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
   handleTransactionDrop,
   handleDragEnd,
   handleOpenMobileEdit,
-  handleCopyToAllMonths
+  handleCopyToAllMonths,
+  handleDeleteTransaction
 }) => {
   // Use state to track the current icon to allow for reactive updates
   const [currentIcon, setCurrentIcon] = useState(transaction.icon || '');
@@ -217,10 +219,10 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
   const textColor = cardIsDark ? '#ffffff' : '#000000';
   const textColorWithOpacity = cardIsDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)';
 
-  // Function to handle card click without triggering when clicking the copy button
+  // Function to handle card click without triggering when clicking action buttons
   const handleCardClick = (e: React.MouseEvent) => {
-    // Don't trigger edit if clicking on the copy button
-    if ((e.target as HTMLElement).closest('.copy-to-all-months-btn')) {
+    // Don't trigger edit if clicking on the action buttons
+    if ((e.target as HTMLElement).closest('.action-button')) {
       return;
     }
     handleOpenMobileEdit(transaction, index);
@@ -367,12 +369,37 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
           {transaction.description}
         </Typography>
         
-        {/* Copy to all months button - moved to top right */}
-        {handleCopyToAllMonths && (
-          <Box sx={{ marginLeft: 'auto' }}>
+        {/* Action buttons container */}
+        <Box sx={{ marginLeft: 'auto', display: 'flex', gap: 0.5 }}>
+          {/* Delete transaction button */}
+          {handleDeleteTransaction && (
+            <Tooltip title="Delete transaction">
+              <IconButton
+                className="action-button delete-transaction-btn"
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteTransaction(transaction, index);
+                }}
+                sx={{
+                  padding: '2px',
+                  color: 'rgba(211, 47, 47, 0.7)', // Red color for delete
+                  '&:hover': {
+                    color: 'rgba(211, 47, 47, 0.9)',
+                    backgroundColor: 'rgba(211, 47, 47, 0.1)',
+                  },
+                }}
+              >
+                <DeleteIcon sx={{ fontSize: '0.9rem' }} />
+              </IconButton>
+            </Tooltip>
+          )}
+          
+          {/* Copy to all months button */}
+          {handleCopyToAllMonths && (
             <Tooltip title="Copy to all months">
               <IconButton
-                className="copy-to-all-months-btn"
+                className="action-button copy-to-all-months-btn"
                 size="small"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -390,8 +417,8 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
                 <ContentCopyIcon sx={{ fontSize: '0.9rem' }} />
               </IconButton>
             </Tooltip>
-          </Box>
-        )}
+          )}
+        </Box>
       </Box>
       
       {/* Bottom row with date and amount */}
@@ -421,7 +448,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
           })}
         </Typography>
         
-        {/* Amount only, copy button moved to top row */}
+        {/* Amount */}
         <Typography 
           variant="body2"
           sx={{ 
