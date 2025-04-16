@@ -769,10 +769,8 @@ export const TransactionTableContent: React.FC = () => {
                 (props.category === 'Income' ? 'rgba(0, 0, 0, 0.7)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)')),
               // Make it slightly more opaque for better visibility
               borderRadius: '4px',
-              // Create a subtle highlight background
-              backgroundColor: hasCustomColor ? 
-                (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)') : 
-                (props.category === 'Income' ? 'rgba(0, 0, 0, 0.03)' : (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)')),
+              // Transparent background
+              backgroundColor: 'transparent',
               // Show only when expanded
               opacity: isExpanded ? 1 : 0,
               visibility: isExpanded ? 'visible' : 'hidden',
