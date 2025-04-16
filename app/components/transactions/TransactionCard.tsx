@@ -310,7 +310,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
       <Box sx={{
         display: 'flex',
         alignItems: 'center',
-        gap: 0.5
+        gap: 0.5, // Add padding top of 3px
       }}>
         {currentIcon && (
           <Box 
@@ -334,6 +334,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
         <Typography 
           variant="subtitle1"
           sx={{ 
+            paddingTop: '3px',
             color: textColor,
             fontWeight: 500,
             overflow: 'hidden',
