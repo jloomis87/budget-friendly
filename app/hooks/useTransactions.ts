@@ -764,6 +764,33 @@ export function useTransactions(initialBudgetId?: string) {
     currentBudgetId  // Add currentBudgetId dependency
   ]);
 
+  // Update all transactions with the same name to have the same icon
+  const updateAllTransactionsWithSameName = useCallback(async (description: string, icon: string, excludeId?: string) => {
+    if (!description) return;
+    
+    const normalizedDescription = description.trim().toLowerCase();
+    const transactionsToUpdate: { index: number, transaction: Transaction }[] = [];
+    
+    // Find all transactions with the same description
+    transactions.forEach((transaction, index) => {
+      if (excludeId && transaction.id === excludeId) return;
+      
+      const transactionDescription = transaction.description.trim().toLowerCase();
+      if (transactionDescription === normalizedDescription && transaction.icon !== icon) {
+        transactionsToUpdate.push({ index, transaction });
+      }
+    });
+    
+    console.log(`Found ${transactionsToUpdate.length} transactions with name "${description}" to update icon`);
+    
+    // Update each transaction
+    for (const { index, transaction } of transactionsToUpdate) {
+      await updateTransaction(index, { icon });
+    }
+    
+    return transactionsToUpdate.length;
+  }, [transactions, updateTransaction]);
+
   return {
     transactions,
     budgetSummary,
@@ -783,6 +810,7 @@ export function useTransactions(initialBudgetId?: string) {
     resetTransactions,
     moveTransaction,
     reorderTransactions,
+    updateAllTransactionsWithSameName,
     budgetPreferences
   };
 } 

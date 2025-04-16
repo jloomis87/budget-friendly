@@ -13,6 +13,7 @@ export interface Transaction {
   category?: string; // Changed from enum to string to allow for custom categories
   type: 'income' | 'expense'; // Add required type field
   order?: number; // Order within the category for sorting
+  icon?: string; // Optional icon (emoji) for the transaction
 }
 
 // Initialize PDF.js worker - using a more compatible approach

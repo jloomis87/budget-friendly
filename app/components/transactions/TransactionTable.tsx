@@ -24,6 +24,7 @@ interface TransactionTableProps {
   onUpdateTransaction: (index: number, updatedTransaction: Partial<Transaction>) => void;
   onDeleteTransaction: (index: number) => void;
   onAddTransaction: (transaction: Transaction) => void;
+  onUpdateAllTransactionsWithSameName?: (description: string, icon: string, excludeId?: string) => Promise<number | undefined>;
   onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
   onDragOver?: (e: React.DragEvent, category: string) => void;
   onDrop?: (e: React.DragEvent, targetCategory: string) => void;
@@ -442,23 +443,29 @@ export const TransactionTableContent: React.FC = () => {
       if (isDropOnCopyZone || (isCopyMode && !isDropOnMoveZone)) {
         console.log("Copying transaction (Copy Zone Drop)");
         
-        // Generate a new ID for the copied transaction
-        const transactionCopy = { 
-          ...draggedTransaction, 
-          id: uuidv4(),
-          // Keep the original category and ensure date is properly set
-          category: draggedTransaction.category,
-          date: new Date(draggedTransaction.date)
-        };
-        
         // Update the date to the target month while preserving the year and day
-        const currentDate = new Date(transactionCopy.date);
+        const currentDate = new Date(draggedTransaction.date);
         const targetMonthIndex = new Date(`${targetMonth} 1`).getMonth();
-        transactionCopy.date = new Date(
+        const newDate = new Date(
           currentDate.getFullYear(),
           targetMonthIndex,
           currentDate.getDate()
         );
+        
+        // Create a clean new transaction object
+        const transactionCopy: Transaction = {
+          description: draggedTransaction.description,
+          amount: draggedTransaction.amount,
+          date: newDate,
+          category: draggedTransaction.category,
+          id: uuidv4(),
+          type: draggedTransaction.type || (draggedTransaction.amount > 0 ? 'income' : 'expense')
+        };
+        
+        // Only include icon if it exists and is not undefined
+        if (draggedTransaction.icon) {
+          transactionCopy.icon = draggedTransaction.icon;
+        }
         
         console.log("Adding copied transaction:", {
           original: draggedTransaction,
@@ -485,7 +492,21 @@ export const TransactionTableContent: React.FC = () => {
         const date = new Date(draggedTransaction.date);
         const targetMonthIndex = new Date(`${targetMonth} 1`).getMonth();
         const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
-        const transactionToMove = { ...draggedTransaction, date: newDate };
+        
+        // Create a clean transaction object for moving
+        const transactionToMove: Transaction = {
+          description: draggedTransaction.description,
+          amount: draggedTransaction.amount,
+          date: newDate,
+          category: draggedTransaction.category,
+          id: draggedTransaction.id,
+          type: draggedTransaction.type || (draggedTransaction.amount > 0 ? 'income' : 'expense')
+        };
+        
+        // Only include icon if it exists and is not undefined
+        if (draggedTransaction.icon) {
+          transactionToMove.icon = draggedTransaction.icon;
+        }
         
         // Find the global index of the transaction to remove
         const globalIndex = utils.findGlobalIndex(draggedTransaction, props.allTransactions);
@@ -564,21 +585,28 @@ export const TransactionTableContent: React.FC = () => {
         return;
       }
       
-      // Clone the transaction to avoid modifying the original
-      const transactionToMove = { ...draggedTransaction };
+      // Update the date to the target month
+      const date = new Date(draggedTransaction.date);
+      const targetMonthIndex = new Date(`${targetMonth} 1`).getMonth();
+      const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
       
       // Determine if this is a copy operation based on copy mode
       if (isCopyMode) {
         console.log('Copy operation via month drop');
-        // This is a copy operation
-        // Generate a new ID for the copied transaction
-        const transactionCopy = { ...draggedTransaction, id: uuidv4() };
+        // Create a clean transaction object for copying
+        const transactionCopy: Transaction = {
+          description: draggedTransaction.description,
+          amount: draggedTransaction.amount,
+          date: newDate,
+          category: draggedTransaction.category,
+          id: uuidv4(),
+          type: draggedTransaction.type || (draggedTransaction.amount > 0 ? 'income' : 'expense')
+        };
         
-        // Update the date to the target month
-        const date = new Date(transactionCopy.date);
-        const targetMonthIndex = new Date(`${targetMonth} 1`).getMonth();
-        const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
-        transactionCopy.date = newDate;
+        // Only include icon if it exists and is not undefined
+        if (draggedTransaction.icon) {
+          transactionCopy.icon = draggedTransaction.icon;
+        }
         
         // Add the transaction to the target month
         props.onAddTransaction(transactionCopy);
@@ -587,12 +615,20 @@ export const TransactionTableContent: React.FC = () => {
         showNotification(`Copied transaction to ${targetMonth}`, 'success');
       } else {
         // This is a move operation
+        // Create a clean transaction object for moving
+        const transactionToMove: Transaction = {
+          description: draggedTransaction.description,
+          amount: draggedTransaction.amount,
+          date: newDate,
+          category: draggedTransaction.category,
+          id: draggedTransaction.id,
+          type: draggedTransaction.type || (draggedTransaction.amount > 0 ? 'income' : 'expense')
+        };
         
-        // Update the date to the target month
-        const date = new Date(transactionToMove.date);
-        const targetMonthIndex = new Date(`${targetMonth} 1`).getMonth();
-        const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
-        transactionToMove.date = newDate;
+        // Only include icon if it exists and is not undefined
+        if (draggedTransaction.icon) {
+          transactionToMove.icon = draggedTransaction.icon;
+        }
         
         // Find the global index of the transaction to remove
         const globalIndex = utils.findGlobalIndex(draggedTransaction, props.allTransactions);

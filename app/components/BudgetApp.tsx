@@ -944,7 +944,8 @@ const BudgetAppContent: React.FC = () => {
     moveTransaction,
     reorderTransactions,
     currentBudgetId,
-    setCurrentBudgetId
+    setCurrentBudgetId,
+    updateAllTransactionsWithSameName
   } = useTransactions(initialBudgetId);
   
   // Sync the current budget ID between transactions and categories
@@ -1217,6 +1218,7 @@ const BudgetAppContent: React.FC = () => {
         onUpdateTransaction={updateTransaction}
         onDeleteTransaction={deleteTransaction}
         onAddTransaction={addTransaction}
+        onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
@@ -1254,6 +1256,7 @@ const BudgetAppContent: React.FC = () => {
             onUpdateTransaction={updateTransaction}
             onDeleteTransaction={deleteTransaction}
             onAddTransaction={addTransaction}
+            onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
@@ -1282,6 +1285,7 @@ const BudgetAppContent: React.FC = () => {
     updateTransaction, 
     deleteTransaction,
     addTransaction,
+    updateAllTransactionsWithSameName,
     getTransactionsByCategory, 
     handleDragStart, 
     handleDragOver, 

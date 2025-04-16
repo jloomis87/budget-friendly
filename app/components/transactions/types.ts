@@ -6,6 +6,7 @@ export interface EditingRow {
   amount: string;
   date: string;
   description: string;
+  icon?: string;
 }
 
 export interface EnhancedTransactionTableProps {
@@ -32,6 +33,7 @@ export interface TransactionUtilsHook {
   findGlobalIndex: (transaction: Transaction, allTransactions: Transaction[]) => number;
   getTransactionId: (transaction: Transaction) => string;
   isDuplicateTransaction: (a: Transaction, b: Transaction) => boolean;
+  updateTransactionsWithSameName: (description: string, icon: string, allTransactions: Transaction[], excludeId?: string) => number[];
 }
 
 export interface TableHeaderProps {
@@ -146,6 +148,8 @@ export interface MobileAddDialogProps {
   getOrdinalSuffix: (day: number) => string;
   tableColor?: string;
   isDark?: boolean;
+  icon?: string;
+  setIcon?: (value: string) => void;
 }
 
 export interface TransactionCardProps {
@@ -238,6 +242,7 @@ export interface TransactionTableContextProps {
   onUpdateTransaction: (index: number, updatedTransaction: Partial<Transaction>) => void;
   onDeleteTransaction: (index: number) => void;
   onAddTransaction: (transaction: Transaction) => void;
+  onUpdateAllTransactionsWithSameName?: (description: string, icon: string, excludeId?: string) => Promise<number | undefined>;
   onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
   onDragOver?: (e: React.DragEvent, category: string) => void;
   onDrop?: (e: React.DragEvent, targetCategory: string) => void;

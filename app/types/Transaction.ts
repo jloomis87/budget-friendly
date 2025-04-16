@@ -8,4 +8,5 @@ export interface Transaction {
   createdAt?: string;
   updatedAt?: string;
   order?: number;
+  icon?: string;
 } 

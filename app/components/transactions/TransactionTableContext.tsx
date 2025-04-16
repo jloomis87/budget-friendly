@@ -6,6 +6,10 @@ import { useTransactionUtils } from './useTransactionUtils';
 import { useTableColors } from '../../hooks/useTableColors';
 import { isColorDark } from '../../utils/colorUtils';
 import { useCategories } from '../../contexts/CategoryContext';
+import { MobileEditDialog } from './MobileEditDialog';
+import { MobileAddDialog } from './MobileAddDialog';
+import { DeleteConfirmationDialog } from './DeleteConfirmationDialog';
+import { CopyMonthConfirmationDialog } from './CopyMonthConfirmationDialog';
 
 // Create the context
 const TransactionTableContext = createContext<{
@@ -47,6 +51,7 @@ const TransactionTableContext = createContext<{
     newDescription: string;
     newAmount: string;
     newDate: string;
+    newIcon: string;
   };
   // Dialog actions
   setEditingRow: React.Dispatch<React.SetStateAction<any | null>>;
@@ -62,6 +67,7 @@ const TransactionTableContext = createContext<{
   setNewDescription: React.Dispatch<React.SetStateAction<string>>;
   setNewAmount: React.Dispatch<React.SetStateAction<string>>;
   setNewDate: React.Dispatch<React.SetStateAction<string>>;
+  setNewIcon: React.Dispatch<React.SetStateAction<string>>;
   // Action handlers
   handleEditingChange: (field: string, value: string) => void;
   handleSaveEdit: () => void;
@@ -247,6 +253,9 @@ export const TransactionTableProvider = ({
   // Add a force refresh counter
   const [refreshCounter, setRefreshCounter] = useState(0);
   
+  // Add an icon state for new transactions
+  const [newIcon, setNewIcon] = useState<string>('');
+  
   // Helper function to reset all drag state
   const resetDragState = useCallback((preserveCopyMode = false) => {
     setIsIntraMonthDrag(false);
@@ -309,14 +318,31 @@ export const TransactionTableProvider = ({
       const updatedTransaction: Partial<Transaction> = {
         description: editingRow.description,
         date: new Date(year, month - 1, day),
-        amount: parseFloat(editingRow.amount) * (props.category === 'Income' ? 1 : -1)
+        amount: parseFloat(editingRow.amount) * (props.category === 'Income' ? 1 : -1),
+        icon: editingRow.icon
       };
       
       const globalIndex = utils.findGlobalIndex(mobileEditTransaction.transaction, allTransactions);
+      
+      // Update all transactions with the same description to have the same icon
+      if (editingRow.icon !== mobileEditTransaction.transaction.icon) {
+        const indicesToUpdate = utils.updateTransactionsWithSameName(
+          editingRow.description,
+          editingRow.icon,
+          allTransactions,
+          mobileEditTransaction.transaction.id
+        );
+        
+        // Update each transaction with the same description to have the same icon
+        indicesToUpdate.forEach(idx => {
+          props.onUpdateTransaction(idx, { icon: editingRow.icon });
+        });
+      }
+      
       props.onUpdateTransaction(globalIndex, updatedTransaction);
       handleCloseMobileEdit();
     }
-  }, [mobileEditTransaction, editingRow, props.category, utils, allTransactions]);
+  }, [mobileEditTransaction, editingRow, props.category, utils, allTransactions, props.onUpdateTransaction]);
   
   const handleAddTransaction = useCallback(() => {
     if (!newDescription.trim() || !newAmount.trim()) return;
@@ -330,14 +356,33 @@ export const TransactionTableProvider = ({
       date: date,
       category: props.category as 'Income' | 'Essentials' | 'Wants' | 'Savings',
       id: uuidv4(),
+      type: props.category === 'Income' ? 'income' : 'expense',
+      icon: newIcon || undefined
     };
 
     props.onAddTransaction(transaction);
+    
+    // Update all transactions with the same description to have the same icon
+    if (newIcon) {
+      const indicesToUpdate = utils.updateTransactionsWithSameName(
+        newDescription.trim(),
+        newIcon,
+        allTransactions,
+        transaction.id
+      );
+      
+      // Update each transaction with the same description to have the same icon
+      indicesToUpdate.forEach(idx => {
+        props.onUpdateTransaction(idx, { icon: newIcon });
+      });
+    }
+
     setNewDescription('');
     setNewAmount('');
     setNewDate(new Date().toISOString().split('T')[0]);
+    setNewIcon('');
     setMobileAddDialogOpen(false);
-  }, [newDescription, newAmount, newDate, props.category, props.onAddTransaction]);
+  }, [newDescription, newAmount, newDate, newIcon, props.category, props.onAddTransaction, allTransactions, utils, props.onUpdateTransaction]);
   
   const handleDeleteClick = useCallback((e: React.MouseEvent | undefined, transaction: Transaction) => {
     // Only call stopPropagation if e is a valid event object
@@ -374,7 +419,8 @@ export const TransactionTableProvider = ({
       identifier: transactionId,
       amount: Math.abs(transaction.amount).toString(),
       date: dateString,
-      description: transaction.description
+      description: transaction.description,
+      icon: transaction.icon || ''
     });
     
     setMobileEditDialogOpen(true);
@@ -395,6 +441,7 @@ export const TransactionTableProvider = ({
     setNewDescription('');
     setNewAmount('');
     setNewDate(newDateValue);
+    setNewIcon('');
     setMobileAddDialogOpen(true);
   }, []);
   
@@ -403,6 +450,7 @@ export const TransactionTableProvider = ({
     setNewDescription('');
     setNewAmount('');
     setNewDate(new Date().toISOString().split('T')[0]);
+    setNewIcon('');
   }, []);
   
   const getNextMonth = useCallback((currentMonth: string): string => {
@@ -455,13 +503,20 @@ export const TransactionTableProvider = ({
       }
 
       // If no matching transaction exists, create a new one
+      // Create a clean object without any undefined values to avoid Firestore errors
       const newTransaction: Transaction = {
-        ...transaction,
-        id: uuidv4(), // Generate new ID for the copy
+        description: transaction.description,
+        amount: props.category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount),
         date: newDate,
-        // Preserve the sign based on category
-        amount: props.category === 'Income' ? Math.abs(transaction.amount) : -Math.abs(transaction.amount)
+        category: props.category as 'Income' | 'Essentials' | 'Wants' | 'Savings',
+        id: uuidv4(), // Generate new ID for the copy
+        type: props.category === 'Income' ? 'income' : 'expense'
       };
+      
+      // Only include icon if it exists and is not undefined
+      if (transaction.icon) {
+        newTransaction.icon = transaction.icon;
+      }
 
       // Add the new transaction
       props.onAddTransaction(newTransaction);
@@ -613,15 +668,15 @@ export const TransactionTableProvider = ({
   const contextValue = {
     props,
     dragState: {
-      isDragging,
       draggedTransaction,
       draggedIndex,
       dragSourceMonth,
       dragOverMonth,
-      dragOverIndex,
-      isIntraMonthDrag,
+      isDragging,
       isCopyMode,
-      dragLeaveTimeout
+      dragLeaveTimeout,
+      dragOverIndex,
+      isIntraMonthDrag
     },
     utils,
     resetDragState,
@@ -651,7 +706,8 @@ export const TransactionTableProvider = ({
       copyTransactions,
       newDescription,
       newAmount,
-      newDate
+      newDate,
+      newIcon
     },
     setEditingRow,
     setDeleteConfirmOpen,
@@ -666,6 +722,7 @@ export const TransactionTableProvider = ({
     setNewDescription,
     setNewAmount,
     setNewDate,
+    setNewIcon,
     handleEditingChange,
     handleSaveEdit,
     handleAddTransaction,
@@ -691,6 +748,74 @@ export const TransactionTableProvider = ({
   return (
     <TransactionTableContext.Provider value={contextValue}>
       {children}
+      
+      {/* Mobile edit dialog */}
+      <MobileEditDialog
+        open={mobileEditDialogOpen}
+        category={props.category}
+        editingRow={editingRow}
+        onClose={handleCloseMobileEdit}
+        onSave={handleSaveEdit}
+        onDelete={() => {
+          if (mobileEditTransaction) {
+            handleDeleteClick(undefined, mobileEditTransaction.transaction);
+            handleCloseMobileEdit();
+          }
+        }}
+        handleEditingChange={handleEditingChange}
+        generateDayOptions={utils.generateDayOptions}
+        getOrdinalSuffix={utils.getOrdinalSuffix}
+        tableColor={getCategoryBackgroundColor() || '#f5f5f5'}
+        isDark={isDark}
+      />
+      
+      {/* Mobile add dialog */}
+      <MobileAddDialog
+        open={mobileAddDialogOpen}
+        category={props.category}
+        newDescription={newDescription}
+        newAmount={newAmount}
+        newDate={newDate}
+        setNewDescription={setNewDescription}
+        setNewAmount={setNewAmount}
+        setNewDate={setNewDate}
+        onClose={handleCloseMobileAdd}
+        onAdd={handleAddTransaction}
+        generateDayOptions={utils.generateDayOptions}
+        getOrdinalSuffix={utils.getOrdinalSuffix}
+        tableColor={getCategoryBackgroundColor() || '#f5f5f5'}
+        isDark={isDark}
+        icon={newIcon}
+        setIcon={setNewIcon}
+      />
+      
+      {/* Delete confirmation dialog */}
+      <DeleteConfirmationDialog
+        open={deleteConfirmOpen}
+        transactionToDelete={transactionToDelete}
+        onClose={() => {
+          setDeleteConfirmOpen(false);
+          setTransactionToDelete(null);
+        }}
+        onConfirm={() => {
+          if (transactionToDelete) {
+            props.onDeleteTransaction(transactionToDelete.index);
+            setDeleteConfirmOpen(false);
+            setTransactionToDelete(null);
+          }
+        }}
+      />
+      
+      {/* Copy month confirmation dialog */}
+      <CopyMonthConfirmationDialog
+        open={copyMonthDialogOpen}
+        onClose={() => setCopyMonthDialogOpen(false)}
+        onConfirm={handleCopyMonthConfirm}
+        sourceMonth={copySourceMonth}
+        targetMonth={copyTargetMonth}
+        transactionCount={copyTransactions.length}
+        onTargetMonthChange={setCopyTargetMonth}
+      />
     </TransactionTableContext.Provider>
   );
 };

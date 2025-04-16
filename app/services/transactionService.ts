@@ -181,7 +181,9 @@ export const getUserTransactions = async (userId: string, budgetId?: string): Pr
           amount: parseFloat(data.amount) || 0,
           date: processedDate,
           category: data.category,
-          order: data.order || 0
+          order: data.order || 0,
+          type: data.type || (parseFloat(data.amount) > 0 ? 'income' : 'expense'),
+          icon: data.icon || undefined
         });
       } catch (docError) {
         console.error(`[Firebase] Error processing document ${doc.id}:`, docError);

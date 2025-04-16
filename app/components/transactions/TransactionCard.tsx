@@ -127,28 +127,48 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
         }
       }}
     >
-      <Typography 
-        variant="subtitle1"
-        sx={{ 
-          color: textColor,
-          fontWeight: 500,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          display: '-webkit-box',
-          WebkitLineClamp: 1,
-          WebkitBoxOrient: 'vertical',
-          fontSize: {
-            xs: '0.64rem', // 75% of 0.85rem
-            sm: '0.64rem',
-            md: '0.64rem',
-            lg: '0.64rem',
-            xl: '0.85rem', // Original size at 1500px and above
-          },
-          lineHeight: 1.2
-        }}
-      >
-        {transaction.description}
-      </Typography>
+      <Box sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0.5
+      }}>
+        {transaction.icon && (
+          <Box sx={{ 
+            fontSize: {
+              xs: '0.7rem',
+              sm: '0.7rem',
+              md: '0.7rem',
+              lg: '0.7rem',
+              xl: '0.9rem',
+            },
+            lineHeight: 1
+          }}>
+            {transaction.icon}
+          </Box>
+        )}
+        <Typography 
+          variant="subtitle1"
+          sx={{ 
+            color: textColor,
+            fontWeight: 500,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 1,
+            WebkitBoxOrient: 'vertical',
+            fontSize: {
+              xs: '0.64rem', // 75% of 0.85rem
+              sm: '0.64rem',
+              md: '0.64rem',
+              lg: '0.64rem',
+              xl: '0.85rem', // Original size at 1500px and above
+            },
+            lineHeight: 1.2
+          }}
+        >
+          {transaction.description}
+        </Typography>
+      </Box>
       
       {/* Bottom row with date and amount */}
       <Box sx={{ 
