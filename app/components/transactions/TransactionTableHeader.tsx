@@ -27,7 +27,8 @@ const emojiOptions = [
   '🍖', '🍗', '🥓', '🧀', '🥚', '🍞', '🥐', '🥨', '🥯', '🥞', '🧇', '🍳', '🥘', '🍿', '🧂',
   '☕', '🍵', '🧋', '🥤', '🧃', '🥛', '🍷', '🍸', '🍹', '🍺', '🍻', '🥂', '🥃', '🥡',
   // Home and Living
-  '🏠', '🏡', '🧹', '🧼', '🧺', '🛁', '🚿', '🪠', '🧯', '🛋️', '🪑', '🛏️', '🚪', '🪟', '🪴',
+  '🏠', '🏡', '🏘️', '🏢', '🏣', '🏤', '🏥', '🏦', '🏨', '🏩', '🏪', '🏫', '🏬', '🏭', '🏯', 
+  '🏰', '🪑', '🛋️', '🛏️', '🚪', '🪟', '🪴', '🧹', '🧼', '🧺', '🛁', '🚿', '🪠', '🧯',
   '🪞', '🧸', '🔧', '🪛', '🪚', '🧰', '💡', '🔌', '🧲', '🧻', '🪥', '🧴',
   // Transportation
   '🚗', '🚙', '🚕', '🛻', '🏎️', '🚌', '🚎', '🚓', '🚑', '🚒', '🚐', '🛺', '🚲', '🛵', '🏍️',
@@ -327,6 +328,295 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
     }
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredEmojis, setFilteredEmojis] = useState<string[]>([]);
+  
+  // Function to filter emojis based on search query
+  const filterEmojis = useCallback((query: string) => {
+    if (!query.trim()) {
+      setFilteredEmojis([]);
+      return;
+    }
+    
+    const searchTerms = query.toLowerCase().split(' ');
+    
+    // Detailed emoji-specific keywords for better search accuracy
+    const emojiKeywords: Record<string, string> = {
+      // Finance & Money keywords
+      '💰': 'money bag cash finance dollar currency wealth',
+      '💵': 'money cash dollar bill currency finance',
+      '💸': 'money cash wings flying dollars finance',
+      '💳': 'credit card payment transaction finance visa mastercard',
+      '🏦': 'bank finance money building savings account',
+      '💹': 'chart increasing growth finance market stock profit',
+      '📈': 'chart increasing growth finance market stock upward',
+      '📉': 'chart decreasing finance market stock downward decline',
+      '💎': 'diamond gem jewel valuable treasure luxury',
+      '👛': 'purse money wallet small bag finance',
+      '💼': 'briefcase business work professional office finance',
+      '🧾': 'receipt invoice bill payment transaction record',
+      '💲': 'dollar sign money currency finance symbol',
+      '💱': 'currency exchange money finance forex conversion',
+      '🪙': 'coin money finance currency gold metal',
+      '📊': 'bar chart graph statistics data analytics finance',
+      '🧮': 'abacus calculator counting math finance budget',
+      
+      // Shopping keywords
+      '🛒': 'shopping cart retail store market buy purchase',
+      '🛍️': 'shopping bags retail purchase fashion gifts',
+      '👕': 'shirt clothes clothing fashion apparel t-shirt',
+      '👗': 'dress clothes clothing fashion apparel woman',
+      '👟': 'sneaker shoe footwear running sports athletic',
+      '👠': 'high heel shoe footwear fashion formal women',
+      '👜': 'handbag purse bag fashion accessories women',
+      
+      // Transportation keywords (vehicles)
+      '🚗': 'car auto automobile vehicle transportation drive driving sedan',
+      '🚙': 'suv car automobile vehicle transportation drive driving jeep',
+      '🚕': 'taxi cab car automobile vehicle transportation',
+      '🛻': 'pickup truck car automobile vehicle transportation utility',
+      '🏎️': 'racing car automobile vehicle transportation sports speed fast',
+      '🚓': 'police car automobile vehicle transportation emergency',
+      '🚑': 'ambulance car automobile vehicle transportation emergency medical',
+      '🚒': 'fire truck engine automobile vehicle transportation emergency',
+      '🚐': 'minivan car automobile vehicle transportation van',
+      '🚚': 'delivery truck vehicle transportation shipping cargo',
+      '🚛': 'truck articulated lorry vehicle transportation cargo',
+      '🚜': 'tractor vehicle transportation farm farming agricultural',
+      '🚘': 'oncoming car automobile vehicle transportation',
+      '🚔': 'police car automobile vehicle transportation emergency',
+      '🚖': 'oncoming taxi cab car automobile vehicle transportation',
+      '🚍': 'oncoming bus vehicle transportation public transit',
+      '🚌': 'bus vehicle transportation public transit',
+      '🚎': 'trolleybus vehicle transportation public transit rail',
+      '🚋': 'tram vehicle transportation public transit rail',
+      '🚞': 'mountain railway vehicle transportation train rail',
+      '🚝': 'monorail vehicle transportation train rail',
+      '🚄': 'high-speed train vehicle transportation rail bullet shinkansen',
+      '🚅': 'bullet train vehicle transportation rail high-speed shinkansen',
+      '🚂': 'locomotive train vehicle transportation rail steam',
+      '🚆': 'train vehicle transportation rail',
+      '🚇': 'metro subway train vehicle transportation rail underground',
+      '🚊': 'tram vehicle transportation rail streetcar',
+      '🚉': 'station train vehicle transportation rail',
+      '🚈': 'light rail vehicle transportation train',
+      '🚢': 'ship boat vehicle transportation maritime sea ocean cruise',
+      '🚤': 'speedboat boat vehicle transportation maritime sea water',
+      '⛴️': 'ferry boat ship vehicle transportation maritime sea',
+      '🛥️': 'motor boat vehicle transportation maritime sea',
+      '🛳️': 'passenger ship boat vehicle transportation maritime sea cruise',
+      '✈️': 'airplane plane aircraft vehicle transportation aviation flying flight',
+      '🛩️': 'small airplane plane aircraft vehicle transportation aviation flying',
+      '🛫': 'airplane departure plane aircraft vehicle transportation takeoff flying',
+      '🛬': 'airplane arrival plane aircraft vehicle transportation landing flying',
+      '🚁': 'helicopter aircraft vehicle transportation aviation flying',
+      '🚀': 'rocket spacecraft vehicle transportation space flying',
+      '🛸': 'flying saucer ufo vehicle transportation space alien',
+      '🚲': 'bicycle bike vehicle transportation cycling',
+      '🛵': 'motor scooter vehicle transportation motorcycle moped',
+      '🏍️': 'motorcycle bike vehicle transportation',
+      '🛺': 'auto rickshaw vehicle transportation tuk tuk',
+      
+      // Aquatic Animals
+      '🐟': 'fish animal aquatic sea ocean marine underwater water',
+      '🐠': 'tropical fish aquarium colorful swimming aquatic animal sea ocean marine',
+      '🐡': 'blowfish pufferfish fish aquatic animal sea ocean marine',
+      '🦈': 'shark fish predator sea ocean aquatic animal swimming jaws',
+      '🐙': 'octopus animal aquatic sea ocean marine underwater water tentacles',
+      '🦑': 'squid animal aquatic sea ocean marine underwater water tentacles',
+      '🦐': 'shrimp animal aquatic sea ocean marine underwater water shellfish crustacean',
+      '🦞': 'lobster animal aquatic sea ocean marine underwater water shellfish crustacean',
+      '🦀': 'crab animal aquatic sea ocean marine underwater water shellfish crustacean',
+      '🐚': 'spiral shell seashell beach ocean marine sea aquatic',
+      '🐬': 'dolphin marine mammal sea ocean aquatic animal swimming',
+      '🐳': 'spouting whale marine mammal giant sea ocean aquatic animal swimming',
+      '🐋': 'whale marine mammal giant sea ocean aquatic animal swimming',
+      '🦭': 'seal animal aquatic sea ocean marine underwater water mammal',
+      '🐊': 'crocodile animal aquatic water reptile alligator',
+      '🐢': 'turtle animal aquatic water reptile tortoise',
+      '🦦': 'otter animal aquatic water mammal',
+      '🐸': 'frog animal amphibian water toad',
+      '🦎': 'lizard animal reptile gecko',
+      
+      // Home & Living keywords
+      '🏠': 'house home building residence dwelling property',
+      '🏡': 'house garden home building residence property yard',
+      '🏘️': 'houses buildings neighborhood community residential',
+      '🏢': 'office building work corporate company highrise',
+      '🏣': 'japanese post office building mail service',
+      '🏤': 'post office building mail service european',
+      '🏥': 'hospital building medical healthcare emergency',
+      '🛋️': 'couch sofa furniture living room home lounge',
+      '🪑': 'chair furniture seat home office',
+      '🛏️': 'bed furniture bedroom sleep home rest',
+      '🚪': 'door entrance exit home house building',
+      '🪟': 'window home house building light view',
+      '🪴': 'potted plant home decoration house plant indoor',
+      '🧹': 'broom cleaning home sweep housework chore',
+      '🧼': 'soap cleaning hygiene wash home bathroom',
+      '🧺': 'basket laundry home cleaning clothes',
+      '🛁': 'bathtub bath bathroom home cleaning hygiene',
+      '🚿': 'shower bathroom home cleaning hygiene water',
+      '🪠': 'plunger bathroom toilet fix home',
+      '🧯': 'fire extinguisher safety emergency home',
+      
+      // Animal keywords
+      '🐶': 'dog pet animal puppy canine friend',
+      '🐕': 'dog pet animal canine friend',
+      '🦮': 'guide dog service animal pet assistance',
+      '🐕‍🦺': 'service dog assistance animal pet',
+      '🐩': 'poodle dog pet animal breed',
+      '🐺': 'wolf animal wildlife dog-like canine',
+      '🦊': 'fox animal wildlife dog-like canine',
+      '🐱': 'cat pet animal kitten feline',
+      '🐈': 'cat pet animal feline',
+      '🐈‍⬛': 'black cat pet animal feline',
+      '🦁': 'lion animal feline wildlife big cat',
+      '🐯': 'tiger animal feline wildlife big cat',
+      '🐅': 'tiger animal feline wildlife big cat',
+      '🐆': 'leopard animal feline wildlife big cat',
+      '🐴': 'horse animal farm livestock',
+      '🐎': 'horse animal farm livestock racing',
+      '🦄': 'unicorn fantasy horse animal magic',
+      '🦓': 'zebra animal wildlife stripes horse-like',
+      '🦌': 'deer animal wildlife forest',
+      '🐮': 'cow animal livestock farm dairy',
+      '🐂': 'ox animal livestock farm bull',
+      '🐃': 'water buffalo animal livestock farm',
+      '🐄': 'cow animal livestock farm dairy',
+      '🐷': 'pig animal livestock farm pork',
+      '🐖': 'pig animal livestock farm pork',
+      '🐗': 'boar animal wildlife pig-like',
+      '🐏': 'ram animal livestock farm sheep male',
+      '🐑': 'sheep animal livestock farm wool',
+      '🐐': 'goat animal livestock farm',
+      '🐪': 'camel animal desert transport',
+      '🐫': 'two-hump camel animal desert transport',
+      '🦙': 'llama animal wool south america',
+      '🦒': 'giraffe animal wildlife safari tall',
+      '🐘': 'elephant animal wildlife large trunk safari',
+      '🦣': 'mammoth animal prehistoric elephant',
+      '🦏': 'rhinoceros animal wildlife safari',
+      '🦛': 'hippopotamus animal wildlife water',
+      '🐭': 'mouse animal rodent pet small',
+      '🐁': 'mouse animal rodent pet small',
+      '🐀': 'rat animal rodent pet',
+      '🐹': 'hamster animal rodent pet small',
+      '🐰': 'rabbit face animal pet bunny easter',
+      '🐇': 'rabbit animal pet bunny easter',
+      '🐿️': 'chipmunk animal rodent wildlife squirrel',
+      '🦫': 'beaver animal rodent wildlife water',
+    };
+    
+    // Category-based search (for broader terms like "money", "home", etc.)
+    const categoryGroups = [
+      { name: 'finance money bank cash credit card dollar budget currency payment wallet', emojis: emojiOptions.slice(0, 45) },
+      { name: 'shopping retail clothes fashion shoes accessories purchase buy shopping', emojis: emojiOptions.slice(45, 104) },
+      { name: 'food dining restaurant meal breakfast lunch dinner drinks coffee cafe cooking', emojis: emojiOptions.slice(104, 154) },
+      { name: 'home house living furniture cleaning bathroom kitchen building apartment real estate property', emojis: emojiOptions.slice(154, 197) },
+      { name: 'transportation car bus train plane travel vehicle automobile bicycle motorcycle', emojis: emojiOptions.slice(197, 227) },
+      { name: 'entertainment leisure fun games sports music movie cinema concert hobby recreation', emojis: emojiOptions.slice(227, 277) },
+      { name: 'animal pet dog cat wildlife zoo farm domestic pets', emojis: emojiOptions.slice(350, 390) },
+      { name: 'health medical hospital doctor medicine wellness fitness', emojis: emojiOptions.slice(277, 292) },
+      { name: 'education school learning student college university study', emojis: emojiOptions.slice(292, 317) },
+      { name: 'technology computer phone internet gadget electronic digital device', emojis: emojiOptions.slice(317, 344) },
+    ];
+    
+    const results: string[] = [];
+    let exactMatches: string[] = [];
+    let keywordMatches: string[] = [];
+    
+    // First check for emoji-specific keyword matches (more accurate)
+    for (const [emoji, keywords] of Object.entries(emojiKeywords)) {
+      // Check if ALL search terms match the keywords
+      const allTermsMatch = searchTerms.every(term => keywords.includes(term));
+      
+      // Check if ANY search term is an exact match to a keyword
+      const exactMatch = searchTerms.some(term => {
+        const keywordsList = keywords.split(' ');
+        return keywordsList.some(keyword => keyword === term);
+      });
+      
+      // Check if ANY search term is contained in the keywords
+      const partialMatch = searchTerms.some(term => keywords.includes(term));
+      
+      if (allTermsMatch) {
+        // Highest priority - add to exact matches
+        exactMatches.push(emoji);
+      } else if (exactMatch) {
+        // High priority - add to exact matches
+        exactMatches.push(emoji);
+      } else if (partialMatch) {
+        // Medium priority - add to keyword matches
+        keywordMatches.push(emoji);
+      }
+    }
+    
+    // Then look for category matches (less accurate, more broad)
+    if (exactMatches.length === 0 && keywordMatches.length === 0) {
+      for (const category of categoryGroups) {
+        const matchesCategory = searchTerms.some(term => 
+          category.name.includes(term)
+        );
+        
+        if (matchesCategory) {
+          results.push(...category.emojis);
+        }
+      }
+    }
+    
+    // Combine results, prioritizing exact matches
+    if (exactMatches.length > 0) {
+      results.push(...exactMatches);
+    }
+    
+    if (keywordMatches.length > 0 && exactMatches.length < 5) {
+      // Only add keyword matches if we don't have many exact matches
+      results.push(...keywordMatches.filter(emoji => !exactMatches.includes(emoji)));
+    }
+    
+    // If still no results, return a small set of common emojis
+    if (results.length === 0) {
+      // Try a broader search through all emojis
+      const broadMatches = emojiOptions.filter(emoji => 
+        emoji in emojiKeywords && 
+        searchTerms.some(term => emojiKeywords[emoji]?.includes(term))
+      );
+      
+      if (broadMatches.length > 0) {
+        results.push(...broadMatches);
+      }
+    }
+    
+    // Remove duplicates and set the filtered emojis
+    setFilteredEmojis([...new Set(results)]);
+  }, [emojiOptions]);
+
+  // Update filtered emojis when search query changes
+  useEffect(() => {
+    filterEmojis(searchQuery);
+  }, [searchQuery, filterEmojis]);
+
+  // Reset search when closing emoji picker
+  useEffect(() => {
+    if (!emojiPickerAnchor) {
+      setSearchQuery('');
+      setFilteredEmojis([]);
+    }
+  }, [emojiPickerAnchor]);
+
+  // Function to handle search input change
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  // Update search results label to be more helpful
+  <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+    {filteredEmojis.length > 0 
+      ? `Search Results for "${searchQuery}" (${filteredEmojis.length})` 
+      : `No exact matches for "${searchQuery}" - try a more general term`}
+  </Typography>
+
   return (
     <Box sx={{ 
       p: 2, 
@@ -605,299 +895,381 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
             Select an icon for {editedName || category}
           </Typography>
           
-          {/* Finance and Money section */}
-          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
-            Finance & Money
-          </Typography>
-          <Box 
-            sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
-              gap: 0.5,
-              mx: 'auto',
-              maxWidth: '100%',
-              justifyContent: 'start'
-            }}
-          >
-            {emojiOptions.slice(0, 45).map((emoji) => (
-              <Paper
-                key={emoji}
-                elevation={selectedIcon === emoji ? 3 : 1}
-                sx={{
-                  width: 28,
-                  height: 28,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  borderRadius: 1,
-                  fontSize: '0.95rem',
-                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                  }
-                }}
-                onClick={() => handleSelectEmoji(emoji)}
-              >
-                {emoji}
-              </Paper>
-            ))}
+          {/* Search input */}
+          <Box sx={{ mb: 2, mt: 1 }}>
+            <TextField
+              placeholder="Search icons (e.g., money, house, food)"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              variant="outlined"
+              size="small"
+              fullWidth
+              InputProps={{
+                startAdornment: (
+                  <Box component="span" sx={{ mr: 1, opacity: 0.7 }}>
+                    🔍
+                  </Box>
+                ),
+                endAdornment: searchQuery ? (
+                  <IconButton 
+                    size="small" 
+                    onClick={() => setSearchQuery('')}
+                    sx={{ mr: -0.5 }}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                ) : null
+              }}
+            />
           </Box>
           
-          {/* Shopping and Retail section */}
-          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
-            Shopping & Retail
-          </Typography>
-          <Box 
-            sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
-              gap: 0.5,
-              mx: 'auto',
-              maxWidth: '100%',
-              justifyContent: 'start'
-            }}
-          >
-            {emojiOptions.slice(45, 104).map((emoji) => (
-              <Paper
-                key={emoji}
-                elevation={selectedIcon === emoji ? 3 : 1}
-                sx={{
-                  width: 28,
-                  height: 28,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  borderRadius: 1,
-                  fontSize: '0.95rem',
-                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                  }
+          {/* Show search results or regular categories */}
+          {searchQuery ? (
+            <>
+              <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+                {filteredEmojis.length > 0 
+                  ? `Search Results for "${searchQuery}" (${filteredEmojis.length})` 
+                  : `No exact matches for "${searchQuery}" - try a more general term`}
+              </Typography>
+              <Box 
+                sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+                  gap: 0.5,
+                  mx: 'auto',
+                  maxWidth: '100%',
+                  justifyContent: 'start'
                 }}
-                onClick={() => handleSelectEmoji(emoji)}
               >
-                {emoji}
-              </Paper>
-            ))}
-          </Box>
-          
-          {/* Food and Dining section */}
-          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
-            Food & Dining
-          </Typography>
-          <Box 
-            sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
-              gap: 0.5,
-              mx: 'auto',
-              maxWidth: '100%',
-              justifyContent: 'start'
-            }}
-          >
-            {emojiOptions.slice(104, 154).map((emoji) => (
-              <Paper
-                key={emoji}
-                elevation={selectedIcon === emoji ? 3 : 1}
-                sx={{
-                  width: 28,
-                  height: 28,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  borderRadius: 1,
-                  fontSize: '0.95rem',
-                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                  }
+                {filteredEmojis.length > 0 ? filteredEmojis.map((emoji) => (
+                  <Paper
+                    key={emoji}
+                    elevation={selectedIcon === emoji ? 3 : 1}
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      borderRadius: 1,
+                      fontSize: '0.95rem',
+                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                      }
+                    }}
+                    onClick={() => handleSelectEmoji(emoji)}
+                  >
+                    {emoji}
+                  </Paper>
+                )) : (
+                  <Typography variant="body2" sx={{ gridColumn: 'span 25', color: 'text.secondary', py: 1 }}>
+                    No matching icons found. Try a different search term.
+                  </Typography>
+                )}
+              </Box>
+            </>
+          ) : (
+            <>
+              {/* Finance and Money section */}
+              <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+                Finance & Money
+              </Typography>
+              <Box 
+                sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+                  gap: 0.5,
+                  mx: 'auto',
+                  maxWidth: '100%',
+                  justifyContent: 'start'
                 }}
-                onClick={() => handleSelectEmoji(emoji)}
               >
-                {emoji}
-              </Paper>
-            ))}
-          </Box>
-          
-          {/* Home and Living section */}
-          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
-            Home & Living
-          </Typography>
-          <Box 
-            sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
-              gap: 0.5,
-              mx: 'auto',
-              maxWidth: '100%',
-              justifyContent: 'start'
-            }}
-          >
-            {emojiOptions.slice(154, 181).map((emoji) => (
-              <Paper
-                key={emoji}
-                elevation={selectedIcon === emoji ? 3 : 1}
-                sx={{
-                  width: 28,
-                  height: 28,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  borderRadius: 1,
-                  fontSize: '0.95rem',
-                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                  }
+                {emojiOptions.slice(0, 45).map((emoji) => (
+                  <Paper
+                    key={emoji}
+                    elevation={selectedIcon === emoji ? 3 : 1}
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      borderRadius: 1,
+                      fontSize: '0.95rem',
+                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                      }
+                    }}
+                    onClick={() => handleSelectEmoji(emoji)}
+                  >
+                    {emoji}
+                  </Paper>
+                ))}
+              </Box>
+              
+              {/* Shopping and Retail section */}
+              <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+                Shopping & Retail
+              </Typography>
+              <Box 
+                sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+                  gap: 0.5,
+                  mx: 'auto',
+                  maxWidth: '100%',
+                  justifyContent: 'start'
                 }}
-                onClick={() => handleSelectEmoji(emoji)}
               >
-                {emoji}
-              </Paper>
-            ))}
-          </Box>
-          
-          {/* Transportation section */}
-          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
-            Transportation
-          </Typography>
-          <Box 
-            sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
-              gap: 0.5,
-              mx: 'auto',
-              maxWidth: '100%',
-              justifyContent: 'start'
-            }}
-          >
-            {emojiOptions.slice(181, 211).map((emoji) => (
-              <Paper
-                key={emoji}
-                elevation={selectedIcon === emoji ? 3 : 1}
-                sx={{
-                  width: 28,
-                  height: 28,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  borderRadius: 1,
-                  fontSize: '0.95rem',
-                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                  }
+                {emojiOptions.slice(45, 104).map((emoji) => (
+                  <Paper
+                    key={emoji}
+                    elevation={selectedIcon === emoji ? 3 : 1}
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      borderRadius: 1,
+                      fontSize: '0.95rem',
+                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                      }
+                    }}
+                    onClick={() => handleSelectEmoji(emoji)}
+                  >
+                    {emoji}
+                  </Paper>
+                ))}
+              </Box>
+              
+              {/* Food and Dining section */}
+              <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+                Food & Dining
+              </Typography>
+              <Box 
+                sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+                  gap: 0.5,
+                  mx: 'auto',
+                  maxWidth: '100%',
+                  justifyContent: 'start'
                 }}
-                onClick={() => handleSelectEmoji(emoji)}
               >
-                {emoji}
-              </Paper>
-            ))}
-          </Box>
-          
-          {/* Entertainment section */}
-          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
-            Entertainment & Leisure
-          </Typography>
-          <Box 
-            sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
-              gap: 0.5,
-              mx: 'auto',
-              maxWidth: '100%',
-              justifyContent: 'start'
-            }}
-          >
-            {emojiOptions.slice(211, 261).map((emoji) => (
-              <Paper
-                key={emoji}
-                elevation={selectedIcon === emoji ? 3 : 1}
-                sx={{
-                  width: 28,
-                  height: 28,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  borderRadius: 1,
-                  fontSize: '0.95rem',
-                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                  }
+                {emojiOptions.slice(104, 154).map((emoji) => (
+                  <Paper
+                    key={emoji}
+                    elevation={selectedIcon === emoji ? 3 : 1}
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      borderRadius: 1,
+                      fontSize: '0.95rem',
+                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                      }
+                    }}
+                    onClick={() => handleSelectEmoji(emoji)}
+                  >
+                    {emoji}
+                  </Paper>
+                ))}
+              </Box>
+              
+              {/* Home and Living section */}
+              <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+                Home & Living
+              </Typography>
+              <Box 
+                sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+                  gap: 0.5,
+                  mx: 'auto',
+                  maxWidth: '100%',
+                  justifyContent: 'start'
                 }}
-                onClick={() => handleSelectEmoji(emoji)}
               >
-                {emoji}
-              </Paper>
-            ))}
-          </Box>
-          
-          {/* Other sections - combined grid for remaining categories */}
-          <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
-            Other Categories
-          </Typography>
-          <Box 
-            sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
-              gap: 0.5,
-              mx: 'auto',
-              maxWidth: '100%',
-              justifyContent: 'start'
-            }}
-          >
-            {emojiOptions.slice(261).map((emoji) => (
-              <Paper
-                key={emoji}
-                elevation={selectedIcon === emoji ? 3 : 1}
-                sx={{
-                  width: 28,
-                  height: 28,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  borderRadius: 1,
-                  fontSize: '0.95rem',
-                  bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                  border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    transform: 'scale(1.1)',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                  }
+                {emojiOptions.slice(154, 197).map((emoji) => (
+                  <Paper
+                    key={emoji}
+                    elevation={selectedIcon === emoji ? 3 : 1}
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      borderRadius: 1,
+                      fontSize: '0.95rem',
+                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                      }
+                    }}
+                    onClick={() => handleSelectEmoji(emoji)}
+                  >
+                    {emoji}
+                  </Paper>
+                ))}
+              </Box>
+              
+              {/* Transportation section */}
+              <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+                Transportation
+              </Typography>
+              <Box 
+                sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+                  gap: 0.5,
+                  mx: 'auto',
+                  maxWidth: '100%',
+                  justifyContent: 'start'
                 }}
-                onClick={() => handleSelectEmoji(emoji)}
               >
-                {emoji}
-              </Paper>
-            ))}
-          </Box>
+                {emojiOptions.slice(197, 227).map((emoji) => (
+                  <Paper
+                    key={emoji}
+                    elevation={selectedIcon === emoji ? 3 : 1}
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      borderRadius: 1,
+                      fontSize: '0.95rem',
+                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                      }
+                    }}
+                    onClick={() => handleSelectEmoji(emoji)}
+                  >
+                    {emoji}
+                  </Paper>
+                ))}
+              </Box>
+              
+              {/* Entertainment section */}
+              <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+                Entertainment & Leisure
+              </Typography>
+              <Box 
+                sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+                  gap: 0.5,
+                  mx: 'auto',
+                  maxWidth: '100%',
+                  justifyContent: 'start'
+                }}
+              >
+                {emojiOptions.slice(227, 277).map((emoji) => (
+                  <Paper
+                    key={emoji}
+                    elevation={selectedIcon === emoji ? 3 : 1}
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      borderRadius: 1,
+                      fontSize: '0.95rem',
+                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                      }
+                    }}
+                    onClick={() => handleSelectEmoji(emoji)}
+                  >
+                    {emoji}
+                  </Paper>
+                ))}
+              </Box>
+              
+              {/* Other sections - combined grid for remaining categories */}
+              <Typography variant="caption" sx={{ display: 'block', mt: 1.5, mb: 0.75, color: 'text.secondary', fontWeight: 'medium' }}>
+                Other Categories
+              </Typography>
+              <Box 
+                sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(28px, 28px))',
+                  gap: 0.5,
+                  mx: 'auto',
+                  maxWidth: '100%',
+                  justifyContent: 'start'
+                }}
+              >
+                {emojiOptions.slice(277).map((emoji) => (
+                  <Paper
+                    key={emoji}
+                    elevation={selectedIcon === emoji ? 3 : 1}
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      borderRadius: 1,
+                      fontSize: '0.95rem',
+                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                      }
+                    }}
+                    onClick={() => handleSelectEmoji(emoji)}
+                  >
+                    {emoji}
+                  </Paper>
+                ))}
+              </Box>
+            </>
+          )}
         </Box>
       </Popover>
 
