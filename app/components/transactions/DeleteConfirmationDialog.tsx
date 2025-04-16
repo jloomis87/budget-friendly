@@ -9,6 +9,7 @@ import {
   Box
 } from '@mui/material';
 import type { Transaction } from '../../services/fileParser';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 interface DeleteConfirmationDialogProps {
   open: boolean;
@@ -24,6 +25,7 @@ export function DeleteConfirmationDialog({
   onConfirm
 }: DeleteConfirmationDialogProps) {
   const isDark = true; // TODO: Get from theme context
+  const { formatCurrency } = useCurrency();
 
   return (
     <Dialog
@@ -50,7 +52,7 @@ export function DeleteConfirmationDialog({
               {transactionToDelete.transaction.description}
             </Typography>
             <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-              ${Math.abs(transactionToDelete.transaction.amount).toFixed(2)}
+              {formatCurrency(Math.abs(transactionToDelete.transaction.amount))}
             </Typography>
           </Box>
         )}

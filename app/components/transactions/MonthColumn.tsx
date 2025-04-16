@@ -5,6 +5,7 @@ import { TransactionCard } from './TransactionCard';
 import type { MonthColumnProps } from './types';
 import type { Transaction } from '../../services/fileParser';
 import { isColorDark } from '../../utils/colorUtils';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 export const MonthColumn: React.FC<MonthColumnProps> = ({
   month,
@@ -40,6 +41,8 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
   handleDeleteTransaction
 }) => {
   const [isCopyModeState, setIsCopyMode] = React.useState(isCopyMode);
+  
+  const { formatCurrency } = useCurrency();
   
   // Get the background color for this category
   const bgColor = (() => {
@@ -225,6 +228,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
         </Box>
       </Box>
       <Typography
+        variant="subtitle1"
         sx={{
           fontSize: {
             xs: '0.65rem',
@@ -235,7 +239,7 @@ export const MonthColumn: React.FC<MonthColumnProps> = ({
           mb: 1
         }}
       >
-        ${Math.abs((monthTransactions as Transaction[]).reduce((sum, t) => sum + t.amount, 0)).toFixed(2)}
+        {formatCurrency(Math.abs((monthTransactions as Transaction[]).reduce((sum, t) => sum + t.amount, 0)))}
       </Typography>
       
       <Stack 

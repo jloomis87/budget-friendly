@@ -2,6 +2,7 @@ import React from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { CurrencyProvider } from './contexts/CurrencyContext';
 import { router } from './routes';
 
 // Error boundary component
@@ -20,7 +21,9 @@ export default function App() {
     <React.StrictMode>
       <AuthProvider>
         <ThemeProvider>
-          <RouterProvider router={router} />
+          <CurrencyProvider>
+            <RouterProvider router={router} />
+          </CurrencyProvider>
         </ThemeProvider>
       </AuthProvider>
     </React.StrictMode>

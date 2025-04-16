@@ -35,11 +35,14 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useCurrency } from '../contexts/CurrencyContext';
 import { useNavigate } from 'react-router-dom';
+import CurrencySelector from './CurrencySelector';
 
 export function AccountSettings() {
   const { user, updateUserPreferences, logout } = useAuth();
   const { mode, toggleColorMode } = useTheme();
+  const { currency } = useCurrency();
   const navigate = useNavigate();
   
   const [editMode, setEditMode] = useState(false);
@@ -56,9 +59,8 @@ export function AccountSettings() {
       goalReminders: true,
     },
     preferences: {
-      currency: user?.preferences?.currency || 'USD',
-      language: 'en',
       darkMode: mode === 'dark',
+      language: 'en',
     }
   });
 
@@ -68,10 +70,6 @@ export function AccountSettings() {
         ...prev,
         displayName: user.displayName || '',
         email: user.email || '',
-        preferences: {
-          ...prev.preferences,
-          currency: user.preferences?.currency || 'USD',
-        }
       }));
     }
   }, [user]);
@@ -96,7 +94,6 @@ export function AccountSettings() {
   const handleSaveChanges = async () => {
     try {
       await updateUserPreferences({
-        currency: formData.preferences.currency,
         notifications: formData.notifications.email,
         theme: formData.preferences.darkMode ? 'dark' : 'light'
       });
@@ -241,23 +238,14 @@ export function AccountSettings() {
                   <ListItem>
                     <ListItemText 
                       primary="Currency"
-                      secondary="Set your preferred currency"
+                      secondary="Set your preferred currency display"
                     />
                     <ListItemSecondaryAction>
-                      <TextField
-                        select
-                        value={formData.preferences.currency}
-                        onChange={(e) => handleInputChange('preferences', {
-                          ...formData.preferences,
-                          currency: e.target.value
-                        })}
+                      <CurrencySelector 
+                        showLabel={false}
+                        size="small"
                         variant="standard"
-                        sx={{ minWidth: 100 }}
-                      >
-                        <option value="USD">USD ($)</option>
-                        <option value="EUR">EUR (€)</option>
-                        <option value="GBP">GBP (£)</option>
-                      </TextField>
+                      />
                     </ListItemSecondaryAction>
                   </ListItem>
                 </List>

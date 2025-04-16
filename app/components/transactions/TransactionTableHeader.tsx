@@ -12,6 +12,7 @@ import PercentIcon from '@mui/icons-material/Percent';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import { useCategories } from '../../contexts/CategoryContext';
+import { useCurrency } from '../../contexts/CurrencyContext';
 import { EmojiPicker, emojiOptions, emojiKeywords } from '../../components/EmojiPicker';
 import type { Category } from '../../contexts/CategoryContext';
 import { useTableColors } from '../../hooks/useTableColors';
@@ -81,6 +82,7 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
   const [percentageError, setPercentageError] = useState<string | null>(null);
   const [categoryPercentages, setCategoryPercentages] = useState<Record<string, number>>({});
   const { updateCategory, getCategoryByName, categories, deleteCategory } = useCategories();
+  const { formatCurrency } = useCurrency();
   const [, , handleCategoryRename] = useTableColors();
   
   // Find the category to get its icon and check if it's a default category
@@ -1026,7 +1028,7 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                 pr: 2
               }}
             >
-              Total: ${Math.abs(totalAmount).toFixed(2)}
+              Total: {formatCurrency(Math.abs(totalAmount))}
             </Typography>
             
             {/* Total transaction count */}

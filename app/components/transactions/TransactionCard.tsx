@@ -4,6 +4,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import type { TransactionCardProps } from './types';
 import { isColorDark } from '../../utils/colorUtils';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 // Create a global registry to track all transaction cards by description
 // This will help us ensure consistent updates across all cards with the same description
@@ -140,6 +141,8 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
   const [currentIcon, setCurrentIcon] = useState(transaction.icon || '');
   // Reference to the card element
   const cardRef = useRef<HTMLDivElement>(null);
+  // Get currency formatter
+  const { formatCurrency } = useCurrency();
   
   // Setup event listeners
   useEffect(() => {
@@ -448,7 +451,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
           })}
         </Typography>
         
-        {/* Amount */}
+        {/* Amount - Update to use formatCurrency */}
         <Typography 
           variant="body2"
           sx={{ 
@@ -462,7 +465,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
             }
           }}
         >
-          ${Math.abs(transaction.amount).toFixed(2)}
+          {formatCurrency(Math.abs(transaction.amount))}
         </Typography>
       </Box>
     </Card>

@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { CategoryProvider } from './contexts/CategoryContext';
+import { CurrencyProvider } from './contexts/CurrencyContext';
 import BudgetApp from './components/BudgetApp';
 import { AccountSettings } from './components/AccountSettings';
 import { PrivacyAndSecurity } from './components/PrivacyAndSecurity';
@@ -63,9 +64,11 @@ export function App() {
   return (
     <AuthProvider>
       <ThemeProvider>
-        <CategoryProvider>
-          <RouterProvider router={router} />
-        </CategoryProvider>
+        <CurrencyProvider>
+          <CategoryProvider>
+            <RouterProvider router={router} />
+          </CategoryProvider>
+        </CurrencyProvider>
       </ThemeProvider>
     </AuthProvider>
   );

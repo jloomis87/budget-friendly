@@ -33,14 +33,7 @@ import type { Transaction } from '../services/fileParser';
 import type { FinancialGoal } from '../services/goalService';
 import { loadGoals, addGoal, updateGoal, deleteGoal } from '../services/goalService';
 import { useAuth } from '../contexts/AuthContext';
-
-// Utility function to format currency
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
-};
+import { useCurrency } from '../contexts/CurrencyContext';
 
 interface GoalDialogData {
   name: string;
@@ -81,6 +74,7 @@ export function FinancialGoals({ transactions, selectedMonths, totalIncome, curr
   const [updatedDebts, setUpdatedDebts] = useState<{[goalId: string]: number}>({});
   
   const { user } = useAuth();
+  const { formatCurrency } = useCurrency();
   
   // Function to calculate updated debt balance with compound interest
   const calculateUpdatedDebtBalance = (goal: FinancialGoal): number => {

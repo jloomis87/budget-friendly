@@ -27,6 +27,7 @@ import {
   LogoutOutlined as LogoutIcon
 } from '@mui/icons-material';
 import { useTheme } from '../../contexts/ThemeContext';
+import CurrencySelector from '../CurrencySelector';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -147,10 +148,19 @@ export function AppLayout({ children }: AppLayoutProps) {
             Budget Friendly
           </Typography>
           
+          {isAuthenticated && (
+            <CurrencySelector 
+              showLabel={false}
+              size="small"
+              variant="standard"
+            />
+          )}
+          
           <IconButton 
             onClick={toggleColorMode} 
             color="inherit" 
             aria-label="toggle dark mode"
+            sx={{ ml: 1 }}
           >
             {isDark ? <LightModeIcon /> : <DarkModeIcon />}
           </IconButton>

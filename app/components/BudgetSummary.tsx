@@ -56,6 +56,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { useCategories } from '../contexts/CategoryContext';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 // Register ChartJS components
 ChartJS.register(
@@ -128,6 +129,8 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
   const [monthlyTransactions, setMonthlyTransactions] = useState<Transaction[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  const { formatCurrency } = useCurrency();
 
   // Log categories and current budget ID for debugging
   useEffect(() => {
@@ -406,12 +409,14 @@ export function BudgetSummary({ summary, plan, suggestions, preferences, transac
   }, []);
 
   // Format currency
+  /* Using formatCurrency from CurrencyContext instead
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
     }).format(amount);
   };
+  */
 
   // Format percentage
   const formatPercentage = (percentage: number) => {

@@ -3,6 +3,7 @@ import { Card, CardContent, Grid, Typography, Box, Tooltip } from '@mui/material
 import { DragIndicatorIcon } from '../../utils/materialIcons';
 import type { MobileTransactionCardProps } from './types';
 import { isColorDark } from '../../utils/colorUtils';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 export function MobileTransactionCard({
   transaction,
@@ -17,6 +18,9 @@ export function MobileTransactionCard({
   const [currentIcon, setCurrentIcon] = useState(transaction.icon);
   // Reference to the card element
   const cardRef = useRef<HTMLDivElement>(null);
+  
+  // Add the formatCurrency function from the CurrencyContext
+  const { formatCurrency } = useCurrency();
   
   // Listen for icon updates
   useEffect(() => {
@@ -120,10 +124,7 @@ export function MobileTransactionCard({
     
     // Add amount
     const amount = document.createElement('div');
-    amount.textContent = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(Math.abs(transaction.amount));
+    amount.textContent = formatCurrency(Math.abs(transaction.amount));
     amount.style.marginLeft = '8px';
     dragPreview.appendChild(amount);
     
@@ -229,7 +230,7 @@ export function MobileTransactionCard({
               color: transaction.amount < 0 ? '#FF5252' : textColor,
               fontWeight: 600
             }}>
-              ${Math.abs(transaction.amount).toFixed(2)}
+              {formatCurrency(Math.abs(transaction.amount))}
             </Typography>
           </Grid>
         </Grid>

@@ -27,6 +27,7 @@ import {
   Info as InfoIcon,
 } from '@mui/icons-material';
 import type { Transaction } from '../services/fileParser';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 interface CategoryDeepDiveProps {
   transactions: Transaction[];
@@ -57,13 +58,7 @@ export const CategoryDeepDive: React.FC<CategoryDeepDiveProps> = ({
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<string | false>(false);
 
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
+  const { formatCurrency } = useCurrency();
 
   // Calculate category analysis
   const categoryAnalysis = useMemo(() => {

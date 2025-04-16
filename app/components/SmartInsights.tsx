@@ -8,6 +8,7 @@ import type { User } from '../types/User';
 import type { Budget } from '../types/Budget';
 import { useAuth } from '../contexts/AuthContext';
 import { useSavings } from '../contexts/SavingsContext';
+import { useCurrency } from '../contexts/CurrencyContext';
 
 const INSIGHT_TYPES = ['warning', 'success', 'info'] as const;
 type InsightType = typeof INSIGHT_TYPES[number];
@@ -43,14 +44,6 @@ interface FinancialGoalWithLastUpdated extends FinancialGoal {
 
 type ValidCategory = 'Essentials' | 'Wants' | 'Savings' | 'Income';
 
-// Utility function to format currency
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
-};
-
 // Add type guard for transaction category
 const isValidCategory = (category: string | undefined): category is ValidCategory => {
   return category === 'Essentials' || category === 'Wants' || category === 'Savings' || category === 'Income';
@@ -84,6 +77,7 @@ export function SmartInsights({ transactions, selectedMonths, totalIncome, onGoa
 
   // Get the authenticated user from Firebase Auth
   const { user } = useAuth();
+  const { formatCurrency } = useCurrency();
 
   // Add new state for actual savings dialog
   const [actualSavingsAmount, setActualSavingsAmount] = useState(0);
