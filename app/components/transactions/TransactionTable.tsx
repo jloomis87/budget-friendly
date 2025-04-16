@@ -56,7 +56,7 @@ export const TransactionTableContent: React.FC = () => {
   const { user } = useAuth();
   const { categories } = useCategories();
   const [tableColors] = useTableColors();
-  const [sortOption, setSortOption] = useState<SortOption>('date');
+  const [sortOption, setSortOption] = useState<SortOption>({ field: 'date', direction: 'desc' });
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
   
   // Load initial expanded state from localStorage and save changes
@@ -264,7 +264,7 @@ export const TransactionTableContent: React.FC = () => {
 
   // Save sort preference to Firebase
   const handleSortChange = async (field: string, direction: 'asc' | 'desc') => {
-    const newSortOption = { field, direction } as SortOption;
+    const newSortOption: SortOption = { field, direction };
     setSortOption(newSortOption);
     
     if (!user?.id || !props.category) return;
@@ -284,11 +284,11 @@ export const TransactionTableContent: React.FC = () => {
     return [...transactions].sort((a, b) => {
       switch (sortOption.field) {
         case 'amount':
-          return direction === 'desc' ? Math.abs(b.amount) - Math.abs(a.amount) : Math.abs(a.amount) - Math.abs(b.amount);
+          return sortOption.direction === 'desc' ? Math.abs(b.amount) - Math.abs(a.amount) : Math.abs(a.amount) - Math.abs(b.amount);
         case 'date':
-          return direction === 'desc' ? new Date(b.date).getTime() - new Date(a.date).getTime() : new Date(a.date).getTime() - new Date(b.date).getTime();
+          return sortOption.direction === 'desc' ? new Date(b.date).getTime() - new Date(a.date).getTime() : new Date(a.date).getTime() - new Date(b.date).getTime();
         case 'description':
-          return direction === 'desc' ? a.description.localeCompare(b.description) : b.description.localeCompare(a.description);
+          return sortOption.direction === 'desc' ? b.description.localeCompare(a.description) : a.description.localeCompare(b.description);
         default:
           return 0;
       }

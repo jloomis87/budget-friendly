@@ -46,6 +46,13 @@ interface TransactionTableHeaderProps extends ImportedTransactionTableHeaderProp
   onAlertMessage?: (message: { type: 'error' | 'warning' | 'info' | 'success', message: string }) => void;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  transactions?: any[]; // Add transactions array
+}
+
+// Define the SortOption type that matches TransactionSort component
+interface SortOption {
+  field: string;
+  direction: 'asc' | 'desc';
 }
 
 export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
@@ -61,7 +68,9 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
   categoryData,
   onAlertMessage,
   isExpanded,
-  onToggleExpand
+  onToggleExpand,
+  hasItems,
+  transactions
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(category);
@@ -726,40 +735,47 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
     );
   };
 
-  // Click handler to make the header clickable while avoiding interactive elements
-  const headerClickHandler = (e: React.MouseEvent) => {
-    if (!onToggleExpand) return;
-    
-    // Don't trigger when clicking interactive elements
-    const target = e.target as HTMLElement;
-    const isInteractive = 
-      target.closest('button') || 
-      target.closest('input') || 
-      target.closest('a') ||
-      target.closest('[role="button"]') ||
-      target.closest('.MuiSlider-root');
-      
-    if (!isInteractive) {
-      onToggleExpand();
-    }
-  };
-
   // Helper function to handle clicks on the header
   const handleHeaderClick = (e: React.MouseEvent) => {
     if (!onToggleExpand) return;
     
     // Don't toggle when clicking on interactive elements
     const target = e.target as HTMLElement;
+    
+    // Check if the click is within the statistics box
+    const statsBox = target.closest('[data-stats-box="true"]');
+    if (statsBox) {
+      return;
+    }
+    
+    // Check specifically for color picker related elements
+    const isColorPickerElement = 
+      target.closest('.MuiPopover-root') || 
+      target.closest('.color-picker') || 
+      target.getAttribute('role') === 'presentation' ||
+      target.closest('[aria-haspopup="true"]') ||
+      target.closest('[data-color-picker]');
+      
+    if (isColorPickerElement) {
+      return;
+    }
+    
+    // Check for any interactive elements
     if (
       target.closest('button') || 
       target.closest('input') || 
       target.closest('a') ||
       target.closest('[role="button"]') ||
-      target.closest('.MuiSlider-root')
+      target.closest('.MuiSlider-root') ||
+      target.closest('.MuiSelect-root') ||
+      target.closest('.MuiMenu-root') ||
+      target.closest('.MuiPopover-root') ||
+      target.closest('.MuiTooltip-popper')
     ) {
       return;
     }
     
+    // If we've made it here, toggle the expand state
     onToggleExpand();
   };
 
@@ -904,6 +920,7 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box 
+            data-stats-box="true"
             sx={{ 
               display: 'flex', 
               alignItems: 'center', 
@@ -1003,21 +1020,74 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
               sx={{ 
                 fontWeight: 600, 
                 color: '#ffffff',
-                fontSize: '0.95rem'
+                fontSize: '0.95rem',
+                mr: 2,
+                borderRight: '1px solid rgba(255,255,255,0.3)', 
+                pr: 2
               }}
             >
               Total: ${Math.abs(totalAmount).toFixed(2)}
             </Typography>
+            
+            {/* Total transaction count */}
+            <Tooltip title="Total number of transactions in this category">
+              <Typography 
+                component="span" 
+                variant="subtitle1" 
+                sx={{ 
+                  fontWeight: 600, 
+                  color: '#ffffff',
+                  fontSize: '0.95rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  mr: 2,
+                  borderRight: '1px solid rgba(255,255,255,0.3)', 
+                  pr: 2
+                }}
+              >
+                <Box component="span" sx={{ mr: 0.75, fontSize: '0.85rem', opacity: 0.9 }}>Transactions:</Box>
+                <Box 
+                  component="span"
+                  sx={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)', 
+                    borderRadius: '4px',
+                    px: 1,
+                    py: 0.25,
+                  }}
+                >
+                  {hasItems ? 
+                    (transactions?.length || 0) : 
+                    0}
+                </Box>
+              </Typography>
+            </Tooltip>
+            
+            <Box 
+              data-stats-box="true" 
+              onClick={(e) => e.stopPropagation()}
+            >
+              <TransactionSort
+                sortOption={typeof sortOption === 'string' 
+                  ? { field: sortOption, direction: 'desc' } // Convert string to object if needed
+                  : sortOption as SortOption}
+                onSortChange={onSortChange ? (option: SortOption) => {
+                  if (typeof option === 'object' && option.field && option.direction) {
+                    onSortChange(option.field, option.direction);
+                  }
+                } : undefined as any}
+                hasCustomDarkColor={!!hasCustomDarkColor}
+                isDark={!!isDark}
+                category={category}
+              />
+            </Box>
+            <Box 
+              data-stats-box="true" 
+              data-color-picker="true"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <CategoryColorPicker category={category} />
+            </Box>
           </Box>
-          
-          <TransactionSort
-            sortOption={sortOption}
-            onSortChange={onSortChange}
-            hasCustomDarkColor={hasCustomDarkColor}
-            isDark={isDark}
-            category={category}
-          />
-          <CategoryColorPicker category={category} />
           
           {/* Expand/Collapse Toggle Button */}
           {onToggleExpand && (

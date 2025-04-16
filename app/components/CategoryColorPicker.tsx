@@ -46,21 +46,19 @@ export function CategoryColorPicker({ category }: CategoryColorPickerProps) {
         onClick={handleOpenColorPicker}
         aria-label={`Change ${category} color`}
         sx={{
-          color: isDark ? '#fff' : 'inherit',
+          color: '#ffffff', // Always white icon
           bgcolor: isCustomColor ? `${tableColors[category]}40` : 'transparent', // Light background of the selected color
           border: isCustomColor ? `2px solid ${tableColors[category]}` : 'none',
           '&:hover': {
-            backgroundColor: isDark 
-              ? 'rgba(255, 255, 255, 0.1)' 
-              : (isCustomColor ? `${tableColors[category]}60` : 'rgba(0, 0, 0, 0.04)')
+            backgroundColor: 'rgba(255, 255, 255, 0.2)', // Consistent hover effect
           }
         }}
       >
         <PaletteIcon 
           fontSize="small" 
           sx={{ 
-            // Always ensure the icon has good contrast with its background
-            color: isDark ? '#fff' : 'rgba(0, 0, 0, 0.7)'
+            // Always white icon for best visibility
+            color: '#ffffff'
           }}
         />
       </IconButton>

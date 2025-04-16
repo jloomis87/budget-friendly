@@ -216,7 +216,10 @@ export interface DragIndicatorProps {
   dragSourceMonth: string | null;
 }
 
-export type SortOption = 'amount' | 'date' | 'description';
+export interface SortOption {
+  field: 'amount' | 'date' | 'description';
+  direction: 'asc' | 'desc';
+}
 
 export interface TransactionTableHeaderProps {
   category: string;
