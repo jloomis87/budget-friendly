@@ -841,6 +841,8 @@ const BudgetAppContent = (): JSX.Element => {
   const isLoadingFromFirebase = useRef(false);
   const isFirstLoad = useRef(true);
   const prevBudgetId = useRef<string | null>(null);
+  // Add a ref to track if we've already attempted a redirect
+  const hasAttemptedRedirect = useRef(false);
   
   // Initialize preferences with default values
   const [preferences, setPreferences] = useLocalStorage<BudgetPreferences>(
@@ -1065,30 +1067,6 @@ const BudgetAppContent = (): JSX.Element => {
       delete window.updateAllTransactionsWithNewCategory;
     };
   }, [user, currentBudgetId, setShouldReload]);
-
-  // Add proper return statements for both authentication states
-  if (!isAuthenticated) {
-    return (
-      <Box sx={{ 
-        width: '100%', 
-        backgroundColor: 'background.default',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        p: { xs: 2, sm: 4 },
-        position: 'relative',
-        overflow: 'hidden',
-        zIndex: 0,
-      }}>
-        {/* Login UI content */}
-        <Typography variant="h5" sx={{ color: "primary.main", mb: 2 }}>
-          Please log in to access your budget
-        </Typography>
-      </Box>
-    );
-  }
 
   return (
     <Box sx={{ 

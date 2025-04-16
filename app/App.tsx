@@ -9,12 +9,21 @@ import { PrivacyAndSecurity } from './components/PrivacyAndSecurity';
 import { HelpAndSupport } from './components/HelpAndSupport';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { DashboardPage } from './pages/DashboardPage';
+import { LoginPage } from './pages/LoginPage';
 import { createBrowserRouter } from 'react-router-dom';
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <BudgetApp />,
+    element: (
+      <ProtectedRoute>
+        <BudgetApp />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/login",
+    element: <LoginPage />,
   },
   {
     path: "/dashboard",
