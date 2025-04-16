@@ -2361,9 +2361,8 @@ export default function BudgetApp() {
     updateAllTransactionsWithSameName
   } = useTransactions();
 
-  // Create a global function to update all transactions with the same name to have the same icon
-  // This is needed for component communication between TransactionTableHeader and TransactionTable
-  React.useEffect(() => {
+  // Attach the global function to update all transaction icons
+  useEffect(() => {
     if (updateAllTransactionsWithSameName) {
       window.updateAllTransactionsWithIcon = async (category: string, icon: string) => {
         // Find all transactions in the specified category
@@ -2400,6 +2399,25 @@ export default function BudgetApp() {
       }
     };
   }, [updateAllTransactionsWithSameName, transactions]);
+  
+  // Force a global refresh of all transaction icons on initial load
+  useEffect(() => {
+    // Wait for component to fully mount and transactions to load
+    const timer = setTimeout(() => {
+      console.log('Triggering initial icon refresh for all transactions');
+      // Dispatch a forceTransactionRefresh event to sync all cards
+      const refreshEvent = new CustomEvent('forceTransactionRefresh', {
+        detail: { 
+          category: 'all',
+          timestamp: Date.now(),
+          forceUpdate: true
+        }
+      });
+      document.dispatchEvent(refreshEvent);
+    }, 500); // Small delay to ensure components are mounted
+    
+    return () => clearTimeout(timer);
+  }, [transactions.length]); // Re-run when transactions change
   
   return (
     <AuthProvider>

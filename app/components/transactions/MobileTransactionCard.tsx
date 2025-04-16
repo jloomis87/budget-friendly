@@ -21,34 +21,43 @@ export function MobileTransactionCard({
   // Listen for icon updates
   useEffect(() => {
     const handleIconUpdate = (event: CustomEvent) => {
-      const { category: updatedCategory, icon } = event.detail;
+      // Only update if this event is for our transaction
+      const { description, icon } = event.detail;
       
-      // Update if this card's category matches the updated category or if 'all' categories are being updated
-      if (updatedCategory === 'all' || updatedCategory === transaction.category) {
-        if (transaction.description) {
-          // Look for all cards with this description
-          const normalizedTransactionDescription = transaction.description.trim().toLowerCase();
-          const normalizedUpdatedDescription = event.detail.description?.trim().toLowerCase();
-          
-          // Check if either we're updating all transactions in a category or this specific transaction description
-          const shouldUpdate = 
-            // Update if the description in the event matches this transaction's description
-            (normalizedUpdatedDescription && normalizedTransactionDescription === normalizedUpdatedDescription) ||
-            // Or if no specific description was provided in the event (category-wide update)
-            !normalizedUpdatedDescription;
-          
-          if (shouldUpdate) {
-            // Set icon state (react-based update)
-            setCurrentIcon(icon);
-            console.log(`MobileTransactionCard "${transaction.description}" received icon update event for "${event.detail.description || 'all in category'}", icon: ${icon}`);
-          }
+      if (description && 
+          description.trim().toLowerCase() === transaction.description.trim().toLowerCase() &&
+          icon !== undefined) {
+        console.log(`[MobileCard] Updating icon for "${description}" to "${icon}"`);
+        setCurrentIcon(icon);
+        
+        // Add animation
+        if (cardRef.current) {
+          cardRef.current.classList.add('card-updated');
+          setTimeout(() => {
+            if (cardRef.current) {
+              cardRef.current.classList.remove('card-updated');
+            }
+          }, 300);
         }
       }
     };
     
     const handleForceRefresh = (event: CustomEvent) => {
       // Force rerender if our transaction matches criteria
-      setCurrentIcon(transaction.icon); // Reset to force React update cycle
+      const normalizedDescription = transaction.description.trim().toLowerCase();
+      const eventDescription = event.detail?.description?.trim().toLowerCase();
+      
+      // If the event has a description and it matches our transaction, update from event
+      if (eventDescription && eventDescription === normalizedDescription && event.detail.icon) {
+        console.log(`[MobileCard] Force refresh match from event for "${normalizedDescription}": ${event.detail.icon}`);
+        setCurrentIcon(event.detail.icon);
+      } else {
+        // Otherwise fallback to transaction data
+        if (transaction.icon !== currentIcon) {
+          console.log(`[MobileCard] Force refresh updating from transaction prop: ${transaction.icon}`);
+          setCurrentIcon(transaction.icon);
+        }
+      }
       
       // Small delay to ensure the DOM has time to update
       setTimeout(() => {
@@ -80,7 +89,7 @@ export function MobileTransactionCard({
       document.removeEventListener('transactionIconsUpdated', handleIconUpdate as EventListener);
       document.removeEventListener('forceTransactionRefresh', handleForceRefresh as EventListener);
     };
-  }, [transaction, transaction.category, currentIcon]);
+  }, [transaction, transaction.category, transaction.icon, currentIcon]);
 
   // Create a custom drag handler for the card
   const handleDragStart = (e: React.DragEvent) => {

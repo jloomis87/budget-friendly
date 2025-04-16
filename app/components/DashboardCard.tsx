@@ -24,59 +24,56 @@ export function DashboardCard({
   // Listen for icon updates
   useEffect(() => {
     const handleIconUpdate = (event: CustomEvent) => {
-      const { category: updatedCategory, icon, description } = event.detail;
+      // Only update if this event is for our transaction
+      const { description, icon } = event.detail;
       
-      // Update if this card's category matches the updated category or if 'all' categories are being updated
-      if (updatedCategory === 'all' || updatedCategory === transaction.category) {
-        // If a specific description is provided, only update if it matches
-        if (description) {
-          const normalizedTransactionDescription = transaction.description.trim().toLowerCase();
-          const normalizedUpdatedDescription = description.trim().toLowerCase();
-          
-          if (normalizedTransactionDescription === normalizedUpdatedDescription) {
-            // Set icon state
-            setCurrentIcon(icon);
-            console.log(`DashboardCard "${transaction.description}" updated icon to: ${icon}`);
-            
-            // Apply animation to show the update
+      if (description && 
+          description.trim().toLowerCase() === transaction.description.trim().toLowerCase() &&
+          icon !== undefined) {
+        console.log(`[DashboardCard] Updating icon for "${description}" to "${icon}"`);
+        setCurrentIcon(icon);
+        
+        // Add animation
+        if (cardRef.current) {
+          cardRef.current.classList.add('card-updated');
+          setTimeout(() => {
             if (cardRef.current) {
-              cardRef.current.style.transition = 'transform 0.2s ease';
-              cardRef.current.style.transform = 'scale(1.02)';
-              
-              setTimeout(() => {
-                if (cardRef.current) {
-                  cardRef.current.style.transform = 'none';
-                }
-              }, 200);
+              cardRef.current.classList.remove('card-updated');
             }
-          }
-        } else {
-          // If no description, update all icons in this category
-          setCurrentIcon(icon);
+          }, 300);
         }
       }
     };
     
     const handleForceRefresh = (event: CustomEvent) => {
       // Force rerender if our transaction matches criteria
-      if (event.detail.category === transaction.category) {
-        setCurrentIcon(transaction.icon); // Reset to force React update cycle
-        
-        // Small delay to ensure the DOM has time to update
-        setTimeout(() => {
-          if (cardRef.current) {
-            // Apply a small animation to show the update
-            cardRef.current.style.transition = 'transform 0.2s ease';
-            cardRef.current.style.transform = 'scale(1.02)';
-            
-            setTimeout(() => {
-              if (cardRef.current) {
-                cardRef.current.style.transform = 'none';
-              }
-            }, 200);
-          }
-        }, 50);
+      const normalizedDescription = transaction.description.trim().toLowerCase();
+      const eventDescription = event.detail?.description?.trim().toLowerCase();
+      
+      // If the event has a description and it matches our transaction, update from event
+      if (eventDescription && eventDescription === normalizedDescription && event.detail.icon) {
+        console.log(`[DashboardCard] Force refresh match from event for "${normalizedDescription}": ${event.detail.icon}`);
+        setCurrentIcon(event.detail.icon);
+      } else if (transaction.icon !== currentIcon) {
+        // Otherwise fallback to transaction data
+        console.log(`[DashboardCard] Force refresh updating from transaction prop: ${transaction.icon}`);
+        setCurrentIcon(transaction.icon);
       }
+      
+      // Small delay to ensure the DOM has time to update
+      setTimeout(() => {
+        if (cardRef.current) {
+          // Apply a small animation to show the update
+          cardRef.current.style.transition = 'transform 0.2s ease';
+          cardRef.current.style.transform = 'scale(1.02)';
+          
+          setTimeout(() => {
+            if (cardRef.current) {
+              cardRef.current.style.transform = 'none';
+            }
+          }, 200);
+        }
+      }, 50);
     };
     
     // Add event listeners
@@ -93,7 +90,7 @@ export function DashboardCard({
       document.removeEventListener('transactionIconsUpdated', handleIconUpdate as EventListener);
       document.removeEventListener('forceTransactionRefresh', handleForceRefresh as EventListener);
     };
-  }, [transaction, transaction.category, currentIcon]);
+  }, [transaction, transaction.category, transaction.icon, currentIcon]);
 
   // Determine if the background is dark or light to set text color
   const isDarkBackground = isColorDark(backgroundColor);

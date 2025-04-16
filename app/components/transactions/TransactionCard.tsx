@@ -24,26 +24,30 @@ const registerCard = (description: string, initialIcon: string | undefined, call
       icon: initialIcon || '',
       callbacks: []
     };
+  } else if (initialIcon && !transactionIconRegistry[normalizedDescription].icon) {
+    // If a card has an icon but the registry doesn't, update registry
+    transactionIconRegistry[normalizedDescription].icon = initialIcon;
   }
   
   // Add this card's update callback to the registry
   transactionIconRegistry[normalizedDescription].callbacks.push(callback);
   
   // Return the current icon for this description from the registry
-  return transactionIconRegistry[normalizedDescription].icon;
+  return transactionIconRegistry[normalizedDescription].icon || initialIcon || '';
 };
 
-// Helper to unregister a card when it unmounts
+// Helper to unregister a card's callback from the registry
 const unregisterCard = (description: string, callback: (icon: string) => void) => {
   const normalizedDescription = description.trim().toLowerCase();
   
   if (transactionIconRegistry[normalizedDescription]) {
+    // Remove the callback from the registry
     const callbackIndex = transactionIconRegistry[normalizedDescription].callbacks.indexOf(callback);
-    if (callbackIndex !== -1) {
+    if (callbackIndex >= 0) {
       transactionIconRegistry[normalizedDescription].callbacks.splice(callbackIndex, 1);
     }
     
-    // If no more cards with this description, remove it from registry
+    // If no more callbacks are registered, clean up
     if (transactionIconRegistry[normalizedDescription].callbacks.length === 0) {
       delete transactionIconRegistry[normalizedDescription];
     }
@@ -149,7 +153,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
     console.log(`[Card] ${normalizedDescription} mounted, registering...`);
     
     // Register this card in the global registry
-    registerCard(
+    const registryIcon = registerCard(
       normalizedDescription,
       transaction.icon || '',  // Make sure we pass the icon
       (newIcon: string) => {   // Add type for newIcon parameter
@@ -165,6 +169,13 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
         }
       }
     );
+    
+    // If the registry has an icon that's different from our current state,
+    // update our state to match the registry
+    if (registryIcon && registryIcon !== currentIcon) {
+      console.log(`[Card] Initial sync - updating "${normalizedDescription}" icon from "${currentIcon}" to registry value: "${registryIcon}"`);
+      setCurrentIcon(registryIcon);
+    }
     
     // Force refresh listener
     const handleForceRefresh = () => {
@@ -196,6 +207,12 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
     };
 
     document.addEventListener('forceTransactionRefresh', handleForceRefresh);
+    
+    // After a brief delay (to let all cards register), trigger a global refresh
+    // This ensures all cards sync with the registry on initial render
+    setTimeout(() => {
+      document.dispatchEvent(new CustomEvent('forceTransactionRefresh'));
+    }, 100);
 
     // Cleanup on unmount
     return () => {
