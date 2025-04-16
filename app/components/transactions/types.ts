@@ -223,10 +223,10 @@ export interface TransactionTableHeaderProps {
   totalAmount: number;
   hasCustomColor: boolean;
   hasCustomDarkColor: boolean;
-  isDark: boolean;
+  isDark?: boolean;
   tableColors: Record<string, string>;
   sortOption: SortOption;
-  onSortChange: (option: SortOption) => void;
+  onSortChange?: (field: string, direction: 'asc' | 'desc') => void;
   totalBudget?: number;
   categoryData?: {
     percentage?: number;

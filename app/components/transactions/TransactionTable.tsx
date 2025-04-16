@@ -737,92 +737,116 @@ export const TransactionTableContent: React.FC = () => {
           onToggleExpand={toggleExpand}
         />
         
-        {/* Only show content if expanded */}
-        {isExpanded && (
-          <>
-            {/* Instructions for dragging - show even if no transactions */}
-            <Typography 
-              variant="caption"
-              sx={{
-                display: 'block',
-                textAlign: 'center',
-                mb: 1,
-                mt: -3,
-                color: hasCustomColor ? 
-                  (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)') : 
-                  (props.category === 'Income' ? 'rgba(0, 0, 0, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)')),
-              }}
-            >
-              {filteredTransactions.length > 0 
-                ? 'Drag to move transactions between months' 
-                : 'Add transactions using the + button in each month'}
-            </Typography>
-            
-            {/* Scrollable area for months */}
-            <Box 
-              sx={{ 
-                display: 'flex',
-                flexDirection: 'row',
-                overflowX: 'auto',
-                px: 2,
-                pb: 2,
-                pt: 1,
-                '&::-webkit-scrollbar': {
-                  height: '8px',
-                },
-                '&::-webkit-scrollbar-track': {
-                  backgroundColor: 'rgba(0,0,0,0.05)',
-                },
-                '&::-webkit-scrollbar-thumb': {
+        {/* Transaction content with smooth animation */}
+        <Box
+          sx={{
+            maxHeight: isExpanded ? '2000px' : '0px',
+            opacity: isExpanded ? 1 : 0,
+            overflow: 'hidden',
+            visibility: isExpanded ? 'visible' : 'hidden',
+            // Keep content visible longer during collapse (opacity change happens later)
+            transition: isExpanded 
+              ? 'max-height 0.45s ease-out, opacity 0.25s ease-in, visibility 0s' 
+              : 'max-height 0.4s ease-in-out, opacity 0.38s ease-out, visibility 0s 0.4s',
+            // Remove padding transitions that might affect content visibility
+            transformOrigin: 'top',
+          }}
+        >
+          {/* Instructions for dragging - show even if no transactions */}
+          <Typography 
+            variant="caption"
+            sx={{
+              display: 'block',
+              textAlign: 'center',
+              mb: 1.5,
+              mt: 1.5, // More spacing above
+              px: 2, // Add horizontal padding
+              py: 0.5, // Add vertical padding
+              color: hasCustomColor ? 
+                (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)') : 
+                (props.category === 'Income' ? 'rgba(0, 0, 0, 0.7)' : (isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)')),
+              // Make it slightly more opaque for better visibility
+              borderRadius: '4px',
+              // Create a subtle highlight background
+              backgroundColor: hasCustomColor ? 
+                (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)') : 
+                (props.category === 'Income' ? 'rgba(0, 0, 0, 0.03)' : (isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)')),
+              // Show only when expanded
+              opacity: isExpanded ? 1 : 0,
+              visibility: isExpanded ? 'visible' : 'hidden',
+              transition: 'opacity 0.3s ease-in-out, visibility 0s',
+              fontWeight: 500, // Slightly bolder
+            }}
+          >
+            {filteredTransactions.length > 0 
+              ? 'Drag to move transactions between months' 
+              : 'Add transactions using the + button in each month'}
+          </Typography>
+          
+          {/* Scrollable area for months */}
+          <Box 
+            sx={{ 
+              display: 'flex',
+              flexDirection: 'row',
+              overflowX: 'auto',
+              px: 2,
+              pb: 2,
+              pt: 1,
+              '&::-webkit-scrollbar': {
+                height: '8px',
+              },
+              '&::-webkit-scrollbar-track': {
+                backgroundColor: 'rgba(0,0,0,0.05)',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                backgroundColor: hasCustomColor ? 
+                  (hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)') : 
+                  (props.category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
+                borderRadius: '4px',
+                '&:hover': {
                   backgroundColor: hasCustomColor ? 
-                    (hasCustomDarkColor ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)') : 
-                    (props.category === 'Income' ? 'rgba(0,0,0,0.2)' : 'rgba(25, 118, 210, 0.3)'),
-                  borderRadius: '4px',
-                  '&:hover': {
-                    backgroundColor: hasCustomColor ? 
-                      (hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)') : 
-                      (props.category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
-                  }
+                    (hasCustomDarkColor ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)') : 
+                    (props.category === 'Income' ? 'rgba(0,0,0,0.3)' : 'rgba(25, 118, 210, 0.5)'),
                 }
-              }}
-            >
-              {months.map((month) => (
-                <MonthColumn
-                  key={month}
-                  month={month}
-                  monthTransactions={groupedTransactions[month] || []}
-                  category={props.category}
-                  isDark={isDark}
-                  hasCustomColor={hasCustomColor}
-                  hasCustomDarkColor={hasCustomDarkColor}
-                  isDragging={isDragging}
-                  draggedTransaction={draggedTransaction}
-                  draggedIndex={draggedIndex}
-                  dragSourceMonth={dragSourceMonth}
-                  dragOverMonth={dragOverMonth}
-                  dragOverIndex={dragOverIndex}
-                  isIntraMonthDrag={isIntraMonthDrag}
-                  isCopyMode={isCopyMode}
-                  getCardBackgroundColor={getCategoryBackgroundColor}
-                  getTextColor={getTextColor}
-                  handleMonthDragOver={handleMonthDragOver}
-                  handleMonthDragLeave={handleMonthDragLeave}
-                  handleMonthDrop={handleMonthDrop}
-                  handleTransactionDragStart={handleTransactionDragStart}
-                  handleTransactionDragOver={handleTransactionDragOver}
-                  handleTransactionDrop={handleTransactionDrop}
-                  handleDragEnd={handleDragEnd}
-                  handleOpenMobileEdit={handleOpenMobileEdit}
-                  handleOpenMobileAdd={handleOpenMobileAdd}
-                  handleCopyMonthClick={handleCopyMonthClick}
-                  getNextMonth={getNextMonth}
-                  getMonthOrder={getMonthOrder}
-                  tableColors={tableColors}
-                />
-              ))}
-            </Box>
-          </>
-        )}
+              }
+            }}
+          >
+            {months.map((month) => (
+              <MonthColumn
+                key={month}
+                month={month}
+                monthTransactions={groupedTransactions[month] || []}
+                category={props.category}
+                isDark={isDark}
+                hasCustomColor={hasCustomColor}
+                hasCustomDarkColor={hasCustomDarkColor}
+                isDragging={isDragging}
+                draggedTransaction={draggedTransaction}
+                draggedIndex={draggedIndex}
+                dragSourceMonth={dragSourceMonth}
+                dragOverMonth={dragOverMonth}
+                dragOverIndex={dragOverIndex}
+                isIntraMonthDrag={isIntraMonthDrag}
+                isCopyMode={isCopyMode}
+                getCardBackgroundColor={getCategoryBackgroundColor}
+                getTextColor={getTextColor}
+                handleMonthDragOver={handleMonthDragOver}
+                handleMonthDragLeave={handleMonthDragLeave}
+                handleMonthDrop={handleMonthDrop}
+                handleTransactionDragStart={handleTransactionDragStart}
+                handleTransactionDragOver={handleTransactionDragOver}
+                handleTransactionDrop={handleTransactionDrop}
+                handleDragEnd={handleDragEnd}
+                handleOpenMobileEdit={handleOpenMobileEdit}
+                handleOpenMobileAdd={handleOpenMobileAdd}
+                handleCopyMonthClick={handleCopyMonthClick}
+                getNextMonth={getNextMonth}
+                getMonthOrder={getMonthOrder}
+                tableColors={tableColors}
+              />
+            ))}
+          </Box>
+        </Box>
       </Paper>
 
       {/* Dialogs */}

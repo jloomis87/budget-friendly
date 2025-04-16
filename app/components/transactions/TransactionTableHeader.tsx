@@ -686,203 +686,245 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
     return emojiKeywords[emoji as keyof typeof emojiKeywords] || emoji;
   }, []);
 
+  // Check if a given event target is an interactive element that should handle its own clicks
+  const isInteractiveElement = (target: HTMLElement): boolean => {
+    return !!target.closest('button') || 
+      !!target.closest('input') || 
+      !!target.closest('a') ||
+      !!target.closest('[role="button"]') ||
+      !!target.closest('.MuiSlider-root') ||
+      !!target.closest('.MuiTextField-root');
+  };
+
+  // Clickable Header wrapper component
+  const ClickableHeader: React.FC<{children: React.ReactNode}> = ({ children }) => {
+    if (!onToggleExpand) {
+      return <>{children}</>;
+    }
+    
+    return (
+      <Box
+        onClick={(e) => {
+          const target = e.target as HTMLElement;
+          if (!isInteractiveElement(target) && onToggleExpand) {
+            onToggleExpand();
+          }
+        }}
+        sx={{
+          cursor: 'pointer',
+          width: '100%',
+          p: 2,
+          '&:hover': {
+            backgroundColor: hasCustomDarkColor 
+              ? 'rgba(255, 255, 255, 0.05)' 
+              : 'rgba(0, 0, 0, 0.02)'
+          }
+        }}
+      >
+        {children}
+      </Box>
+    );
+  };
+
+  // Click handler to make the header clickable while avoiding interactive elements
+  const headerClickHandler = (e: React.MouseEvent) => {
+    if (!onToggleExpand) return;
+    
+    // Don't trigger when clicking interactive elements
+    const target = e.target as HTMLElement;
+    const isInteractive = 
+      target.closest('button') || 
+      target.closest('input') || 
+      target.closest('a') ||
+      target.closest('[role="button"]') ||
+      target.closest('.MuiSlider-root');
+      
+    if (!isInteractive) {
+      onToggleExpand();
+    }
+  };
+
+  // Helper function to handle clicks on the header
+  const handleHeaderClick = (e: React.MouseEvent) => {
+    if (!onToggleExpand) return;
+    
+    // Don't toggle when clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button') || 
+      target.closest('input') || 
+      target.closest('a') ||
+      target.closest('[role="button"]') ||
+      target.closest('.MuiSlider-root')
+    ) {
+      return;
+    }
+    
+    onToggleExpand();
+  };
+
   return (
-    <Box sx={{ 
-      p: 2, 
-      display: 'flex', 
-      justifyContent: 'space-between', 
-      alignItems: 'center', 
-      borderBottom: '1px solid', 
-      borderColor: 'rgba(0, 0, 0, 0.1)' 
-    }}>
-      {isEditing ? (
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Box sx={{ fontSize: '1.3rem', mr: 1.5, display: 'flex', alignItems: 'center' }}>
-            {categoryInfo?.icon || '📊'}
-          </Box>
-          <TextField
-            value={editedName}
-            onChange={(e) => setEditedName(e.target.value)}
-            onKeyDown={handleKeyDown}
-            autoFocus
-            size="small"
-            sx={{ 
-              width: '200px',
-              input: { 
-                fontWeight: 'bold',
-                color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.87)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? '#fff' : 'inherit')),
-              }
-            }}
-          />
-          <Tooltip title="Save">
-            <IconButton 
-              onClick={handleSaveEdit} 
-              size="small" 
-              color="primary"
-              sx={{ ml: 1 }}
-            >
-              <CheckIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Cancel">
-            <IconButton 
-              onClick={handleCancelEdit} 
+    <Box>
+      {/* Header with clickable area */}
+      <Box 
+        sx={{ 
+          p: 2, 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          borderBottom: '1px solid', 
+          borderColor: 'rgba(0, 0, 0, 0.1)',
+          cursor: onToggleExpand ? 'pointer' : 'default',
+          '&:hover': {
+            backgroundColor: onToggleExpand ? (hasCustomDarkColor ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)') : 'transparent'
+          }
+        }}
+        onClick={handleHeaderClick}
+      >
+        {isEditing ? (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ fontSize: '1.3rem', mr: 1.5, display: 'flex', alignItems: 'center' }}>
+              {categoryInfo?.icon || '📊'}
+            </Box>
+            <TextField
+              value={editedName}
+              onChange={(e) => setEditedName(e.target.value)}
+              onKeyDown={handleKeyDown}
+              autoFocus
               size="small"
-              sx={{ ml: 0.5 }}
-            >
-              <CloseIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      ) : (
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Box 
-            sx={{ 
-              fontSize: '1.3rem', 
-              mr: 1.5, 
-              display: 'flex', 
-              alignItems: 'center',
-              cursor: 'pointer',
-              padding: '4px',
-              borderRadius: '50%',
-              transition: 'all 0.2s',
-              '&:hover': {
-                backgroundColor: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.07)',
-                transform: 'scale(1.05)'
-              },
-              '&:active': {
-                transform: 'scale(0.97)'
-              }
-            }}
-            onClick={(e) => {
-              setSelectedIcon(categoryInfo?.icon || '📊');
-              setEditedName(category);
-              setEmojiPickerAnchor(e.currentTarget);
-            }}
-          >
-            <Tooltip title={`${getEmojiDescription(categoryInfo?.icon || '📊')} - Click to change`}>
-              <Box component="span">
-                {categoryInfo?.icon || '📊'}
-              </Box>
+              sx={{ 
+                width: '200px',
+                input: { 
+                  fontWeight: 'bold',
+                  color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.87)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? '#fff' : 'inherit')),
+                }
+              }}
+            />
+            <Tooltip title="Save">
+              <IconButton 
+                onClick={handleSaveEdit} 
+                size="small" 
+                color="primary"
+                sx={{ ml: 1 }}
+              >
+                <CheckIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Cancel">
+              <IconButton 
+                onClick={handleCancelEdit} 
+                size="small"
+                sx={{ ml: 0.5 }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
             </Tooltip>
           </Box>
-          <Typography 
-            variant="h6" 
-            sx={{ 
-              fontWeight: 'bold',
-              color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.87)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? '#fff' : 'inherit')),
-              fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-              letterSpacing: '0.01em',
-            }}
-          >
-            {category}
-          </Typography>
-          {!isIncome && (
-            <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-              <Tooltip title="Edit category name and icon">
-                <IconButton 
-                  onClick={handleEditClick} 
-                  size="small"
-                  sx={{ 
-                    color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
-                    '&:hover': {
-                      color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.9)' : (isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)'),
-                    }
-                  }}
-                >
-                  <EditIcon fontSize="small" />
-                </IconButton>
+        ) : (
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box 
+              sx={{ 
+                fontSize: '1.3rem', 
+                mr: 1.5, 
+                display: 'flex', 
+                alignItems: 'center',
+                cursor: 'pointer',
+                padding: '4px',
+                borderRadius: '50%',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  backgroundColor: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.07)',
+                  transform: 'scale(1.05)'
+                },
+                '&:active': {
+                  transform: 'scale(0.97)'
+                }
+              }}
+              onClick={(e) => {
+                setSelectedIcon(categoryInfo?.icon || '📊');
+                setEditedName(category);
+                setEmojiPickerAnchor(e.currentTarget);
+              }}
+            >
+              <Tooltip title={`${getEmojiDescription(categoryInfo?.icon || '📊')} - Click to change`}>
+                <Box component="span">
+                  {categoryInfo?.icon || '📊'}
+                </Box>
               </Tooltip>
-              
-              {!isDefaultCategory && (
-                <Tooltip title="Delete category">
+            </Box>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontWeight: 'bold',
+                color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.87)' : (category === 'Income' ? 'rgba(0, 0, 0, 0.87)' : (isDark ? '#fff' : 'inherit')),
+                fontFamily: '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                letterSpacing: '0.01em',
+              }}
+            >
+              {category}
+            </Typography>
+            {!isIncome && (
+              <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
+                <Tooltip title="Edit category name and icon">
                   <IconButton 
-                    onClick={handleDeleteClick} 
+                    onClick={handleEditClick} 
                     size="small"
                     sx={{ 
-                      ml: 0.5,
-                      color: hasCustomDarkColor ? 'rgba(255, 80, 80, 0.7)' : 'rgba(211, 47, 47, 0.7)',
+                      color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
                       '&:hover': {
-                        color: hasCustomDarkColor ? 'rgba(255, 80, 80, 0.9)' : 'rgba(211, 47, 47, 0.9)',
+                        color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.9)' : (isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.9)'),
                       }
                     }}
                   >
-                    <DeleteIcon fontSize="small" />
+                    <EditIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
-              )}
-            </Box>
-          )}
-        </Box>
-      )}
-      
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Box 
-          sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 2,
-            backgroundColor: 'rgba(33, 33, 33, 0.3)',
-            color: '#ffffff',
-            p: 1.5,
-            px: 2,
-            borderRadius: 2,
-            boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
-            backdropFilter: 'blur(4px)',
-            flexGrow: {
-              xs: 1,
-              sm: 0
-            }
-          }}
-        >
-          {/* For non-Income categories, show allocation information */}
-          {!isIncome ? (
-            <>
-              <Box sx={{ display: 'flex', alignItems: 'center', mr: 2, borderRight: '1px solid rgba(255,255,255,0.3)', pr: 2 }}>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    fontWeight: 'medium',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Box component="span" sx={{ mr: 0.75 }}>Target Allocation:</Box>
-                  <Tooltip title="Edit target allocation">
-                    <Box 
-                      component="span" 
-                      onClick={handlePercentageDialogOpen}
+                
+                {!isDefaultCategory && (
+                  <Tooltip title="Delete category">
+                    <IconButton 
+                      onClick={handleDeleteClick} 
+                      size="small"
                       sx={{ 
-                        fontWeight: 'bold', 
-                        cursor: 'pointer',
-                        color: '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                        borderRadius: '4px',
-                        px: 1,
-                        py: 0.25,
-                        border: '1px solid rgba(255, 255, 255, 0.25)',
-                        transition: 'all 0.2s ease',
+                        ml: 0.5,
+                        color: hasCustomDarkColor ? 'rgba(255, 80, 80, 0.7)' : 'rgba(211, 47, 47, 0.7)',
                         '&:hover': {
-                          backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                          color: '#ffffff',
-                          transform: 'scale(1.03)',
-                        },
-                        '&:active': {
-                          transform: 'scale(0.98)',
+                          color: hasCustomDarkColor ? 'rgba(255, 80, 80, 0.9)' : 'rgba(211, 47, 47, 0.9)',
                         }
                       }}
                     >
-                      {percentage}% <PercentIcon sx={{ ml: 0.5, fontSize: '1rem', opacity: 0.8 }} />
-                    </Box>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
                   </Tooltip>
-                </Typography>
+                )}
               </Box>
-              
-              <Box sx={{ display: 'flex', alignItems: 'center', mr: 2, borderRight: '1px solid rgba(255,255,255,0.3)', pr: 2 }}>
-                <Tooltip title="Actual spending percentage based on current transactions">
+            )}
+          </Box>
+        )}
+        
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 2,
+              backgroundColor: 'rgba(33, 33, 33, 0.3)',
+              color: '#ffffff',
+              p: 1.5,
+              px: 2,
+              borderRadius: 2,
+              boxShadow: '0 3px 10px rgba(0,0,0,0.2)',
+              backdropFilter: 'blur(4px)',
+              flexGrow: {
+                xs: 1,
+                sm: 0
+              }
+            }}
+          >
+            {/* For non-Income categories, show allocation information */}
+            {!isIncome ? (
+              <>
+                <Box sx={{ display: 'flex', alignItems: 'center', mr: 2, borderRight: '1px solid rgba(255,255,255,0.3)', pr: 2 }}>
                   <Typography 
                     variant="body2" 
                     sx={{ 
@@ -892,65 +934,110 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                       alignItems: 'center',
                     }}
                   >
-                    <Box component="span" sx={{ mr: 0.75 }}>Current Allocation:</Box>
-                    <Box 
-                      component="span" 
+                    <Box component="span" sx={{ mr: 0.75 }}>Target Allocation:</Box>
+                    <Tooltip title="Edit target allocation">
+                      <Box 
+                        component="span" 
+                        onClick={handlePercentageDialogOpen}
+                        sx={{ 
+                          fontWeight: 'bold', 
+                          cursor: 'pointer',
+                          color: '#ffffff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                          borderRadius: '4px',
+                          px: 1,
+                          py: 0.25,
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                            color: '#ffffff',
+                            transform: 'scale(1.03)',
+                          },
+                          '&:active': {
+                            transform: 'scale(0.98)',
+                          }
+                        }}
+                      >
+                        {percentage}% <PercentIcon sx={{ ml: 0.5, fontSize: '1rem', opacity: 0.8 }} />
+                      </Box>
+                    </Tooltip>
+                  </Typography>
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', mr: 2, borderRight: '1px solid rgba(255,255,255,0.3)', pr: 2 }}>
+                  <Tooltip title="Actual spending percentage based on current transactions">
+                    <Typography 
+                      variant="body2" 
                       sx={{ 
-                        fontWeight: 'bold',
-                        // Keep the color system for allocations but make it more visible
-                        color: getCurrentAllocationColor(Math.abs(totalAmount), percentage),
-                        filter: 'brightness(1.2)'
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        fontWeight: 'medium',
+                        display: 'flex',
+                        alignItems: 'center',
                       }}
                     >
-                      {getCurrentAllocationPercentage(Math.abs(totalAmount))}%
-                    </Box>
-                  </Typography>
-                </Tooltip>
-              </Box>
-            </>
-          ) : null}
-          
-          {/* For all categories, show the total */}
-          <Typography 
-            component="span" 
-            variant="subtitle1" 
-            sx={{ 
-              fontWeight: 600, 
-              color: '#ffffff',
-              fontSize: '0.95rem'
-            }}
-          >
-            Total: ${Math.abs(totalAmount).toFixed(2)}
-          </Typography>
-        </Box>
-        
-        <TransactionSort
-          sortOption={sortOption}
-          onSortChange={onSortChange}
-          hasCustomDarkColor={hasCustomDarkColor}
-          isDark={isDark}
-          category={category}
-        />
-        <CategoryColorPicker category={category} />
-        
-        {/* Expand/Collapse Toggle Button */}
-        {onToggleExpand && (
-          <Tooltip title={isExpanded ? "Collapse transactions" : "Expand transactions"}>
-            <IconButton 
-              onClick={onToggleExpand}
+                      <Box component="span" sx={{ mr: 0.75 }}>Current Allocation:</Box>
+                      <Box 
+                        component="span" 
+                        sx={{ 
+                          fontWeight: 'bold',
+                          // Keep the color system for allocations but make it more visible
+                          color: getCurrentAllocationColor(Math.abs(totalAmount), percentage),
+                          filter: 'brightness(1.2)'
+                        }}
+                      >
+                        {getCurrentAllocationPercentage(Math.abs(totalAmount))}%
+                      </Box>
+                    </Typography>
+                  </Tooltip>
+                </Box>
+              </>
+            ) : null}
+            
+            {/* For all categories, show the total */}
+            <Typography 
+              component="span" 
+              variant="subtitle1" 
               sx={{ 
-                color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.8)' : (isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.7)'),
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                },
-                transition: 'all 0.2s ease',
+                fontWeight: 600, 
+                color: '#ffffff',
+                fontSize: '0.95rem'
               }}
             >
-              {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            </IconButton>
-          </Tooltip>
-        )}
+              Total: ${Math.abs(totalAmount).toFixed(2)}
+            </Typography>
+          </Box>
+          
+          <TransactionSort
+            sortOption={sortOption}
+            onSortChange={onSortChange}
+            hasCustomDarkColor={hasCustomDarkColor}
+            isDark={isDark}
+            category={category}
+          />
+          <CategoryColorPicker category={category} />
+          
+          {/* Expand/Collapse Toggle Button */}
+          {onToggleExpand && (
+            <Tooltip title={isExpanded ? "Collapse transactions" : "Expand transactions"}>
+              <IconButton 
+                onClick={onToggleExpand}
+                sx={{ 
+                  color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.8)' : (isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.7)'),
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                  },
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
       </Box>
 
       {/* Emoji Picker Component */}
