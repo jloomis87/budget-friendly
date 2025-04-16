@@ -505,7 +505,6 @@ const BudgetSelector: React.FC<{
     <Paper 
       elevation={1}
       sx={{
-        mb: 2,
         p: 1,
         borderRadius: 2,
         display: 'flex',
@@ -1205,21 +1204,38 @@ const BudgetAppContent = (): JSX.Element => {
       
       {/* Main Content */}
       <Box sx={{ px: 0 }}>
-        {/* Budget Selector - Always shown */}
-        <Box sx={{ px: { xs: 1, sm: 2, md: 3 } }}>
+        {/* Budget Selector and Month Selector - Always shown and sticky */}
+        <Box 
+          sx={{ 
+            position: 'sticky',
+            top: 0,
+            zIndex: 1100,
+            bgcolor: 'background.default',
+            pt: 1,
+            pb: 1,
+            px: { xs: 1, sm: 2, md: 3 },
+            boxShadow: (theme) => `0 2px 4px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.1)'}`,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            transition: 'box-shadow 0.3s ease'
+          }}
+        >
           <BudgetSelector 
             setCurrentBudgetId={setCurrentBudgetId} 
             setAlertMessage={setAlertMessage}
           />
           
           {/* Month Selector */}
-          <Box sx={{ mb: '10px' }}>
+          <Box sx={{ mb: '10px', mt: 1 }}>
             <MonthSelector 
               selectedMonths={selectedMonths}
               onChange={setSelectedMonths}
             />
           </Box>
-          
+        </Box>
+        
+        {/* Content below sticky header, add padding to prevent content from being hidden */}
+        <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, pt: 2 }}>
           {/* Conditional content based on active tab */}
           {activeStep === 0 && (
             <>
@@ -1323,12 +1339,9 @@ const BudgetAppContent = (): JSX.Element => {
             <>
               {transactions.some(t => t.category === 'Income') && budgetSummary && budgetPlan ? (
                 <Box sx={{ 
-                  mt: 4,
-                  mb: 6,
                   position: 'relative'
                 }}>
                   <Box sx={{ 
-                    mx: { xs: 2, sm: 3 },
                     overflow: 'hidden',
                     position: 'relative',
                   }}>

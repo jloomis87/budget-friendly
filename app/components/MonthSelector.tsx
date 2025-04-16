@@ -28,6 +28,10 @@ interface MonthSelectorProps {
 }
 
 export function MonthSelector({ selectedMonths, onChange }: MonthSelectorProps) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  
   const handleChange = (
     event: React.MouseEvent<HTMLElement>,
     newMonths: string[],
@@ -46,16 +50,99 @@ export function MonthSelector({ selectedMonths, onChange }: MonthSelectorProps) 
     onChange([currentMonth]);
   };
 
-  // For mobile view, use a Select component instead
- 
-  // Desktop view with ToggleButtonGroup
+  // For mobile view, use a minimized version
+  if (isMobile) {
+    return (
+      <Box>
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          mb: 1
+        }}>
+          <Typography 
+            variant="subtitle2" 
+            sx={{ 
+              fontWeight: 600,
+              color: 'text.primary'
+            }}
+          >
+            {selectedMonths.length === MONTHS.length 
+              ? 'All Months' 
+              : selectedMonths.length === 1 
+                ? selectedMonths[0] 
+                : `${selectedMonths.length} Months Selected`}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button 
+              size="small"
+              onClick={handleSelectAll}
+              sx={{
+                textTransform: 'none',
+                fontSize: '0.75rem',
+                py: 0.5,
+                minWidth: 'auto'
+              }}
+            >
+              All
+            </Button>
+            <Button 
+              size="small"
+              onClick={handleDeselectAll}
+              sx={{
+                textTransform: 'none',
+                fontSize: '0.75rem',
+                py: 0.5,
+                minWidth: 'auto'
+              }}
+            >
+              Current
+            </Button>
+          </Box>
+        </Box>
+        
+        <Box 
+          sx={{ 
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 0.5,
+            mb: 1
+          }}
+        >
+          {MONTHS.map((month) => (
+            <Chip
+              key={month}
+              label={month.substring(0, 3)}
+              size="small"
+              clickable
+              color={selectedMonths.includes(month) ? "primary" : "default"}
+              variant={selectedMonths.includes(month) ? "filled" : "outlined"}
+              onClick={() => {
+                const newSelection = selectedMonths.includes(month)
+                  ? selectedMonths.filter(m => m !== month)
+                  : [...selectedMonths, month];
+                onChange(newSelection);
+              }}
+              sx={{
+                fontWeight: selectedMonths.includes(month) ? 600 : 400,
+                transition: 'all 0.2s',
+                fontSize: '0.75rem'
+              }}
+            />
+          ))}
+        </Box>
+      </Box>
+    );
+  }
+
+  // Desktop view with grid of toggle buttons
   return (
     <Box>
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
-        mb: 2 
+        mb: 1
       }}>
         <Typography 
           variant="subtitle1" 
@@ -64,7 +151,11 @@ export function MonthSelector({ selectedMonths, onChange }: MonthSelectorProps) 
             color: 'text.primary'
           }}
         >
-          Select Month(s)
+          {selectedMonths.length === MONTHS.length 
+            ? 'All Months Selected' 
+            : selectedMonths.length === 1 
+              ? `Month: ${selectedMonths[0]}` 
+              : `${selectedMonths.length} Months Selected`}
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button 
@@ -85,7 +176,7 @@ export function MonthSelector({ selectedMonths, onChange }: MonthSelectorProps) 
               fontSize: '0.875rem'
             }}
           >
-            Deselect All
+            Current Month
           </Button>
         </Box>
       </Box>
