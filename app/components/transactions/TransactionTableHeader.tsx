@@ -41,10 +41,10 @@ const emojiOptions = [
   '💊', '💉', '🩹', '🩺', '🔬', '🧪', '🦷', '🧠', '👓', '🧬', '🏥', '⚕️', '🩸', '🩻', '🫀',
   // Education
   '📚', '📝', '📎', '✏️', '✒️', '🖋️', '🖊️', '🖌️', '🖍️', '📏', '📐', '📓', '📔', '📒', '📕',
-  '📗', '📘', '📙', '🎓', '🔍', '🔎', '📄', '📑', '📊', '📋', '📌', '📍', '🧮', '📆', '📅',
+  '📗', '📘', '📙', '🎓', '📋', '📌', '📍', '🧮', '📆', '📅',
   // Technology
-  '💻', '⌨️', '🖥️', '🖱️', '💿', '💾', '📀', '🧮', '🔋', '🔌', '📱', '📲', '☎️', '📞', '📟',
-  '📠', '⏱️', '⏲️', '⏰', '🕰️', '📡', '🔦', '🪫', '💡', '🔍', '🔎', '📡',
+  '💻', '⌨️', '🖥️', '🖱️', '💿', '💾', '📀', '🔋', '🔌', '📱', '📲', '☎️', '📞', '📟',
+  '📠', '⏱️', '⏲️', '⏰', '🕰️', '📡', '🔦', '🪫', '💡', '🔍', '🔎',
   // Utilities and Services
   '📦', '📫', '📪', '📬', '📭', '📮', '🗒️', '🗓️', '🔖', '🏷️', '📧', '📨', '📩', '📤', '📥',
   '📁', '📂', '🗂️', '📰', '🗞️', '📑', '🔒', '🔓', '🔏', '🔐', '🔑', '🗝️', '🔨', '🪓', '⛏️',
@@ -415,9 +415,6 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
       '🚲': 'bicycle bike vehicle transportation cycling',
       '🛵': 'motor scooter vehicle transportation motorcycle moped',
       '🏍️': 'motorcycle bike vehicle transportation',
-      '🛺': 'auto rickshaw vehicle transportation tuk tuk',
-      
-      // Aquatic Animals
       '🐟': 'fish animal aquatic sea ocean marine underwater water',
       '🐠': 'tropical fish aquarium colorful swimming aquatic animal sea ocean marine',
       '🐡': 'blowfish pufferfish fish aquatic animal sea ocean marine',
@@ -437,8 +434,6 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
       '🦦': 'otter animal aquatic water mammal',
       '🐸': 'frog animal amphibian water toad',
       '🦎': 'lizard animal reptile gecko',
-      
-      // Home & Living keywords
       '🏠': 'house home building residence dwelling property',
       '🏡': 'house garden home building residence property yard',
       '🏘️': 'houses buildings neighborhood community residential',
@@ -459,8 +454,6 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
       '🚿': 'shower bathroom home cleaning hygiene water',
       '🪠': 'plunger bathroom toilet fix home',
       '🧯': 'fire extinguisher safety emergency home',
-      
-      // Animal keywords
       '🐶': 'dog pet animal puppy canine friend',
       '🐕': 'dog pet animal canine friend',
       '🦮': 'guide dog service animal pet assistance',
@@ -502,7 +495,6 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
       '🐁': 'mouse animal rodent pet small',
       '🐀': 'rat animal rodent pet',
       '🐹': 'hamster animal rodent pet small',
-      '🐰': 'rabbit face animal pet bunny easter',
       '🐇': 'rabbit animal pet bunny easter',
       '🐿️': 'chipmunk animal rodent wildlife squirrel',
       '🦫': 'beaver animal rodent wildlife water',
@@ -617,6 +609,213 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
       : `No exact matches for "${searchQuery}" - try a more general term`}
   </Typography>
 
+  // Get emoji description for tooltip
+  const getEmojiDescription = useCallback((emoji: string): string => {
+    const emojiKeywords = {
+      // Finance & Money keywords
+      '💰': 'Money Bag',
+      '💵': 'Dollar Bill',
+      '💸': 'Money with Wings',
+      '💳': 'Credit Card',
+      '🏦': 'Bank',
+      '💹': 'Chart Increasing with Yen',
+      '📈': 'Chart Increasing',
+      '📉': 'Chart Decreasing',
+      '💎': 'Gem Stone',
+      '👛': 'Purse',
+      '💼': 'Briefcase',
+      '🧾': 'Receipt',
+      '💲': 'Dollar Sign',
+      '💱': 'Currency Exchange',
+      '🪙': 'Coin',
+      '📊': 'Bar Chart',
+      '🧮': 'Abacus',
+      '💴': 'Yen Banknote',
+      '💶': 'Euro Banknote',
+      '💷': 'Pound Banknote',
+      '🏧': 'ATM Sign',
+      
+      // Shopping keywords
+      '🛒': 'Shopping Cart',
+      '🛍️': 'Shopping Bags',
+      '👕': 'T-Shirt',
+      '👗': 'Dress',
+      '👟': 'Running Shoe',
+      '👠': 'High-Heeled Shoe',
+      '👜': 'Handbag',
+      '🧥': 'Coat',
+      '🕶️': 'Sunglasses',
+      '👑': 'Crown',
+      '💄': 'Lipstick',
+      '⌚': 'Watch',
+      '💍': 'Ring',
+      '🎒': 'Backpack',
+      
+      // Transportation keywords
+      '🚗': 'Automobile',
+      '🚙': 'SUV',
+      '🚕': 'Taxi',
+      '🛻': 'Pickup Truck',
+      '🏎️': 'Racing Car',
+      '🚓': 'Police Car',
+      '🚑': 'Ambulance',
+      '🚒': 'Fire Engine',
+      '🚐': 'Minibus',
+      '🛺': 'Auto Rickshaw',
+      '🚲': 'Bicycle',
+      '🛵': 'Motor Scooter',
+      '🏍️': 'Motorcycle',
+      '✈️': 'Airplane',
+      '🚁': 'Helicopter',
+      '🚀': 'Rocket',
+      '🚂': 'Locomotive',
+      '🚆': 'Train',
+      '🚇': 'Metro',
+      '🚊': 'Tram',
+      '🚉': 'Station',
+      '🚤': 'Speedboat',
+      '⛴️': 'Ferry',
+      '🚢': 'Ship',
+      
+      // Food and Dining
+      '🍕': 'Pizza',
+      '🍔': 'Hamburger',
+      '🍟': 'French Fries',
+      '🌮': 'Taco',
+      '🌯': 'Burrito',
+      '🥗': 'Green Salad',
+      '🍣': 'Sushi',
+      '🍱': 'Bento Box',
+      '🍜': 'Steaming Bowl',
+      '🍲': 'Pot of Food',
+      '🍛': 'Curry Rice',
+      '🍝': 'Spaghetti',
+      '🥪': 'Sandwich',
+      '☕': 'Hot Beverage',
+      '🍵': 'Teacup Without Handle',
+      '🧋': 'Bubble Tea',
+      '🥤': 'Cup with Straw',
+      '🍷': 'Wine Glass',
+      '🍸': 'Cocktail Glass',
+      '🍹': 'Tropical Drink',
+      '🍺': 'Beer Mug',
+      '🍻': 'Clinking Beer Mugs',
+      
+      // Home and Living
+      '🏠': 'House',
+      '🏡': 'House with Garden',
+      '🏘️': 'Houses',
+      '🪑': 'Chair',
+      '🛋️': 'Couch and Lamp',
+      '🛏️': 'Bed',
+      '🚪': 'Door',
+      '🪟': 'Window',
+      '🪴': 'Potted Plant',
+      '🧹': 'Broom',
+      '🧼': 'Soap',
+      '🧺': 'Basket',
+      '🛁': 'Bathtub',
+      '🚿': 'Shower',
+      '🪠': 'Plunger',
+      '🧯': 'Fire Extinguisher',
+      
+      // Animals and Pets
+      '🐶': 'Dog Face',
+      '🐱': 'Cat Face',
+      '🐭': 'Mouse Face',
+      '🐹': 'Hamster Face',
+      '🐰': 'Rabbit Face',
+      '🦊': 'Fox Face',
+      '🐻': 'Bear Face',
+      '🐼': 'Panda Face',
+      '🐨': 'Koala',
+      '🦁': 'Lion Face',
+      '🐯': 'Tiger Face',
+      '🐮': 'Cow Face',
+      '🐷': 'Pig Face',
+      '🐸': 'Frog Face',
+      '🐵': 'Monkey Face',
+      '🐔': 'Chicken',
+      '🐧': 'Penguin',
+      '🐦': 'Bird',
+      
+      // Aquatic Animals
+      '🐟': 'Fish',
+      '🐠': 'Tropical Fish',
+      '🐡': 'Blowfish',
+      '🦈': 'Shark',
+      '🐙': 'Octopus',
+      '🦑': 'Squid',
+      '🦐': 'Shrimp',
+      '🦞': 'Lobster',
+      '🦀': 'Crab',
+      '🐚': 'Spiral Shell',
+      '🐬': 'Dolphin',
+      '🐳': 'Spouting Whale',
+      '🐋': 'Whale',
+      '🦭': 'Seal',
+      
+      // Entertainment
+      '🎬': 'Clapper Board',
+      '🎮': 'Video Game',
+      '🎯': 'Direct Hit',
+      '🎲': 'Game Die',
+      '🎨': 'Artist Palette',
+      '🎭': 'Performing Arts',
+      '🎪': 'Circus Tent',
+      '🎟️': 'Admission Tickets',
+      '🎫': 'Ticket',
+      '🎼': 'Musical Score',
+      '🎵': 'Musical Note',
+      '🎶': 'Musical Notes',
+      '🎸': 'Guitar',
+      '🎹': 'Piano',
+      '🎺': 'Trumpet',
+      '🎻': 'Violin',
+      '🎷': 'Saxophone',
+      '🎧': 'Headphones',
+      
+      // Technology
+      '💻': 'Laptop',
+      '⌨️': 'Keyboard',
+      '🖥️': 'Desktop Computer',
+      '🖱️': 'Computer Mouse',
+      '💿': 'Optical Disc',
+      '💾': 'Floppy Disk',
+      '📀': 'DVD',
+      '🔋': 'Battery',
+      '🔌': 'Electric Plug',
+      '📱': 'Mobile Phone',
+      '📲': 'Phone with Arrow',
+      '☎️': 'Telephone',
+      '📞': 'Telephone Receiver',
+      '📟': 'Pager',
+      
+      // Miscellaneous
+      '❤️': 'Red Heart',
+      '💘': 'Heart with Arrow',
+      '💝': 'Heart with Ribbon',
+      '💖': 'Sparkling Heart',
+      '💗': 'Growing Heart',
+      '💓': 'Beating Heart',
+      '💞': 'Revolving Hearts',
+      '💕': 'Two Hearts',
+      '💯': 'Hundred Points',
+      '✅': 'Check Mark',
+      '❎': 'Cross Mark',
+      '🏆': 'Trophy',
+      '🥇': 'Gold Medal',
+      '🥈': 'Silver Medal',
+      '🥉': 'Bronze Medal',
+      '🧿': 'Nazar Amulet',
+      '🔮': 'Crystal Ball',
+      '🧸': 'Teddy Bear'
+    };
+    
+    // Return the description or the emoji itself if not found
+    return emojiKeywords[emoji] || emoji;
+  }, []);
+
   return (
     <Box sx={{ 
       p: 2, 
@@ -691,7 +890,7 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
               setEmojiPickerAnchor(e.currentTarget);
             }}
           >
-            <Tooltip title="Click to change icon">
+            <Tooltip title={`${getEmojiDescription(categoryInfo?.icon || '📊')} - Click to change`}>
               <Box component="span">
                 {categoryInfo?.icon || '📊'}
               </Box>
@@ -942,30 +1141,31 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                 }}
               >
                 {filteredEmojis.length > 0 ? filteredEmojis.map((emoji) => (
-                  <Paper
-                    key={emoji}
-                    elevation={selectedIcon === emoji ? 3 : 1}
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      borderRadius: 1,
-                      fontSize: '0.95rem',
-                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        transform: 'scale(1.1)',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                      }
-                    }}
-                    onClick={() => handleSelectEmoji(emoji)}
-                  >
-                    {emoji}
-                  </Paper>
+                  <Tooltip key={emoji} title={getEmojiDescription(emoji)} arrow placement="top">
+                    <Paper
+                      elevation={selectedIcon === emoji ? 3 : 1}
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        borderRadius: 1,
+                        fontSize: '0.95rem',
+                        bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                        border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                        }
+                      }}
+                      onClick={() => handleSelectEmoji(emoji)}
+                    >
+                      {emoji}
+                    </Paper>
+                  </Tooltip>
                 )) : (
                   <Typography variant="body2" sx={{ gridColumn: 'span 25', color: 'text.secondary', py: 1 }}>
                     No matching icons found. Try a different search term.
@@ -990,30 +1190,31 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                 }}
               >
                 {emojiOptions.slice(0, 45).map((emoji) => (
-                  <Paper
-                    key={emoji}
-                    elevation={selectedIcon === emoji ? 3 : 1}
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      borderRadius: 1,
-                      fontSize: '0.95rem',
-                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        transform: 'scale(1.1)',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                      }
-                    }}
-                    onClick={() => handleSelectEmoji(emoji)}
-                  >
-                    {emoji}
-                  </Paper>
+                  <Tooltip key={emoji} title={getEmojiDescription(emoji)} arrow placement="top">
+                    <Paper
+                      elevation={selectedIcon === emoji ? 3 : 1}
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        borderRadius: 1,
+                        fontSize: '0.95rem',
+                        bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                        border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                        }
+                      }}
+                      onClick={() => handleSelectEmoji(emoji)}
+                    >
+                      {emoji}
+                    </Paper>
+                  </Tooltip>
                 ))}
               </Box>
               
@@ -1032,30 +1233,31 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                 }}
               >
                 {emojiOptions.slice(45, 104).map((emoji) => (
-                  <Paper
-                    key={emoji}
-                    elevation={selectedIcon === emoji ? 3 : 1}
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      borderRadius: 1,
-                      fontSize: '0.95rem',
-                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        transform: 'scale(1.1)',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                      }
-                    }}
-                    onClick={() => handleSelectEmoji(emoji)}
-                  >
-                    {emoji}
-                  </Paper>
+                  <Tooltip key={emoji} title={getEmojiDescription(emoji)} arrow placement="top">
+                    <Paper
+                      elevation={selectedIcon === emoji ? 3 : 1}
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        borderRadius: 1,
+                        fontSize: '0.95rem',
+                        bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                        border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                        }
+                      }}
+                      onClick={() => handleSelectEmoji(emoji)}
+                    >
+                      {emoji}
+                    </Paper>
+                  </Tooltip>
                 ))}
               </Box>
               
@@ -1074,30 +1276,31 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                 }}
               >
                 {emojiOptions.slice(104, 154).map((emoji) => (
-                  <Paper
-                    key={emoji}
-                    elevation={selectedIcon === emoji ? 3 : 1}
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      borderRadius: 1,
-                      fontSize: '0.95rem',
-                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        transform: 'scale(1.1)',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                      }
-                    }}
-                    onClick={() => handleSelectEmoji(emoji)}
-                  >
-                    {emoji}
-                  </Paper>
+                  <Tooltip key={emoji} title={getEmojiDescription(emoji)} arrow placement="top">
+                    <Paper
+                      elevation={selectedIcon === emoji ? 3 : 1}
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        borderRadius: 1,
+                        fontSize: '0.95rem',
+                        bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                        border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                        }
+                      }}
+                      onClick={() => handleSelectEmoji(emoji)}
+                    >
+                      {emoji}
+                    </Paper>
+                  </Tooltip>
                 ))}
               </Box>
               
@@ -1116,30 +1319,31 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                 }}
               >
                 {emojiOptions.slice(154, 197).map((emoji) => (
-                  <Paper
-                    key={emoji}
-                    elevation={selectedIcon === emoji ? 3 : 1}
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      borderRadius: 1,
-                      fontSize: '0.95rem',
-                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        transform: 'scale(1.1)',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                      }
-                    }}
-                    onClick={() => handleSelectEmoji(emoji)}
-                  >
-                    {emoji}
-                  </Paper>
+                  <Tooltip key={emoji} title={getEmojiDescription(emoji)} arrow placement="top">
+                    <Paper
+                      elevation={selectedIcon === emoji ? 3 : 1}
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        borderRadius: 1,
+                        fontSize: '0.95rem',
+                        bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                        border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                        }
+                      }}
+                      onClick={() => handleSelectEmoji(emoji)}
+                    >
+                      {emoji}
+                    </Paper>
+                  </Tooltip>
                 ))}
               </Box>
               
@@ -1158,30 +1362,31 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                 }}
               >
                 {emojiOptions.slice(197, 227).map((emoji) => (
-                  <Paper
-                    key={emoji}
-                    elevation={selectedIcon === emoji ? 3 : 1}
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      borderRadius: 1,
-                      fontSize: '0.95rem',
-                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        transform: 'scale(1.1)',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                      }
-                    }}
-                    onClick={() => handleSelectEmoji(emoji)}
-                  >
-                    {emoji}
-                  </Paper>
+                  <Tooltip key={emoji} title={getEmojiDescription(emoji)} arrow placement="top">
+                    <Paper
+                      elevation={selectedIcon === emoji ? 3 : 1}
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        borderRadius: 1,
+                        fontSize: '0.95rem',
+                        bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                        border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                        }
+                      }}
+                      onClick={() => handleSelectEmoji(emoji)}
+                    >
+                      {emoji}
+                    </Paper>
+                  </Tooltip>
                 ))}
               </Box>
               
@@ -1200,30 +1405,31 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                 }}
               >
                 {emojiOptions.slice(227, 277).map((emoji) => (
-                  <Paper
-                    key={emoji}
-                    elevation={selectedIcon === emoji ? 3 : 1}
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      borderRadius: 1,
-                      fontSize: '0.95rem',
-                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        transform: 'scale(1.1)',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                      }
-                    }}
-                    onClick={() => handleSelectEmoji(emoji)}
-                  >
-                    {emoji}
-                  </Paper>
+                  <Tooltip key={emoji} title={getEmojiDescription(emoji)} arrow placement="top">
+                    <Paper
+                      elevation={selectedIcon === emoji ? 3 : 1}
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        borderRadius: 1,
+                        fontSize: '0.95rem',
+                        bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                        border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                        }
+                      }}
+                      onClick={() => handleSelectEmoji(emoji)}
+                    >
+                      {emoji}
+                    </Paper>
+                  </Tooltip>
                 ))}
               </Box>
               
@@ -1242,30 +1448,31 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                 }}
               >
                 {emojiOptions.slice(277).map((emoji) => (
-                  <Paper
-                    key={emoji}
-                    elevation={selectedIcon === emoji ? 3 : 1}
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      borderRadius: 1,
-                      fontSize: '0.95rem',
-                      bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
-                      border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
-                      transition: 'all 0.2s ease',
-                      '&:hover': {
-                        transform: 'scale(1.1)',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-                      }
-                    }}
-                    onClick={() => handleSelectEmoji(emoji)}
-                  >
-                    {emoji}
-                  </Paper>
+                  <Tooltip key={emoji} title={getEmojiDescription(emoji)} arrow placement="top">
+                    <Paper
+                      elevation={selectedIcon === emoji ? 3 : 1}
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        borderRadius: 1,
+                        fontSize: '0.95rem',
+                        bgcolor: selectedIcon === emoji ? `rgba(33, 150, 243, 0.1)` : 'background.paper',
+                        border: selectedIcon === emoji ? `2px solid #2196f3` : '1px solid #eee',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          transform: 'scale(1.1)',
+                          boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+                        }
+                      }}
+                      onClick={() => handleSelectEmoji(emoji)}
+                    >
+                      {emoji}
+                    </Paper>
+                  </Tooltip>
                 ))}
               </Box>
             </>
