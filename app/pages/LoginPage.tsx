@@ -11,10 +11,21 @@ import {
   Tab,
   CircularProgress,
   Alert,
-  Link
+  Link,
+  Grid,
+  Card,
+  CardContent,
+  CardMedia,
+  useMediaQuery
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { 
+  PieChart as PieChartIcon,
+  SaveAlt as SaveAltIcon,
+  TrendingUp as TrendingUpIcon,
+  Category as CategoryIcon 
+} from '@mui/icons-material';
 
 export function LoginPage() {
   const [activeTab, setActiveTab] = useState(0); // 0 for login, 1 for signup
@@ -22,6 +33,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('sm'));
   
   // Form states
   const [loginEmail, setLoginEmail] = useState('');
@@ -132,31 +144,54 @@ export function LoginPage() {
     <Box 
       sx={{ 
         width: '100%',
-        height: '100vh',
-        bgcolor: '#FFFFFF',
+        minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
         alignItems: 'center',
         position: 'relative',
         overflow: 'hidden',
-      }}
-    >
-      {/* Background with subtle pattern */}
-      <Box 
-        sx={{
+        pb: 8,
+        bgcolor: '#e8e9ec',
+        '&::after': {
+          content: '""',
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          opacity: 0.03,
-          backgroundImage: 'radial-gradient(#3f51b5 1px, transparent 1px)',
-          backgroundSize: '20px 20px',
-          zIndex: 0
-        }}
-      />
-      
+          zIndex: 0,
+          animation: 'simplePulse 8s ease-in-out infinite',
+        },
+        '@keyframes simplePulse': {
+          '0%': {
+            boxShadow: 'inset 0 0 100px 50px rgba(63,81,181,0.6)'
+          },
+          '50%': {
+            boxShadow: 'inset 0 0 150px 80px rgba(76,175,80,0.6)'
+          },
+          '100%': {
+            boxShadow: 'inset 0 0 100px 50px rgba(63,81,181,0.6)'
+          }
+        },
+        // More subtle animation on mobile
+        [theme.breakpoints.down('sm')]: {
+          '&::after': {
+            animation: 'simplePulseMobile 8s ease-in-out infinite',
+          },
+          '@keyframes simplePulseMobile': {
+            '0%': {
+              boxShadow: 'inset 0 0 50px 20px rgba(63,81,181,0.4)'
+            },
+            '50%': {
+              boxShadow: 'inset 0 0 70px 30px rgba(76,175,80,0.4)'
+            },
+            '100%': {
+              boxShadow: 'inset 0 0 50px 20px rgba(63,81,181,0.4)'
+            }
+          }
+        }
+      }}
+    >
       <Container 
         maxWidth="md" 
         sx={{ 
@@ -169,7 +204,7 @@ export function LoginPage() {
       >
         <Box 
           sx={{ 
-            mb: 4, 
+            mb: 2, // Small margin between logo and tagline
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -180,10 +215,36 @@ export function LoginPage() {
             alt="Friendly Budgets Logo" 
             style={{
               width: 1000, // 4x larger than before (was 250)
-              marginBottom: '1rem',
-              filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))'
+              marginBottom: '0', // Remove margin before tagline
+              filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))',
+              clipPath: isSmallScreen ? 'none' : 'inset(0 0 0px 0)', // No clipPath on small screens
+              marginTop: isSmallScreen ? '-30px' : '60px' // Move the logo up a bit to compensate
             }}
           />
+          
+          {/* Tagline */}
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              color: 'rgb(50, 176, 58)',
+              //Add Underline but with space between the words
+              textDecoration: isSmallScreen ? 'none' : 'underline',
+              textDecorationColor: 'rgb(42, 156, 49)',
+              textDecorationThickness: '4px',
+              textUnderlineOffset: '8px',
+              //rounded corders on text decoration
+              textDecorationStyle: 'dotted',
+              fontWeight: 700,
+              fontSize: '1.0rem',
+              textAlign: 'center',
+              mb: 3,
+            //curve the text
+            textTransform: 'capitalize',
+              mt: isSmallScreen ? '0px' : '-60px' // Move tagline up to close gap with cropped logo
+            }}
+          >
+            Smart personal finance management with customizable budget planning.
+          </Typography>
         </Box>
         
         <Paper 
@@ -195,6 +256,7 @@ export function LoginPage() {
             borderRadius: 4,
             width: '100%',
             maxWidth: 480,
+            minWidth: { sm: '590px', xs: 'auto' },
             backgroundColor: 'rgba(255, 255, 255, 0.9)',
             backdropFilter: 'blur(8px)',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)'
@@ -345,8 +407,17 @@ export function LoginPage() {
               
               {/* Add "Don't have an account?" link */}
               <Box sx={{ mt: 3, textAlign: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Don't have an account?{' '}
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary" 
+                  sx={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 0.5
+                  }}
+                >
+                  Don't have an account?
                   <Link
                     component="button"
                     variant="body2"
@@ -358,7 +429,9 @@ export function LoginPage() {
                       textDecoration: 'none',
                       '&:hover': {
                         textDecoration: 'underline'
-                      }
+                      },
+                      display: 'inline-flex',
+                      alignItems: 'center'
                     }}
                   >
                     Sign Up
@@ -555,8 +628,18 @@ export function LoginPage() {
               
               {/* Add "Already have an account?" link */}
               <Box sx={{ mt: 3, textAlign: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Already have an account?{' '}
+                <Typography 
+                  variant="body2" 
+                  color="gray"
+                  sx={{ 
+                    
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 0.5
+                  }}
+                >
+                  Already have an account?
                   <Link
                     component="button"
                     variant="body2"
@@ -568,7 +651,9 @@ export function LoginPage() {
                       textDecoration: 'none',
                       '&:hover': {
                         textDecoration: 'underline'
-                      }
+                      },
+                      display: 'inline-flex',
+                      alignItems: 'center'
                     }}
                   >
                     Log In
