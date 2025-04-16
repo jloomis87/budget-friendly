@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Card, Typography, Box } from '@mui/material';
+import { Card, Typography, Box, IconButton, Tooltip } from '@mui/material';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import type { TransactionCardProps } from './types';
 import { isColorDark } from '../../utils/colorUtils';
 
@@ -130,7 +131,8 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
   handleTransactionDragOver,
   handleTransactionDrop,
   handleDragEnd,
-  handleOpenMobileEdit
+  handleOpenMobileEdit,
+  handleCopyToAllMonths
 }) => {
   // Use state to track the current icon to allow for reactive updates
   const [currentIcon, setCurrentIcon] = useState(transaction.icon || '');
@@ -215,6 +217,15 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
   const textColor = cardIsDark ? '#ffffff' : '#000000';
   const textColorWithOpacity = cardIsDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)';
 
+  // Function to handle card click without triggering when clicking the copy button
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't trigger edit if clicking on the copy button
+    if ((e.target as HTMLElement).closest('.copy-to-all-months-btn')) {
+      return;
+    }
+    handleOpenMobileEdit(transaction, index);
+  };
+
   return (
     <Card
       ref={cardRef}
@@ -226,7 +237,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
       onDragOver={(e) => handleTransactionDragOver(e, month, index)}
       onDrop={(e) => handleTransactionDrop(e, month, index)}
       onDragEnd={handleDragEnd}
-      onClick={() => handleOpenMobileEdit(transaction, index)}
+      onClick={handleCardClick}
       sx={{
         mb: 1,
         p: 0.75,
@@ -243,6 +254,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
         cursor: 'pointer !important', // Force pointer cursor with !important
         boxShadow: '0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23)',
         opacity: draggedTransaction?.id === transaction.id ? 0.5 : 1,
+        position: 'relative', // Added to help position the copy button
         // Add styles for when this card is the drop target for intra-month sorting
         ...(isIntraMonthDrag && dragOverIndex === index && dragSourceMonth === month ? {
           borderTop: draggedIndex !== null && draggedIndex > index 
@@ -354,6 +366,32 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
         >
           {transaction.description}
         </Typography>
+        
+        {/* Copy to all months button - moved to top right */}
+        {handleCopyToAllMonths && (
+          <Box sx={{ marginLeft: 'auto' }}>
+            <Tooltip title="Copy to all months">
+              <IconButton
+                className="copy-to-all-months-btn"
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyToAllMonths(transaction);
+                }}
+                sx={{
+                  padding: '2px',
+                  color: textColorWithOpacity,
+                  '&:hover': {
+                    color: textColor,
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  },
+                }}
+              >
+                <ContentCopyIcon sx={{ fontSize: '0.9rem' }} />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        )}
       </Box>
       
       {/* Bottom row with date and amount */}
@@ -383,7 +421,7 @@ export const TransactionCard: React.FC<TransactionCardProps> = ({
           })}
         </Typography>
         
-        {/* Amount to the right of date */}
+        {/* Amount only, copy button moved to top row */}
         <Typography 
           variant="body2"
           sx={{ 

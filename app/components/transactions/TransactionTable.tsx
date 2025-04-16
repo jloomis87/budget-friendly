@@ -694,6 +694,78 @@ export const TransactionTableContent: React.FC = () => {
   // Group transactions by month for better organization
   const transactionsByMonth = groupTransactionsByMonth(filteredTransactions);
   
+  // Add a function to copy a transaction to all months
+  const handleCopyToAllMonths = (transaction: Transaction) => {
+    // Get all available months
+    const allMonths = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    
+    // Get the current month of the transaction
+    const transactionMonth = new Date(transaction.date).toLocaleString('default', { month: 'long' });
+    
+    // Create a count for successful copies
+    let copyCount = 0;
+    
+    // Copy to all other months
+    allMonths.forEach(month => {
+      // Skip the month that already has this transaction
+      if (month === transactionMonth) {
+        return;
+      }
+      
+      // Check if the transaction already exists in this month
+      const monthTransactions = props.allTransactions.filter(t => {
+        const tMonth = new Date(t.date).toLocaleString('default', { month: 'long' });
+        return tMonth === month && t.category === transaction.category;
+      });
+      
+      // Check for duplicates in the target month
+      const isDuplicate = monthTransactions.some(
+        t => 
+          t.description === transaction.description && 
+          Math.abs(t.amount) === Math.abs(transaction.amount)
+      );
+      
+      if (isDuplicate) {
+        // Skip if duplicate exists
+        return;
+      }
+      
+      // Convert the target month to a date
+      const targetMonthIndex = new Date(`${month} 1`).getMonth();
+      
+      // Create a new date for the copied transaction
+      const currentDate = new Date(transaction.date);
+      const newDate = new Date(
+        currentDate.getFullYear(),
+        targetMonthIndex,
+        currentDate.getDate()
+      );
+      
+      // Create a copy of the transaction with the new date and a new ID
+      const transactionCopy = {
+        ...transaction,
+        date: newDate,
+        id: uuidv4() // Generate a new ID
+      };
+      
+      // Add the transaction to the target month
+      props.onAddTransaction(transactionCopy);
+      
+      // Increment copy count
+      copyCount++;
+    });
+    
+    // Show a notification about the result
+    if (copyCount > 0) {
+      showNotification(`Copied "${transaction.description}" to ${copyCount} other months`, 'success');
+    } else {
+      showNotification('No additional months to copy to (duplicate check)', 'warning');
+    }
+  };
+
   // Define more reusable styles
   const tableStyles = {
     width: '100%',
@@ -840,6 +912,7 @@ export const TransactionTableContent: React.FC = () => {
                 handleOpenMobileEdit={handleOpenMobileEdit}
                 handleOpenMobileAdd={handleOpenMobileAdd}
                 handleCopyMonthClick={handleCopyMonthClick}
+                handleCopyToAllMonths={handleCopyToAllMonths}
                 getNextMonth={getNextMonth}
                 getMonthOrder={getMonthOrder}
                 tableColors={tableColors}

@@ -175,6 +175,7 @@ export interface TransactionCardProps {
   handleTransactionDrop: (e: React.DragEvent, targetMonth: string, targetIndex: number) => void;
   handleDragEnd: (e: React.DragEvent) => void;
   handleOpenMobileEdit: (transaction: Transaction, index: number) => void;
+  handleCopyToAllMonths?: (transaction: Transaction) => void;
 }
 
 export interface MonthColumnProps {
@@ -204,6 +205,7 @@ export interface MonthColumnProps {
   handleOpenMobileEdit: (transaction: Transaction, index: number) => void;
   handleOpenMobileAdd: (month: string) => void;
   handleCopyMonthClick: (month: string, transactions: Transaction[]) => void;
+  handleCopyToAllMonths?: (transaction: Transaction) => void;
   getNextMonth: (currentMonth: string) => string;
   getMonthOrder: (month: string) => number;
   tableColors?: Record<string, string>;
