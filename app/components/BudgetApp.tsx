@@ -389,7 +389,6 @@ const BudgetSelector: React.FC<{
   const handleAddBudget = async () => {
     if (newBudgetName.trim() && user) {
       try {
-
         const createdAt = new Date().toISOString();
         // Create a new budget document in Firebase
         const newBudgetRef = await addDoc(
@@ -405,8 +404,6 @@ const BudgetSelector: React.FC<{
         const transactionsCollectionRef = collection(db, 'users', user.id, 'budgets', newBudgetRef.id, 'transactions');
         // We don't need to add any documents, just ensuring the collection path exists
         
-   
-        
         const newBudget = {
           id: newBudgetRef.id,
           name: newBudgetName.trim(),
@@ -418,10 +415,13 @@ const BudgetSelector: React.FC<{
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
         
-       
         setBudgets(updatedBudgets);
         setCurrentBudget(newBudget.id);
+        
+        // Note: This will trigger useTransactions to handle the budget change
+        // The fix in useTransactions will prevent clearing the UI elements
         setCurrentBudgetId(newBudget.id);
+        
         setNewBudgetName('');
         setShowNewBudgetField(false);
         
@@ -1324,8 +1324,8 @@ const BudgetAppContent = (): JSX.Element => {
       
       {/* Main Content */}
       <Box sx={{ px: 0 }}>
-        {/* Budget Selector and Month Selector - Only shown when user has transactions */}
-        {transactions.length > 0 && (
+        {/* Budget Selector and Month Selector - Only hidden when user has no transactions across ALL budgets */}
+        {(transactions.length > 0 || isAuthenticated) && (
           <Box 
             sx={{ 
               position: 'sticky',
@@ -1586,7 +1586,12 @@ const BudgetAppContent = (): JSX.Element => {
               
               {activeStep === 1 && (
                 <>
-                  {transactions.some(t => t.category === 'Income') && budgetSummary && budgetPlan ? (
+                  {transactionsLoading ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+                      <CircularProgress />
+                      <Typography variant="body2" sx={{ mt: 2 }}>Loading budget data...</Typography>
+                    </Box>
+                  ) : transactions.some(t => t.category === 'Income') && budgetSummary && budgetPlan ? (
                     <Box sx={{ 
                       position: 'relative'
                     }}>

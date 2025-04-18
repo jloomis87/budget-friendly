@@ -159,15 +159,17 @@ export function useTransactions(initialBudgetId?: string) {
       } else {
         // No cached data, clear all data when budget changes
         ReactDOM.unstable_batchedUpdates(() => {
-          setTransactions([]);
-          setBudgetSummary(null);
-          setBudgetPlan(null);
-          setSuggestions([]);
+          // Don't immediately clear transactions when switching to a new budget
+          // This prevents the budget bar, month selector, and Budget/Insight sections from disappearing
+          // The real data will be loaded after the API call completes
           
           // Set the new budget ID
           setCurrentBudgetId(initialBudgetId);
           // Force a reload of transactions
           setShouldReload(true);
+          
+          // Keep loading state active until data is loaded from Firebase
+          setIsLoading(true);
         });
       }
     }
