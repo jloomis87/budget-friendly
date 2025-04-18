@@ -9,7 +9,7 @@ import { TransactionTableHeader } from './TransactionTableHeader';
 import { MonthColumn } from './MonthColumn';
 import { DragIndicator } from './DragIndicator';
 import type { Transaction } from '../../services/fileParser';
-import type { TransactionTableContextProps, SortOption } from './types';
+import type { SortOption, TransactionTableContextProps } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
@@ -40,11 +40,13 @@ interface TransactionTableProps {
   isDark: boolean;
   onTransactionsChange: (newTransactions: Transaction[]) => void;
   onAlertMessage?: (message: { type: 'error' | 'warning' | 'info' | 'success', message: string }) => void;
+  id?: string; // Optional ID for targeting with tutorial
+  tutorialEditId?: string; // Optional ID for the tutorial edit button target
 }
 
 export const TransactionTable: React.FC<TransactionTableProps> = (props) => {
   return (
-    <TransactionTableProvider value={props as TransactionTableContextProps}>
+    <TransactionTableProvider value={{ props }}>
       <TransactionTableContent />
     </TransactionTableProvider>
   );
@@ -121,17 +123,34 @@ export const TransactionTableContent: React.FC = () => {
     showNotification
   } = context;
   
-  const { category, transactions, isDark, onDeleteTransaction, selectedMonths } = props;
   const { 
-    isDragging, 
-    draggedTransaction, 
-    draggedIndex, 
-    dragSourceMonth, 
-    dragOverMonth, 
-    dragOverIndex, 
-    isIntraMonthDrag, 
+    category, 
+    transactions, 
+    isDark, 
+    onDeleteTransaction, 
+    selectedMonths, 
+    id,
+    dragOverCategory, 
+    recentlyDropped,
+    allTransactions,
+    onAddTransaction,
+    onAddTransactionBatch,
+    onUpdateAllTransactionsWithSameName,
+    onTransactionsChange,
+    onDragStart
+  } = props;
+  
+  // Extract drag state variables
+  const {
+    draggedTransaction,
+    draggedIndex,
+    dragSourceMonth,
+    dragOverMonth,
+    isDragging,
     isCopyMode,
-    dragLeaveTimeout
+    dragLeaveTimeout,
+    dragOverIndex,
+    isIntraMonthDrag
   } = dragState;
   
   // First, define the getCategoryBackgroundColor function
@@ -197,6 +216,11 @@ export const TransactionTableContent: React.FC = () => {
 
   // Calculate total budget across all non-income categories
   const calculateTotalBudget = () => {
+    // Check if allTransactions exists
+    if (!props.allTransactions) {
+      return 0;
+    }
+    
     // Filter out income transactions
     const nonIncomeTransactions = props.allTransactions.filter(t => {
       const transactionCategory = categories.find(c => c.name === t.category);
@@ -806,12 +830,21 @@ export const TransactionTableContent: React.FC = () => {
         dragSourceMonth={dragSourceMonth}
       />
       
-      <Paper 
-        elevation={3}
+      <Paper
+        elevation={isColorDark(getCategoryBackgroundColor() || '') ? 1 : 0}
+        id={id}
         sx={{
-          ...backgroundStyles,
+          position: 'relative',
+          mb: 2,
           overflow: 'hidden',
-          transition: 'all 0.3s ease',
+          ...backgroundStyles,
+          transition: 'all 0.3s ease-in-out',
+          ...(dragState.isDragging && context.props.dragOverCategory === category
+            ? { transform: 'scale(1.005)', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }
+            : {}),
+          ...(context.props.recentlyDropped === category
+            ? { animation: 'pulse 1s' }
+            : {})
         }}
       >
         {/* Table header with category name and total */}

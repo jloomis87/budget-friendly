@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useSavings } from '../../contexts/SavingsContext';
+import { useSavings, SavingsContextType } from '../../contexts/SavingsContext';
 import { useNavigate } from 'react-router-dom';
 
 // Import specific icons from materialIcons utility
@@ -32,11 +32,23 @@ import {
 interface UserMenuProps {
 }
 
+// Create a wrapper for useSavings that returns a default value if context is not available
+const useSafetyCheckSavings = (): Partial<SavingsContextType> => {
+  try {
+    // Try to use the savings context
+    return useSavings();
+  } catch (error) {
+    // If it fails, return a default empty object
+    console.warn('SavingsContext not available, using fallback');
+    return { lastUpdated: null };
+  }
+};
+
 const UserMenu: React.FC<UserMenuProps> = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { mode, toggleColorMode, isLoading } = useTheme();
-  const { lastUpdated } = useSavings();
+  const { lastUpdated } = useSafetyCheckSavings();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 

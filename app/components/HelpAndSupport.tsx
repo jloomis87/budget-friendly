@@ -76,12 +76,32 @@ const resources = [
   }
 ];
 
+// Update the window interface to include our global function
+declare global {
+  interface Window {
+    showTutorial?: () => void;
+  }
+}
+
 export function HelpAndSupport() {
   const navigate = useNavigate();
   const [expandedFaq, setExpandedFaq] = useState<string | false>(false);
 
   const handleFaqChange = (panel: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
     setExpandedFaq(isExpanded ? panel : false);
+  };
+
+  // Function to trigger the tutorial from Help & Support
+  const handleViewGuide = () => {
+    // Navigate back to the main page first
+    navigate('/');
+    
+    // Use a timeout to ensure navigation completes before showing tutorial
+    setTimeout(() => {
+      if (window.showTutorial) {
+        window.showTutorial();
+      }
+    }, 300);
   };
 
   return (
@@ -144,6 +164,7 @@ export function HelpAndSupport() {
                   variant="outlined"
                   startIcon={<BookIcon />}
                   sx={{ mt: 'auto' }}
+                  onClick={handleViewGuide}
                 >
                   View Guide
                 </Button>

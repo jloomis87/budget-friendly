@@ -60,22 +60,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       try {
         if (firebaseUser) {
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          const userData = userDoc.data();
+          // Add a small delay to ensure authentication is fully registered
+          await new Promise(resolve => setTimeout(resolve, 500));
           
-          setUser({
-            id: firebaseUser.uid,
-            email: firebaseUser.email,
-            name: userData?.name || '',
-            displayName: firebaseUser.displayName,
-            preferences: userData?.preferences || {},
-          });
+          try {
+            // Attempt to get user data from Firestore
+            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            const userData = userDoc.data();
+            
+            setUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: userData?.name || firebaseUser.displayName || 'User',
+              displayName: firebaseUser.displayName,
+              preferences: userData?.preferences || {},
+            });
+          } catch (dbError) {
+            // Handle Firestore error more gracefully
+            console.error('Error fetching user data:', dbError);
+            
+            // Still set basic user data from firebase auth even when Firestore fails
+            setUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || 'User',
+              displayName: firebaseUser.displayName,
+              preferences: {},
+            });
+            
+            // Clear error after a moment - don't block the UI
+            setTimeout(() => setError(null), 3000);
+          }
         } else {
           setUser(null);
         }
       } catch (err) {
-        console.error('Error fetching user data:', err);
+        console.error('Auth state change error:', err);
         setError('Failed to load user data');
+        // Ensure user is cleared on error
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -104,17 +127,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
-      // Create user document in Firestore
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
+      // Create user document in Firestore with proper permissions
+      const userDocRef = doc(db, 'users', userCredential.user.uid);
+      
+      // Use setDoc instead of updateDoc for new documents - this is important!
+      await setDoc(userDocRef, {
         email,
         name,
         createdAt: new Date().toISOString(),
+        hasCompletedOnboarding: false,
+        hasTransactions: false,
         preferences: {
           theme: 'light',
           notifications: true,
           currency: 'USD',
         },
       });
+      
+      // Wait a moment to ensure Firestore operations complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Sign the user out immediately so they have to log in manually
+      // This ensures they are redirected to the login screen
+      await signOut(auth);
     } catch (err) {
       console.error('Sign up error:', err);
       setError('Failed to create account');

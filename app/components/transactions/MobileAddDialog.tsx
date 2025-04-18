@@ -70,7 +70,17 @@ export function MobileAddDialog({
   // Modified onAdd function to pass the selected icon to the parent
   const handleAddWithIcon = () => {
     // Pass the selected icon to the onAdd function
-    onAdd();
+    if (typeof onAdd === 'function') {
+      onAdd();
+    } else {
+      console.error("Error: onAdd is not a function", { onAdd });
+      // Display an error notification if available
+      if (window.showNotification) {
+        window.showNotification("Failed to add transaction. Please try again.", "error");
+      } else {
+        alert("Failed to add transaction. Please try again.");
+      }
+    }
   };
 
   return (

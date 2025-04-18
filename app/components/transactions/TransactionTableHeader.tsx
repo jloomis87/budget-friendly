@@ -839,7 +839,10 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
             </Tooltip>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Box 
+            sx={{ display: 'flex', alignItems: 'center' }}
+            id="category-header-with-edit"
+          >
             <Box 
               sx={{ 
                 fontSize: '1.3rem', 
@@ -887,6 +890,7 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                   <IconButton 
                     onClick={handleEditClick} 
                     size="small"
+                    id={`${category.toLowerCase()}-edit-button`}
                     sx={{ 
                       color: hasCustomDarkColor ? 'rgba(255, 255, 255, 0.6)' : (isDark ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)'),
                       '&:hover': {
@@ -958,6 +962,7 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                       <Box 
                         component="span" 
                         onClick={handlePercentageDialogOpen}
+                        id={`${category.toLowerCase()}-target-allocation`}
                         sx={{ 
                           fontWeight: 'bold', 
                           cursor: 'pointer',
@@ -989,7 +994,8 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
                 <Box sx={{ display: 'flex', alignItems: 'center', mr: 2, borderRight: '1px solid rgba(255,255,255,0.3)', pr: 2 }}>
                   <Tooltip title="Actual spending percentage based on current transactions">
                     <Typography 
-                      variant="body2" 
+                      variant="body2"
+                      id={`${category.toLowerCase()}-current-allocation`}
                       sx={{ 
                         color: 'rgba(255, 255, 255, 0.9)',
                         fontWeight: 'medium',
@@ -1018,7 +1024,8 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
             {/* For all categories, show the total */}
             <Typography 
               component="span" 
-              variant="subtitle1" 
+              variant="subtitle1"
+              id={`${category.toLowerCase()}-transaction-total`}
               sx={{ 
                 fontWeight: 600, 
                 color: '#ffffff',
@@ -1035,7 +1042,8 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
             <Tooltip title="Total number of transactions in this category">
               <Typography 
                 component="span" 
-                variant="subtitle1" 
+                variant="subtitle1"
+                id={`${category.toLowerCase()}-transaction-count`}
                 sx={{ 
                   fontWeight: 600, 
                   color: '#ffffff',
@@ -1065,6 +1073,7 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
             <Box 
               data-stats-box="true" 
               onClick={(e) => e.stopPropagation()}
+              id={`${category.toLowerCase()}-transaction-sort`}
             >
               <TransactionSort
                 sortOption={typeof sortOption === 'string' 
@@ -1083,6 +1092,7 @@ export const TransactionTableHeader: React.FC<TransactionTableHeaderProps> = ({
             <Box 
               data-stats-box="true" 
               data-color-picker="true"
+              id={`${category.toLowerCase()}-category-color-picker`}
               onClick={(e) => e.stopPropagation()}
             >
               <CategoryColorPicker category={category} />

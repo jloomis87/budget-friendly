@@ -2,41 +2,54 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if the user is accessing their own resources
+    function isUser(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
     // Allow authenticated users to read and update their own profile
     match /users/{userId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      // Allow creation with auth
+      allow create: if isAuthenticated();
+      
+      // Allow read, update, delete for the user's own data
+      allow read, update, delete: if isUser(userId);
       
       // Allow users to access their own settings subcollection
       match /settings/{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isUser(userId);
       }
       
       // Allow users to access their own transactions subcollection
       match /transactions/{transactionId} {
-        allow create: if request.auth != null && request.auth.uid == userId;
-        allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+        allow create: if isUser(userId);
+        allow read, update, delete: if isUser(userId);
       }
       
       // Allow users to access their own goals subcollection
       match /goals/{goalId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isUser(userId);
       }
       
       match /budgets/{budgetId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isUser(userId);
         
         match /transactions/{transactionId} {
-          allow read, write: if request.auth != null && request.auth.uid == userId;
+          allow read, write: if isUser(userId);
         }
       }
       
       match /preferences/{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isUser(userId);
       }
       
       match /sortPreferences/{category} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isUser(userId);
       }
     }
     

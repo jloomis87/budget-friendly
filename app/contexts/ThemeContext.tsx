@@ -51,6 +51,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (isAuthenticated && user) {
       try {
         setFirebaseError(null);
+        
+        // Add a slight delay to ensure authentication is complete
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
         // Store theme preference directly in the user document
         const userDocRef = doc(db, 'users', user.id);
         const userDoc = await getDoc(userDocRef);
@@ -66,6 +70,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } catch (error) {
         console.error('Error saving theme preference to Firebase:', error);
         setFirebaseError('Failed to save theme preference to Firebase');
+        // Silently continue - the app will still work with localStorage
       }
     }
   }, [isAuthenticated, user]);
@@ -88,6 +93,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (isAuthenticated && user && loadedUserIdRef.current !== user.id) {
         setIsLoading(true);
        
+        // Add a small delay to ensure Firebase authentication is fully processed
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         try {
           setFirebaseError(null);
@@ -100,8 +107,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const userTheme = userDoc.data().preferences.theme as PaletteMode;
             setMode(userTheme);
           } else {
-            // No theme preference in Firebase, use the local one and save it
-            await saveThemeToFirebase(mode);
+            // No theme preference in Firebase, use the local one
+            // Don't immediately try to save back to Firebase, which might fail
+            // Just use localStorage value until we know Firebase access works
+            console.log('No theme preference found in Firebase, using local setting:', mode);
           }
           
           // Mark this user as loaded
@@ -109,6 +118,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         } catch (error) {
           console.error('Error loading theme preference from Firebase:', error);
           setFirebaseError('Failed to load theme preference from Firebase');
+          
+          // Gracefully continue with localStorage theme without showing errors to user
+          // We'll silently fall back to the localStorage value
         } finally {
           setIsLoading(false);
         }

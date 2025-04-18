@@ -244,25 +244,30 @@ export interface TransactionTableHeaderProps {
 }
 
 export interface TransactionTableContextProps {
-  category: string;
-  transactions: Transaction[];
-  allTransactions: Transaction[];
-  isDark: boolean;
-  onUpdateTransaction: (index: number, updatedTransaction: Partial<Transaction>) => void;
-  onDeleteTransaction: (index: number) => void;
-  onAddTransaction: (transaction: Transaction) => void;
-  onAddTransactionBatch?: (transactions: Transaction[]) => void;
-  onUpdateAllTransactionsWithSameName?: (description: string, icon: string, excludeId?: string) => Promise<number | undefined>;
-  onForceReload?: () => void;
-  onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
-  onDragOver?: (e: React.DragEvent, category: string) => void;
-  onDrop?: (e: React.DragEvent, targetCategory: string) => void;
-  dragOverCategory?: string | null;
-  recentlyDropped?: string | null;
-  onReorder?: (category: string, sourceIndex: number, targetIndex: number) => void;
-  selectedMonths?: string[];
-  month: string;
-  onTransactionsChange: (newTransactions: Transaction[]) => void;
+  props: {
+    category: string;
+    transactions: Transaction[];
+    allTransactions: Transaction[];
+    onUpdateTransaction: (index: number, updatedTransaction: Partial<Transaction>) => void;
+    onDeleteTransaction: (index: number) => void;
+    onAddTransaction: (transaction: Transaction) => void;
+    onAddTransactionBatch?: (transactions: Transaction[]) => void;
+    onUpdateAllTransactionsWithSameName?: (description: string, icon: string, excludeId?: string) => Promise<number | undefined>;
+    onForceReload?: () => void;
+    onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
+    onDragOver?: (e: React.DragEvent, category: string) => void;
+    onDrop?: (e: React.DragEvent, targetCategory: string) => void;
+    dragOverCategory?: string | null;
+    recentlyDropped?: string | null;
+    onReorder?: (category: string, sourceIndex: number, targetIndex: number) => void;
+    selectedMonths?: string[];
+    month: string;
+    isDark: boolean;
+    onTransactionsChange: (newTransactions: Transaction[]) => void;
+    onAlertMessage?: (message: { type: 'error' | 'warning' | 'info' | 'success', message: string }) => void;
+    id?: string; // Optional ID for targeting with tutorial
+  };
+  // ... rest of interface
 }
 
 export interface DragDropState {

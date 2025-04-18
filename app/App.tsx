@@ -12,13 +12,16 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { createBrowserRouter } from 'react-router-dom';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const router = createBrowserRouter([
   {
     path: "/",
     element: (
       <ProtectedRoute>
-        <BudgetApp />
+        <ErrorBoundary>
+          <BudgetApp />
+        </ErrorBoundary>
       </ProtectedRoute>
     ),
   },

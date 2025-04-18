@@ -223,8 +223,9 @@ export const TransactionTableProvider = ({
     return tableColors[categoryName] || '#f5f5f5'; // Default light gray if no color is set
   }, [tableColors]);
   
-  // Extract props
-  const props = value;
+  // Extract props from the nested structure
+  const propsContainer = value;
+  const props = propsContainer.props;
   const { category, transactions, allTransactions, isDark } = props;
   
   // State for drag and drop
@@ -274,16 +275,20 @@ export const TransactionTableProvider = ({
   }, []);
   
   // Calculate total amount
-  const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
+  const totalAmount = transactions?.reduce ? transactions.reduce((sum, t) => sum + t.amount, 0) : 0;
   
   // Filter transactions by selected months
   const filteredTransactions = React.useMemo(() => {
     
     // Create a unique key for debugging transaction updates
-    const transactionIds = transactions.map(t => t.id).join(',').substring(0, 50);
+    const transactionIds = transactions?.map ? transactions.map(t => t.id).join(',').substring(0, 50) : '';
     
     if (!props.selectedMonths?.length) {
-      return transactions;
+      return transactions || [];
+    }
+    
+    if (!transactions) {
+      return [];
     }
     
     const filtered = transactions.filter(transaction => {
@@ -378,7 +383,7 @@ export const TransactionTableProvider = ({
       icon: dialogState.editingRow.icon
     };
     
-    const globalIndex = utils.findGlobalIndex(dialogState.mobileEditTransaction.transaction, allTransactions);
+    const globalIndex = utils.findGlobalIndex(dialogState.mobileEditTransaction.transaction, Array.isArray(allTransactions) ? allTransactions : []);
     if (globalIndex === -1) {
       console.error("Cannot save edit: transaction not found in allTransactions", dialogState.mobileEditTransaction.transaction);
       handleCloseMobileEdit();
@@ -388,28 +393,42 @@ export const TransactionTableProvider = ({
     // Check if icon was changed
     if (dialogState.editingRow.icon !== dialogState.mobileEditTransaction.transaction.icon) {
       // First update the specific transaction
-      props.onUpdateTransaction(globalIndex, updatedTransaction);
+      if (typeof props.onUpdateTransaction === 'function') {
+        props.onUpdateTransaction(globalIndex, updatedTransaction);
+      } else {
+        console.error("Error: onUpdateTransaction is not a function", props);
+        showNotification("Failed to update transaction. Please try again.", "error");
+        handleCloseMobileEdit();
+        return;
+      }
       
       // Then use the specialized function to update all transactions with the same name
-      if (props.onUpdateAllTransactionsWithSameName) {
+      if (typeof props.onUpdateAllTransactionsWithSameName === 'function') {
         props.onUpdateAllTransactionsWithSameName(dialogState.editingRow.description, dialogState.editingRow.icon, dialogState.mobileEditTransaction.transaction.id);
       } else {
         // Fallback to the old method if the specialized function is not available
         const indicesToUpdate = utils.updateTransactionsWithSameName(
           dialogState.editingRow.description,
           dialogState.editingRow.icon,
-          allTransactions,
+          Array.isArray(allTransactions) ? allTransactions : [],
           dialogState.mobileEditTransaction.transaction.id
         );
         
         // Update each transaction with the same description to have the same icon
-        indicesToUpdate.forEach(idx => {
-          props.onUpdateTransaction(idx, { icon: dialogState.editingRow.icon });
-        });
+        if (typeof props.onUpdateTransaction === 'function') {
+          indicesToUpdate.forEach(idx => {
+            props.onUpdateTransaction(idx, { icon: dialogState.editingRow.icon });
+          });
+        }
       }
     } else {
       // No icon change, just update the transaction normally
-      props.onUpdateTransaction(globalIndex, updatedTransaction);
+      if (typeof props.onUpdateTransaction === 'function') {
+        props.onUpdateTransaction(globalIndex, updatedTransaction);
+      } else {
+        console.error("Error: onUpdateTransaction is not a function", props);
+        showNotification("Failed to update transaction. Please try again.", "error");
+      }
     }
     
     handleCloseMobileEdit();
@@ -426,9 +445,12 @@ export const TransactionTableProvider = ({
     let iconToUse = dialogState.newIcon;
     const normalizedNewDescription = dialogState.newDescription.trim().toLowerCase();
     
-    const existingTransactionsWithSameName = allTransactions.filter(
-      t => t.description.trim().toLowerCase() === normalizedNewDescription
-    );
+    // Add a null check to safely handle the case where allTransactions might be undefined
+    const existingTransactionsWithSameName = Array.isArray(allTransactions)
+      ? allTransactions.filter(
+          t => t.description.trim().toLowerCase() === normalizedNewDescription
+        )
+      : [];
     
     if (existingTransactionsWithSameName.length > 0 && existingTransactionsWithSameName[0].icon) {
       // Use the icon from existing transactions
@@ -445,7 +467,14 @@ export const TransactionTableProvider = ({
       icon: iconToUse || undefined
     };
 
-    props.onAddTransaction(transaction);
+    // Add a check to ensure onAddTransaction is a function before calling it
+    if (typeof props.onAddTransaction === 'function') {
+      props.onAddTransaction(transaction);
+    } else {
+      console.error("Error: onAddTransaction is not a function", props);
+      showNotification("Failed to add transaction. Please try again.", "error");
+      return; // Exit early since we can't add the transaction
+    }
     
     // If we have an icon (either from input or from existing transactions),
     // update all other transactions with the same name to have this icon
@@ -453,12 +482,12 @@ export const TransactionTableProvider = ({
       const indicesToUpdate = utils.updateTransactionsWithSameName(
         dialogState.newDescription.trim(),
         iconToUse,
-        allTransactions,
+        Array.isArray(allTransactions) ? allTransactions : [],
         transaction.id
       );
       
       // Update each transaction with the same description to have the same icon
-      if (indicesToUpdate.length > 0) {
+      if (indicesToUpdate.length > 0 && typeof props.onUpdateTransaction === 'function') {
         
         indicesToUpdate.forEach(idx => {
           props.onUpdateTransaction(idx, { icon: iconToUse });
@@ -483,7 +512,7 @@ export const TransactionTableProvider = ({
       e.stopPropagation();
     }
     
-    const globalIndex = utils.findGlobalIndex(transaction, allTransactions);
+    const globalIndex = utils.findGlobalIndex(transaction, Array.isArray(allTransactions) ? allTransactions : []);
     
     if (globalIndex !== -1) {
       setDialogState(prev => ({
@@ -496,7 +525,7 @@ export const TransactionTableProvider = ({
   
   const handleOpenMobileEdit = useCallback((transaction: Transaction, index: number) => {
     const transactionId = utils.getTransactionId(transaction);
-    const globalIndex = utils.findGlobalIndex(transaction, allTransactions);
+    const globalIndex = utils.findGlobalIndex(transaction, Array.isArray(allTransactions) ? allTransactions : []);
     
     if (globalIndex === -1) {
       console.error("Could not find transaction in allTransactions:", transaction);
@@ -707,8 +736,11 @@ export const TransactionTableProvider = ({
     if (typeof props.onAddTransactionBatch === 'function' && transactionsToAdd.length > 0) {
       
       // Call the batch add function and handle the promise
-      props.onAddTransactionBatch(transactionsToAdd)
-        .then(() => {
+      const result = props.onAddTransactionBatch(transactionsToAdd);
+      
+      // Handle the result as a Promise if it is one
+      if (result && typeof result.then === 'function') {
+        result.then(() => {
           
           // Notify any parent components that they need to refresh their data
           const refreshEvent = new CustomEvent('forceParentDataRefresh', {
@@ -736,6 +768,13 @@ export const TransactionTableProvider = ({
           console.error('Error in batch transaction add:', error);
           showNotification('Error adding transactions', 'error');
         });
+      } else {
+        // If it's not a Promise, just show success message and refresh
+        if (addedCount > 0) {
+          showNotification(`Copied ${addedCount} transactions from ${dialogState.copySourceMonth} to ${dialogState.copyTargetMonth}`, 'success');
+        }
+        forceRefresh();
+      }
     } else {
       
       // Create an array of promises for each transaction add
@@ -1071,7 +1110,7 @@ export const TransactionTableProvider = ({
   }, []);
   
   const contextValue = {
-    props,
+    props: props,
     dragState: {
       draggedTransaction,
       draggedIndex,
@@ -1195,7 +1234,12 @@ export const TransactionTableProvider = ({
         }}
         onConfirm={() => {
           if (dialogState.transactionToDelete) {
-            props.onDeleteTransaction(dialogState.transactionToDelete.index);
+            if (typeof props.onDeleteTransaction === 'function') {
+              props.onDeleteTransaction(dialogState.transactionToDelete.index);
+            } else {
+              console.error("Error: onDeleteTransaction is not a function", props);
+              showNotification("Failed to delete transaction. Please try again.", "error");
+            }
             setDialogState(prev => ({
               ...prev,
               deleteConfirmOpen: false,

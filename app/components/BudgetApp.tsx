@@ -97,6 +97,8 @@ import UserMenu from './auth/UserMenu';
 import { create503020Plan } from '../services/budgetCalculator';
 import * as transactionService from '../services/transactionService';
 import { BudgetSummary as BudgetSummaryType, BudgetPlan as BudgetPlanType } from '../services/budgetCalculator';
+import { TutorialOverlay } from './tutorial/TutorialOverlay';
+import { tutorialSteps } from './tutorial/tutorialSteps';
 
 // Add this interface for alert messages
 interface AlertMessage {
@@ -503,6 +505,7 @@ const BudgetSelector: React.FC<{
 
   return (
     <Paper 
+      id="budget-selector"
       elevation={1}
       sx={{
         p: 1,
@@ -540,7 +543,10 @@ const BudgetSelector: React.FC<{
                   <IconButton 
                     size="small" 
                     color="primary" 
-                    onClick={() => handleEditBudget(budget.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditBudget(budget.id);
+                    }}
                   >
                     <SaveIcon />
                   </IconButton>
@@ -772,6 +778,8 @@ declare global {
   interface Window {
     updateAllTransactionsWithIcon?: (category: string, icon: string) => Promise<void>;
     updateAllTransactionsWithNewCategory?: (oldCategoryName: string, newCategoryName: string, categoryId: string) => Promise<void>;
+    showTutorialOnBudgetAppLoad?: boolean;
+    showTutorial?: () => void;
   }
 }
 
@@ -782,13 +790,11 @@ function BudgetApp() {
       <ThemeProvider>
         <GlobalStyles
           styles={{
-            'html, body': {
-              minHeight: '100vh'
+            '.drag-item': {
+              cursor: 'grab'
             },
-            '.dragging-active': {
-              cursor: 'grabbing !important'
-            },
-            '.dragging-active *': {
+            '.dragging': {
+              opacity: 0.5,
               cursor: 'grabbing !important'
             },
             '.drag-target': {
@@ -801,9 +807,7 @@ function BudgetApp() {
           }}
         />
         <SavingsProvider>
-          <CategoryProvider>
-            <BudgetAppContent />
-          </CategoryProvider>
+          <BudgetAppContent />
         </SavingsProvider>
       </ThemeProvider>
     </AuthProvider>
@@ -825,6 +829,15 @@ const BudgetAppContent = (): JSX.Element => {
     transaction: Transaction;
     index: number;
   } | null>(null);
+  
+  // State for tutorial
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [hasSeenTutorial, setHasSeenTutorial] = useLocalStorage<boolean>(
+    'friendlyBudgets_hasSeenTutorial',
+    'budgetFriendly_hasSeenTutorial',
+    false
+  );
+  const [previousTransactionCount, setPreviousTransactionCount] = useState(0);
   
   // Get current month name for default selection
   const currentMonth = new Date().toLocaleString('default', { month: 'long' });
@@ -1063,11 +1076,17 @@ const BudgetAppContent = (): JSX.Element => {
       }
     };
     
+    // Add a global function to show the tutorial
+    window.showTutorial = () => {
+      setShowTutorial(true);
+    };
+    
     // Cleanup when component unmounts
     return () => {
       delete window.updateAllTransactionsWithNewCategory;
+      delete window.showTutorial;
     };
-  }, [user, currentBudgetId, setShouldReload]);
+  }, [user, currentBudgetId, setShouldReload, setShowTutorial]);
 
   // Listen for global refresh events
   useEffect(() => {
@@ -1119,6 +1138,110 @@ const BudgetAppContent = (): JSX.Element => {
       document.removeEventListener('updateCategoryTransactions', handleTargetedRefresh);
     };
   }, [setShouldReload]);
+
+  // Check if the user has just added their first transaction
+  useEffect(() => {
+    // Only show tutorial if we went from 0 to 1+ transactions and they haven't seen it yet
+    if (previousTransactionCount === 0 && transactions.length > 0 && !hasSeenTutorial) {
+      // Wait a moment for the UI to update before showing the tutorial
+      const timer = setTimeout(() => {
+        setShowTutorial(true);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    
+    // Update previous count for next comparison
+    setPreviousTransactionCount(transactions.length);
+  }, [transactions.length, previousTransactionCount, hasSeenTutorial]);
+
+  // Listen for manual requests to show the tutorial (enhanced version)
+  useEffect(() => {
+    const handleShowTutorial = (event: Event) => {
+      // Make sure we haven't shown the tutorial yet in this session
+      if (!hasSeenTutorial) {
+        // Show the tutorial when the custom event is dispatched
+        setShowTutorial(true);
+      }
+    };
+    
+    // Add event listener for the showTutorial custom event
+    document.addEventListener('showTutorial', handleShowTutorial);
+    
+    // Cleanup
+    return () => {
+      document.removeEventListener('showTutorial', handleShowTutorial);
+    };
+  }, [hasSeenTutorial]);
+
+  // Check for first login and show tutorial if it's a new user with a transaction
+  useEffect(() => {
+    // Check both authentication and transaction status
+    if (isAuthenticated && user?.id && transactions.length > 0 && !hasSeenTutorial) {
+      const checkUserStatus = async () => {
+        try {
+          const userDocRef = doc(db, 'users', user.id);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            
+            // If this is their first time or they haven't seen the tutorial
+            if (!userData.hasSeenTutorial && transactions.length > 0) {
+              // Show the tutorial
+              setShowTutorial(true);
+              
+              // Update the user document to mark tutorial as seen
+              await updateDoc(userDocRef, {
+                hasSeenTutorial: true
+              });
+            }
+          }
+        } catch (error) {
+          console.warn('Error checking user tutorial status:', error);
+        }
+      };
+      
+      // Run the check
+      checkUserStatus();
+    }
+  }, [isAuthenticated, user?.id, transactions.length, hasSeenTutorial]);
+
+  // Check for tutorial flag in localStorage on mount
+  useEffect(() => {
+    const tutorialFlag = localStorage.getItem('friendlyBudgets_showTutorial');
+    if (tutorialFlag === 'true') {
+      // Clear the flag immediately
+      localStorage.removeItem('friendlyBudgets_showTutorial');
+      
+      // Show the tutorial after a short delay to ensure UI is ready
+      const timer = setTimeout(() => {
+        setShowTutorial(true);
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Check for global window flag set by Help & Support
+  useEffect(() => {
+    if (window.showTutorialOnBudgetAppLoad === true) {
+      // Clear the flag immediately
+      window.showTutorialOnBudgetAppLoad = false;
+      
+      // Show the tutorial after a short delay to ensure UI is ready
+      const timer = setTimeout(() => {
+        setShowTutorial(true);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
+  // Handle tutorial completion
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+    setHasSeenTutorial(true);
+  };
 
   return (
     <Box sx={{ 
@@ -1175,6 +1298,7 @@ const BudgetAppContent = (): JSX.Element => {
           }}
         >
           <Box 
+            id="friendly-budgets-logo"
             sx={{ 
               display: 'flex',
               flexDirection: 'column',
@@ -1200,288 +1324,372 @@ const BudgetAppContent = (): JSX.Element => {
       
       {/* Main Content */}
       <Box sx={{ px: 0 }}>
-        {/* Budget Selector and Month Selector - Always shown and sticky */}
-        <Box 
-          sx={{ 
-            position: 'sticky',
-            top: 0,
-            zIndex: 1100,
-            bgcolor: 'background.default',
-            pt: 1.5,
-            pb: 0.5,
-            px: { xs: 1, sm: 2, md: 3 },
-            boxShadow: (theme) => `0 2px 4px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.1)'}`,
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            transition: 'box-shadow 0.3s ease'
-          }}
-        >
-          {/* Tabs */}
-          <Box sx={{ 
-            width: '100%', 
-            maxWidth: 500, 
-            mx: 'auto',
-            mt: 0,
-            mb: 2
-          }}>
-            <Tabs
-              value={activeStep}
-              onChange={(e, newValue) => setActiveStep(newValue)}
-              variant="fullWidth"
-              sx={{
-                '& .MuiTab-root': {
-                  color: 'text.secondary',
-                  transition: 'all 0.2s ease',
-                  '&.Mui-selected': {
-                    color: 'success.main',
-                    fontWeight: 700,
+        {/* Budget Selector and Month Selector - Only shown when user has transactions */}
+        {transactions.length > 0 && (
+          <Box 
+            sx={{ 
+              position: 'sticky',
+              top: 0,
+              zIndex: 1100,
+              bgcolor: 'background.default',
+              pt: 1.5,
+              pb: 0.5,
+              px: { xs: 1, sm: 2, md: 3 },
+              boxShadow: (theme) => `0 2px 4px ${theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.1)'}`,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              transition: 'box-shadow 0.3s ease'
+            }}
+          >
+            {/* Tabs */}
+            <Box sx={{ 
+              width: '100%', 
+              maxWidth: 500, 
+              mx: 'auto',
+              mt: 0,
+              mb: 2
+            }}>
+              <Tabs
+                value={activeStep}
+                onChange={(e, newValue) => setActiveStep(newValue)}
+                variant="fullWidth"
+                sx={{
+                  '& .MuiTab-root': {
+                    color: 'text.secondary',
+                    transition: 'all 0.2s ease',
+                    '&.Mui-selected': {
+                      color: 'success.main',
+                      fontWeight: 700,
+                    },
+                    '&:not(.Mui-selected):hover': {
+                      color: 'primary.main',
+                      backgroundColor: (theme) => 
+                        theme.palette.mode === 'dark' 
+                          ? 'rgba(25, 118, 210, 0.08)' 
+                          : 'rgba(25, 118, 210, 0.04)',
+                    },
+                    whiteSpace: 'nowrap',
+                    minWidth: 160,
+                    minHeight: '48px',
+                    py: 1,
+                    borderRadius: 1
                   },
-                  '&:not(.Mui-selected):hover': {
-                    color: 'primary.main',
-                    backgroundColor: (theme) => 
-                      theme.palette.mode === 'dark' 
-                        ? 'rgba(25, 118, 210, 0.08)' 
-                        : 'rgba(25, 118, 210, 0.04)',
+                  '& .MuiTabs-indicator': {
+                    backgroundColor: 'success.main',
+                    height: '3px',
+                    borderRadius: '3px 3px 0 0',
+                    transition: 'all 0.2s ease'
                   },
-                  whiteSpace: 'nowrap',
-                  minWidth: 160,
-                  minHeight: '48px',
-                  py: 1,
-                  borderRadius: 1
-                },
-                '& .MuiTabs-indicator': {
-                  backgroundColor: 'success.main',
-                  height: '3px',
-                  borderRadius: '3px 3px 0 0',
-                  transition: 'all 0.2s ease'
-                },
-              }}
-            >
-              <Tab 
-                label="Budgets" 
-                sx={{ 
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  fontSize: '0.95rem',
-                }} 
-              />
-              <Tab 
-                label="Insights and Planning" 
-                sx={{ 
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  fontSize: '0.95rem',
-                }} 
-              />
-            </Tabs>
-          </Box>
-          
-          <BudgetSelector 
-            setCurrentBudgetId={setCurrentBudgetId} 
-            setAlertMessage={setAlertMessage}
-          />
-          
-          {/* Month Selector */}
-          <Box sx={{ mb: '10px', mt: 1 }}>
-            <MonthSelector 
-              selectedMonths={selectedMonths}
-              onChange={setSelectedMonths}
+                }}
+              >
+                <Tab 
+                  label="Budgets" 
+                  sx={{ 
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    fontSize: '0.95rem',
+                  }} 
+                />
+                <Tab
+                  id="insights-tab" 
+                  label="Insights and Planning" 
+                  sx={{ 
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    fontSize: '0.95rem',
+                  }} 
+                />
+              </Tabs>
+            </Box>
+            
+            <BudgetSelector 
+              setCurrentBudgetId={setCurrentBudgetId} 
+              setAlertMessage={setAlertMessage}
             />
+            
+            {/* Month Selector */}
+            <Box id="month-selector" sx={{ mb: '10px', mt: 1 }}>
+              <MonthSelector 
+                selectedMonths={selectedMonths}
+                onChange={setSelectedMonths}
+              />
+            </Box>
           </Box>
-        </Box>
+        )}
         
         {/* Content below sticky header, add padding to prevent content from being hidden */}
         <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, pt: 2 }}>
-          {/* Conditional content based on active tab */}
-          {activeStep === 0 && (
-            <>
+          {/* For new users with no transactions, only show Income table */}
+          {transactions.length === 0 ? (
+            <Box>
               {transactionsLoading ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4 }}>
                   <CircularProgress />
-                  <Typography variant="body2" sx={{ mt: 2 }}>Loading transactions...</Typography>
-                </Box>
-              ) : transactions.length > 0 ? (
-                /* Render the transaction tables */
-                <Box>
-                  {/* Income transactions */}
-                  <TransactionTable
-                    key="Income"
-                    category="Income"
-                    transactions={transactions.filter(t => t.category === 'Income')}
-                    allTransactions={transactions}
-                    onUpdateTransaction={updateTransaction}
-                    onDeleteTransaction={deleteTransaction}
-                    onAddTransaction={addTransaction}
-                    onAddTransactionBatch={addTransactionBatch}
-                    onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
-                    selectedMonths={selectedMonths}
-                    month={currentMonth}
-                    isDark={false}
-                    onForceReload={() => setShouldReload(true)}
-                    onTransactionsChange={(newTransactions) => {
-                      // Find and update changed transactions
-                      newTransactions.forEach((transaction) => {
-                        const index = transactions.findIndex((t) => t.id === transaction.id);
-                        if (index !== -1) {
-                          updateTransaction(index, transaction);
-                        }
-                      });
-                    }}
-                    onDragStart={() => {}}
-                    onDragOver={() => {}}
-                    onDrop={() => {}}
-                    dragOverCategory={null}
-                    recentlyDropped={null}
-                    onReorder={() => {}}
-                  />
-                  
-                  {/* Expense categories */}
-                  {categories
-                    .filter(category => category.name !== 'Income' && !category.isIncome)
-                    .map(category => (
-                      <TransactionTable
-                        key={category.id}
-                        category={category.name}
-                        transactions={transactions.filter(t => t.category === category.name)}
-                        allTransactions={transactions}
-                        onUpdateTransaction={updateTransaction}
-                        onDeleteTransaction={deleteTransaction}
-                        onAddTransaction={addTransaction}
-                        onAddTransactionBatch={addTransactionBatch}
-                        onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
-                        selectedMonths={selectedMonths}
-                        month={currentMonth}
-                        isDark={false}
-                        onForceReload={() => setShouldReload(true)}
-                        onTransactionsChange={(newTransactions) => {
-                          // Find and update changed transactions
-                          newTransactions.forEach((transaction) => {
-                            const index = transactions.findIndex((t) => t.id === transaction.id);
-                            if (index !== -1) {
-                              updateTransaction(index, transaction);
-                            }
-                          });
-                        }}
-                        onDragStart={() => {}}
-                        onDragOver={() => {}}
-                        onDrop={() => {}}
-                        dragOverCategory={null}
-                        recentlyDropped={null}
-                        onReorder={() => {}}
-                      />
-                    ))}
+                  <Typography variant="body2" sx={{ mt: 2 }}>Loading...</Typography>
                 </Box>
               ) : (
-                <Box sx={{ p: 2, textAlign: 'center' }}>
-                  <Typography variant="body1">
-                    No transactions found. Add your first transaction!
-                  </Typography>
-                  <Button 
-                    variant="contained" 
-                    color="primary"
-                    sx={{ mt: 2, ml: 2 }}
-                    onClick={() => {
-                      // Add example transaction
-                      const transaction: Transaction = {
-                        description: 'Example Income',
-                        amount: 1000,
-                        date: new Date(),
-                        category: 'Income',
-                        type: 'income'
-                      };
-                      addTransaction(transaction);
-                    }}
-                  >
-                    Add Example Transaction
-                  </Button>
-                  <Button 
-                    variant="outlined"
-                    sx={{ mt: 2, ml: 2 }}
-                    onClick={() => {
-                      // Force reload of transactions
-                      setShouldReload(true);
-                    }}
-                  >
-                    Reload Transactions
-                  </Button>
-                </Box>
+                <>
+                  <Box sx={{ mb: 3, mt: 1, textAlign: 'center' }}>
+                    <Typography variant="subtitle1" color="text.secondary">
+                      Start by adding your income below by pressing the "+" card.
+                    </Typography>
+                  </Box>
+                  
+                  {/* Income transactions table only */}
+                  <Box id="category-income">
+                    <TransactionTable
+                      key="Income"
+                      category="Income"
+                      transactions={transactions.filter(t => t.category === 'Income')}
+                      allTransactions={transactions}
+                      onUpdateTransaction={updateTransaction}
+                      onDeleteTransaction={deleteTransaction}
+                      onAddTransaction={addTransaction}
+                      onAddTransactionBatch={addTransactionBatch}
+                      onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
+                      selectedMonths={selectedMonths}
+                      month={currentMonth}
+                      isDark={false}
+                      onForceReload={() => setShouldReload(true)}
+                      onTransactionsChange={(newTransactions) => {
+                        // Find and update changed transactions
+                        newTransactions.forEach((transaction) => {
+                          const index = transactions.findIndex((t) => t.id === transaction.id);
+                          if (index !== -1) {
+                            updateTransaction(index, transaction);
+                          }
+                        });
+                      }}
+                      onDragStart={() => {}}
+                      onDragOver={() => {}}
+                      onDrop={() => {}}
+                      dragOverCategory={null}
+                      recentlyDropped={null}
+                      onReorder={() => {}}
+                    />
+                  </Box>
+                </>
+              )}
+            </Box>
+          ) : (
+            /* Show full content for existing users with transactions */
+            <>
+              {/* Conditional content based on active tab */}
+              {activeStep === 0 && (
+                <>
+                  {transactionsLoading ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', p: 4 }}>
+                      <CircularProgress />
+                      <Typography variant="body2" sx={{ mt: 2 }}>Loading transactions...</Typography>
+                    </Box>
+                  ) : (
+                    /* Render the transaction tables */
+                    <Box>
+                      {/* Income transactions */}
+                      <Box id="category-income">
+                        <TransactionTable
+                          key="Income"
+                          category="Income"
+                          transactions={transactions.filter(t => t.category === 'Income')}
+                          allTransactions={transactions}
+                          onUpdateTransaction={updateTransaction}
+                          onDeleteTransaction={deleteTransaction}
+                          onAddTransaction={addTransaction}
+                          onAddTransactionBatch={addTransactionBatch}
+                          onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
+                          selectedMonths={selectedMonths}
+                          month={currentMonth}
+                          isDark={false}
+                          onForceReload={() => setShouldReload(true)}
+                          onTransactionsChange={(newTransactions) => {
+                            // Find and update changed transactions
+                            newTransactions.forEach((transaction) => {
+                              const index = transactions.findIndex((t) => t.id === transaction.id);
+                              if (index !== -1) {
+                                updateTransaction(index, transaction);
+                              }
+                            });
+                          }}
+                          onDragStart={() => {}}
+                          onDragOver={() => {}}
+                          onDrop={() => {}}
+                          dragOverCategory={null}
+                          recentlyDropped={null}
+                          onReorder={() => {}}
+                        />
+                      </Box>
+                      
+                      {/* Expense categories */}
+                      {categories
+                        .filter(category => category.name !== 'Income' && !category.isIncome)
+                        .map(category => (
+                          <Box 
+                            key={category.id}
+                            id={`category-${category.name.toLowerCase()}`}
+                          >
+                            <TransactionTable
+                              key={category.id}
+                              category={category.name}
+                              transactions={transactions.filter(t => t.category === category.name)}
+                              allTransactions={transactions}
+                              onUpdateTransaction={updateTransaction}
+                              onDeleteTransaction={deleteTransaction}
+                              onAddTransaction={addTransaction}
+                              onAddTransactionBatch={addTransactionBatch}
+                              onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
+                              selectedMonths={selectedMonths}
+                              month={currentMonth}
+                              isDark={false}
+                              onForceReload={() => setShouldReload(true)}
+                              onTransactionsChange={(newTransactions) => {
+                                // Find and update changed transactions
+                                newTransactions.forEach((transaction) => {
+                                  const index = transactions.findIndex((t) => t.id === transaction.id);
+                                  if (index !== -1) {
+                                    updateTransaction(index, transaction);
+                                  }
+                                });
+                              }}
+                              onDragStart={() => {}}
+                              onDragOver={() => {}}
+                              onDrop={() => {}}
+                              dragOverCategory={null}
+                              recentlyDropped={null}
+                              onReorder={() => {}}
+                              tutorialEditId={category.name === 'Essentials' ? 'category-editor-essentials' : undefined}
+                            />
+                          </Box>
+                        ))}
+                    </Box>
+                  )}
+                  
+                  {/* Add Category Button */}
+                  <Box id="add-category-button">
+                    <AddCategoryButton />
+                  </Box>
+                  
+                  {/* Hidden element for edit category button tutorial */}
+                  <Box 
+                    id="edit-category-button" 
+                    sx={{ 
+                      position: 'absolute', 
+                      right: 70, 
+                      top: 200,
+                      width: 30,
+                      height: 30,
+                      opacity: 0,
+                      pointerEvents: 'none'
+                    }} 
+                  />
+                </>
               )}
               
-              {/* Add Category Button */}
-              <AddCategoryButton />
-            </>
-          )}
-          
-          {activeStep === 1 && (
-            <>
-              {transactions.some(t => t.category === 'Income') && budgetSummary && budgetPlan ? (
-                <Box sx={{ 
-                  position: 'relative'
-                }}>
-                  <Box sx={{ 
-                    overflow: 'hidden',
-                    position: 'relative',
-                  }}>
+              {activeStep === 1 && (
+                <>
+                  {transactions.some(t => t.category === 'Income') && budgetSummary && budgetPlan ? (
+                    <Box sx={{ 
+                      position: 'relative'
+                    }}>
+                      <Box sx={{ 
+                        overflow: 'hidden',
+                        position: 'relative',
+                      }}>
+                        <Paper 
+                          elevation={1}
+                          sx={{ 
+                            p: 2, 
+                            pb: 3,
+                            borderRadius: 2,
+                            overflow: 'hidden'
+                          }}
+                        >
+                          <BudgetActions onPreferencesChange={setPreferences} />
+                          <BudgetSummary 
+                            summary={budgetSummary as BudgetSummaryType} 
+                            plan={budgetPlan as BudgetPlanType} 
+                            suggestions={suggestions}
+                            preferences={preferences}
+                            transactions={transactions}
+                            selectedMonths={selectedMonths}
+                            showActualAmounts={preferences.displayPreferences.showActualAmounts}
+                            showPercentages={preferences.displayPreferences.showPercentages}
+                            showDifferences={preferences.displayPreferences.showDifferences}
+                            showProgressBars={preferences.chartPreferences.showProgressBars}
+                          />
+                        </Paper>
+                      </Box>
+                    </Box>
+                  ) : (
                     <Paper 
-                      elevation={1}
                       sx={{ 
-                        p: 2, 
-                        pb: 3,
+                        p: 4, 
+                        mt: 4, 
+                        textAlign: 'center',
                         borderRadius: 2,
-                        overflow: 'hidden'
+                        bgcolor: 'background.paper',
+                        border: '1px solid',
+                        borderColor: 'divider'
                       }}
                     >
-                      <BudgetActions onPreferencesChange={setPreferences} />
-                      <BudgetSummary 
-                        summary={budgetSummary as BudgetSummaryType} 
-                        plan={budgetPlan as BudgetPlanType} 
-                        suggestions={suggestions}
-                        preferences={preferences}
-                        transactions={transactions}
-                        selectedMonths={selectedMonths}
-                        showActualAmounts={preferences.displayPreferences.showActualAmounts}
-                        showPercentages={preferences.displayPreferences.showPercentages}
-                        showDifferences={preferences.displayPreferences.showDifferences}
-                        showProgressBars={preferences.chartPreferences.showProgressBars}
-                      />
+                      <Typography variant="h6" gutterBottom sx={{ color: 'text.primary', fontWeight: 600 }}>
+                        No Income Recorded
+                      </Typography>
+                      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                        Please add income transactions in order to see the insights and planning for this budget.
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        onClick={() => setActiveStep(0)}
+                        sx={{
+                          borderRadius: 2,
+                          textTransform: 'none',
+                          fontWeight: 600
+                        }}
+                      >
+                        Add Income
+                      </Button>
                     </Paper>
-                  </Box>
-                </Box>
-              ) : (
-                <Paper 
-                  sx={{ 
-                    p: 4, 
-                    mt: 4, 
-                    textAlign: 'center',
-                    borderRadius: 2,
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider'
-                  }}
-                >
-                  <Typography variant="h6" gutterBottom sx={{ color: 'text.primary', fontWeight: 600 }}>
-                    No Income Recorded
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                    Please add income transactions in order to see the insights and planning for this budget.
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    onClick={() => setActiveStep(0)}
-                    sx={{
-                      borderRadius: 2,
-                      textTransform: 'none',
-                      fontWeight: 600
-                    }}
-                  >
-                    Add Income
-                  </Button>
-                </Paper>
+                  )}
+                </>
               )}
             </>
           )}
         </Box>
       </Box>
+      
+      {/* Tutorial Overlay */}
+      <TutorialOverlay 
+        steps={tutorialSteps}
+        onComplete={handleTutorialComplete}
+        isOpen={showTutorial}
+      />
+      
+      {/* Button to manually trigger tutorial (helpful for testing and when users want to see it again) */}
+      {transactions.length > 0 && hasSeenTutorial && (
+        <Box 
+          sx={{ 
+            position: 'fixed', 
+            bottom: 20, 
+            right: 20, 
+            zIndex: 1000 
+          }}
+        >
+          <Tooltip title="Show tutorial">
+            <IconButton
+              onClick={() => setShowTutorial(true)}
+              sx={{ 
+                bgcolor: 'primary.main', 
+                color: 'white',
+                '&:hover': {
+                  bgcolor: 'primary.dark'
+                }
+              }}
+            >
+              <HelpOutlineIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )}
     </Box>
   );
 };
