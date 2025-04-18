@@ -666,9 +666,73 @@ export const addTransactionBatch = async (
     
     // Process each transaction
     for (const transactionData of transactionsData) {
-      // Default to 'Uncategorized' if category is undefined
       const category = transactionData.category || 'Uncategorized';
-      
+      let transactionDate: Date;
+      try {
+        if (typeof transactionData.date === 'number') {
+          const now = new Date();
+          transactionDate = new Date(now.getFullYear(), now.getMonth(), transactionData.date);
+        } else if (transactionData.date instanceof Date) {
+          transactionDate = transactionData.date;
+        } else {
+          transactionDate = new Date(transactionData.date);
+          if (isNaN(transactionDate.getTime())) {
+            transactionDate = new Date(); // Fallback
+          }
+        }
+      } catch {
+        transactionDate = new Date(); // Fallback
+      }
+      const targetMonthName = transactionDate.toLocaleString('default', { month: 'long' });
+      const targetYear = transactionDate.getFullYear();
+
+      // --- Duplicate Check --- 
+      // Query for potential duplicates in the target month/year/category
+      const q = query(
+        transactionsRef,
+        where('category', '==', category),
+        where('description', '==', transactionData.description),
+        // We need to compare amount potentially too, but Firestore range queries are limited.
+        // A simpler check might be sufficient, or we fetch and filter locally.
+        // Fetching all for the month/category might be needed for accurate amount check.
+      );
+      const querySnapshot = await getDocs(q);
+      let isDuplicateInDB = false;
+      querySnapshot.forEach((doc) => {
+        const existingData = doc.data();
+        let existingDate: Date;
+        try {
+           if (typeof existingData.date === 'object' && existingData.date.seconds) {
+             // Handle Firestore Timestamp
+             existingDate = existingData.date.toDate();
+           } else if (existingData.date instanceof Date) {
+             existingDate = existingData.date;
+           } else if (typeof existingData.date === 'number') {
+             const now = new Date();
+             existingDate = new Date(now.getFullYear(), now.getMonth(), existingData.date);
+           } else {
+             existingDate = new Date(existingData.date);
+             if(isNaN(existingDate.getTime())) throw new Error('Invalid date');
+           }
+        } catch { existingDate = new Date(0); /* Invalid date fallback */ }
+        
+        const existingMonthName = existingDate.toLocaleString('default', { month: 'long' });
+        const existingYear = existingDate.getFullYear();
+
+        // Check month, year, and amount match
+        if (existingMonthName === targetMonthName && 
+            existingYear === targetYear && 
+            Math.abs(existingData.amount) === Math.abs(transactionData.amount)) {
+          isDuplicateInDB = true;
+        }
+      });
+
+      if (isDuplicateInDB) {
+        console.log(`Skipping duplicate transaction in DB: ${transactionData.description} for ${targetMonthName} ${targetYear}`);
+        continue; // Skip adding this transaction to the batch
+      }
+      // --- End Duplicate Check ---
+
       // Get the next order for this category
       const nextOrder = (categoryOrderMap[category] || 0) + 1;
       categoryOrderMap[category] = nextOrder; // Update for the next transaction

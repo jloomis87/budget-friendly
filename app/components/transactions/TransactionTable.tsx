@@ -16,9 +16,6 @@ import { db } from '../../firebase/firebaseConfig';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCategories } from '../../contexts/CategoryContext';
 import { useTableColors } from '../../hooks/useTableColors';
-import { EditIcon, DeleteIcon, AddIcon } from '@mui/icons-material';
-import { EditTransactionDialog } from './EditTransactionDialog';
-import { AddTransactionDialog } from './AddTransactionDialog';
 import { EmptyTable } from './EmptyTable';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 
@@ -31,6 +28,7 @@ interface TransactionTableProps {
   onAddTransaction: (transaction: Transaction) => void;
   onAddTransactionBatch?: (transactions: Transaction[]) => void;
   onUpdateAllTransactionsWithSameName?: (description: string, icon: string, excludeId?: string) => Promise<number | undefined>;
+  onForceReload?: () => void;
   onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
   onDragOver?: (e: React.DragEvent, category: string) => void;
   onDrop?: (e: React.DragEvent, targetCategory: string) => void;
@@ -45,6 +43,11 @@ interface TransactionTableProps {
 }
 
 export const TransactionTable: React.FC<TransactionTableProps> = (props) => {
+  console.log('TransactionTable props:', {
+    hasAddTransactionBatch: !!props.onAddTransactionBatch,
+    category: props.category
+  });
+  
   return (
     <TransactionTableProvider value={props as TransactionTableContextProps}>
       <TransactionTableContent />
@@ -55,7 +58,7 @@ export const TransactionTable: React.FC<TransactionTableProps> = (props) => {
 export const TransactionTableContent: React.FC = () => {
   const context = useTransactionTableContext();
   const { user } = useAuth();
-  const { categories } = useCategories();
+  const { categories, updateCategory, deleteCategory, getCategoryByName } = useCategories();
   const [tableColors] = useTableColors();
   const [sortOption, setSortOption] = useState<SortOption>({ field: 'date', direction: 'desc' });
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
@@ -84,7 +87,7 @@ export const TransactionTableContent: React.FC = () => {
       console.error('Error saving expanded state:', error);
     }
   };
-  
+
   const { 
     props, 
     dragState, 
@@ -265,7 +268,8 @@ export const TransactionTableContent: React.FC = () => {
 
   // Save sort preference to Firebase
   const handleSortChange = async (field: string, direction: 'asc' | 'desc') => {
-    const newSortOption: SortOption = { field, direction };
+    // Cast the field to the correct type
+    const newSortOption: SortOption = { field: field as SortOption['field'], direction }; 
     setSortOption(newSortOption);
     
     if (!user?.id || !props.category) return;
@@ -298,46 +302,30 @@ export const TransactionTableContent: React.FC = () => {
 
   // Group transactions by month - use filteredTransactions to respect selectedMonths
   const groupedTransactions = useMemo(() => {
-    const grouped = groupTransactionsByMonth(filteredTransactions);
+    const initialGrouped = groupTransactionsByMonth(filteredTransactions);
+    // Create a new object to hold sorted results, preventing mutation
+    const sortedGrouped: Record<string, Transaction[]> = {}; 
     
-    // Sort transactions in each month
-    Object.keys(grouped).forEach(month => {
-      grouped[month] = sortTransactions(grouped[month]);
+    Object.keys(initialGrouped).forEach(month => {
+      // Sort and assign to the new object
+      sortedGrouped[month] = sortTransactions(initialGrouped[month]); 
     });
     
-    return grouped;
-  }, [filteredTransactions, sortOption]);
+    return sortedGrouped; // Return the new, non-mutated object
+  }, [filteredTransactions, sortOption, groupTransactionsByMonth]); // Added groupTransactionsByMonth dependency
   
-  // Ensure all months are displayed, even if they have no transactions
+  // Ensure all months are displayed based on selection
   const ensureAllMonths = () => {
     const allMonths = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
     
-    // If selectedMonths is defined, only show those months
     if (selectedMonths && selectedMonths.length > 0) {
-      // Create empty arrays for any selected month that doesn't have transactions
-      selectedMonths.forEach(month => {
-        if (!groupedTransactions[month]) {
-          groupedTransactions[month] = [];
-        }
-      });
-      
-      // Get months in order, but only the selected ones
-      return Object.keys(groupedTransactions)
-        .filter(month => selectedMonths.includes(month))
-        .sort((a, b) => getMonthOrder(a) - getMonthOrder(b));
+      // Return selected months, sorted correctly
+      return [...selectedMonths].sort((a, b) => getMonthOrder(a) - getMonthOrder(b));
     } else {
-      // If no months are selected, show all months
-      // First, ensure all months have at least an empty array
-      allMonths.forEach(month => {
-        if (!groupedTransactions[month]) {
-          groupedTransactions[month] = [];
-        }
-      });
-      
-      // Return all months in order
+      // Return all months in standard order
       return allMonths;
     }
   };
@@ -709,6 +697,9 @@ export const TransactionTableContent: React.FC = () => {
     // Create a count for successful copies
     let copyCount = 0;
     
+    // Array to hold transactions to add
+    const transactionsToAdd: Transaction[] = [];
+
     // Copy to all other months
     allMonths.forEach(month => {
       // Skip the month that already has this transaction
@@ -752,12 +743,38 @@ export const TransactionTableContent: React.FC = () => {
         id: uuidv4() // Generate a new ID
       };
       
-      // Add the transaction to the target month
-      props.onAddTransaction(transactionCopy);
+      // Add the transaction copy to the batch array
+      transactionsToAdd.push(transactionCopy);
       
       // Increment copy count
       copyCount++;
     });
+
+    console.log('transactionsToAdd:', transactionsToAdd);
+    console.log('props.onAddTransactionBatch exists:', !!props.onAddTransactionBatch);
+
+    // Add all transactions at once if possible using the batch function
+    if (props.onAddTransactionBatch && transactionsToAdd.length > 0) {
+      console.log('Using batch function to add transactions');
+      console.log('onAddTransactionBatch type:', typeof props.onAddTransactionBatch);
+      try {
+        props.onAddTransactionBatch(transactionsToAdd);
+        console.log('Batch function called successfully');
+      } catch (error) {
+        console.error('Error calling batch function:', error);
+        // Fall back to individual adds
+        console.log('Falling back to individual adds due to error');
+        transactionsToAdd.forEach(copy => {
+          props.onAddTransaction(copy);
+        });
+      }
+    } else {
+      console.log('Falling back to adding transactions one by one');
+      // Fallback: add one by one (less efficient, ensure onAddTransaction is optimistic)
+      transactionsToAdd.forEach(copy => {
+        props.onAddTransaction(copy);
+      });
+    }
     
     // Show a notification about the result
     if (copyCount > 0) {
@@ -826,6 +843,10 @@ export const TransactionTableContent: React.FC = () => {
           onToggleExpand={toggleExpand}
           hasItems={filteredTransactions.length > 0}
           transactions={filteredTransactions}
+          categories={categories}
+          updateCategory={updateCategory}
+          deleteCategory={deleteCategory}
+          getCategoryByName={getCategoryByName}
         />
         
         {/* Transaction content with smooth animation */}
@@ -929,7 +950,16 @@ export const TransactionTableContent: React.FC = () => {
                 handleOpenMobileEdit={handleOpenMobileEdit}
                 handleOpenMobileAdd={handleOpenMobileAdd}
                 handleCopyMonthClick={handleCopyMonthClick}
-                handleCopyToAllMonths={handleCopyToAllMonths}
+                handleCopyToAllMonths={(transaction) => {
+                  console.log('Context before handleCopyToAllMonths:', {
+                    props: JSON.stringify({
+                      hasAddTransactionBatch: !!props.onAddTransactionBatch,
+                      category: props.category,
+                      hasAddTransaction: !!props.onAddTransaction
+                    })
+                  });
+                  handleCopyToAllMonths(transaction);
+                }}
                 handleDeleteTransaction={handleDeleteTransaction}
                 getNextMonth={getNextMonth}
                 getMonthOrder={getMonthOrder}

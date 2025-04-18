@@ -818,7 +818,7 @@ const BudgetAppContent = (): JSX.Element => {
   const theme = useMuiTheme();
   const { categories, setCurrentBudgetId: setCategoriesBudgetId } = useCategories();
   const [activeStep, setActiveStep] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [dragOverCategory, setDragOverCategory] = useState<string | null>(null);
   const [recentlyDropped, setRecentlyDropped] = useState<string | null>(null);
   const [draggedTransaction, setDraggedTransaction] = useState<{
@@ -905,7 +905,8 @@ const BudgetAppContent = (): JSX.Element => {
     setCurrentBudgetId,
     updateAllTransactionsWithSameName,
     setShouldReload,
-    isLoading: transactionsLoading
+    isLoading: transactionsLoading,
+    addTransactionBatch
   } = useTransactions();
 
   // Load user preferences from Firebase when component mounts or user changes
@@ -1067,6 +1068,62 @@ const BudgetAppContent = (): JSX.Element => {
       delete window.updateAllTransactionsWithNewCategory;
     };
   }, [user, currentBudgetId, setShouldReload]);
+
+  // Listen for global refresh events
+  useEffect(() => {
+    const handleForceRefresh = (event: Event) => {
+      const customEvent = event as CustomEvent<any>;
+      console.log('Force refresh event received in BudgetApp', customEvent.detail);
+      
+      // Check if this is from a copy-to-all-months operation
+      const isCopyToAllMonths = customEvent.detail?.description && 
+                                customEvent.detail?.count > 1;
+                                
+      if (isCopyToAllMonths) {
+        console.log('Copy-to-all-months operation detected, forcing immediate reload');
+        // Force immediate reload for copy-to-all-months operations
+        setShouldReload(true);
+        
+        // Schedule a second reload with a delay to ensure everything is updated
+        setTimeout(() => {
+          console.log('Scheduled second reload after copy-to-all-months');
+          setShouldReload(true);
+        }, 1000);
+      } else {
+        // Standard reload for other operations
+        setShouldReload(true);
+      }
+    };
+    
+    // Add more targeted refresh handler
+    const handleTargetedRefresh = (event: Event) => {
+      // This is a targeted refresh event that only requires minimal updates
+      const customEvent = event as CustomEvent<any>;
+      console.log('Targeted refresh event received in BudgetApp', customEvent.detail);
+      
+      // We'll make a more surgical update without refreshing the whole screen
+      // This only causes our hook to fetch new data when it's actually needed
+      if (customEvent.detail?.operation === 'copyToAllMonths') {
+        // Just refresh the transactions data without triggering full app reload
+        if (setShouldReload) {
+          console.log('Performing targeted refresh for copyToAllMonths operation');
+          setShouldReload(true);
+        }
+      }
+    };
+    
+    // Add event listeners
+    document.addEventListener('forceParentDataRefresh', handleForceRefresh);
+    window.addEventListener('transactionsUpdated', handleForceRefresh);
+    document.addEventListener('updateCategoryTransactions', handleTargetedRefresh);
+    
+    return () => {
+      // Clean up listeners on unmount
+      document.removeEventListener('forceParentDataRefresh', handleForceRefresh);
+      window.removeEventListener('transactionsUpdated', handleForceRefresh);
+      document.removeEventListener('updateCategoryTransactions', handleTargetedRefresh);
+    };
+  }, [setShouldReload]);
 
   return (
     <Box sx={{ 
@@ -1260,10 +1317,12 @@ const BudgetAppContent = (): JSX.Element => {
                     onUpdateTransaction={updateTransaction}
                     onDeleteTransaction={deleteTransaction}
                     onAddTransaction={addTransaction}
+                    onAddTransactionBatch={addTransactionBatch}
                     onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
                     selectedMonths={selectedMonths}
                     month={currentMonth}
                     isDark={false}
+                    onForceReload={() => setShouldReload(true)}
                     onTransactionsChange={(newTransactions) => {
                       // Find and update changed transactions
                       newTransactions.forEach((transaction) => {
@@ -1293,10 +1352,12 @@ const BudgetAppContent = (): JSX.Element => {
                         onUpdateTransaction={updateTransaction}
                         onDeleteTransaction={deleteTransaction}
                         onAddTransaction={addTransaction}
+                        onAddTransactionBatch={addTransactionBatch}
                         onUpdateAllTransactionsWithSameName={updateAllTransactionsWithSameName}
                         selectedMonths={selectedMonths}
                         month={currentMonth}
                         isDark={false}
+                        onForceReload={() => setShouldReload(true)}
                         onTransactionsChange={(newTransactions) => {
                           // Find and update changed transactions
                           newTransactions.forEach((transaction) => {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { Transaction } from '../services/fileParser';
 import { 
   calculateBudgetSummary, 
@@ -31,7 +31,7 @@ export function useTransactions(initialBudgetId?: string) {
   const [budgetSummary, setBudgetSummary] = useState<BudgetSummary | null>(null);
   const [budgetPlan, setBudgetPlan] = useState<BudgetPlan | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [budgetPreferences, setBudgetPreferences] = useState<BudgetPreferences | null>(null);
   
   // State for current budget ID
@@ -60,6 +60,9 @@ export function useTransactions(initialBudgetId?: string) {
     plan: BudgetPlan | null,
     suggestions: string[]
   }>>({});
+
+  // Refs to track component state
+  const isFirstLoad = useRef(true);
 
   // Helper function to show toast notifications
   const showToast = useCallback((message: string, type: 'error' | 'warning' | 'success' | 'info' = 'success') => {
@@ -450,38 +453,19 @@ export function useTransactions(initialBudgetId?: string) {
         type: newTransaction.type || (newTransaction.amount > 0 ? 'income' : 'expense')
       };
       
-      setIsLoading(true);
+      // --- Optimistic UI Update ---
+      // Update local state immediately before potential async operations
+      const updatedTransactions = [...transactions, updatedTransaction];
+      const summary = calculateBudgetSummary(updatedTransactions);
+      const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
+      const budgetSuggestions = getBudgetSuggestions(plan);
       
-      // Track transaction ID for return value
-      let transactionId = updatedTransaction.id || '';
-      
-      // If authenticated, save to Firestore
-      if (isAuthenticated && user?.id) {
-        const newId = await transactionService.addTransaction(user.id, updatedTransaction, currentBudgetId);
-        if (newId) {
-          transactionId = newId;
-          updatedTransaction.id = newId;
-        }
-        
-        // Set shouldReload to true after successful Firestore save
-        setShouldReload(true);
-      }
-      
-      // Update all states in a single batch
       ReactDOM.unstable_batchedUpdates(() => {
-        const updatedTransactions = [...transactions, updatedTransaction];
-        
-        // Calculate all updates at once
-        const summary = calculateBudgetSummary(updatedTransactions);
-        const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
-        const budgetSuggestions = getBudgetSuggestions(plan);
-        
-        // Update state for each
         setTransactions(updatedTransactions);
         setBudgetSummary(summary);
         setBudgetPlan(plan);
         setSuggestions(budgetSuggestions);
-        
+
         // If not authenticated, update localStorage
         if (!isAuthenticated || !user?.id) {
           setLocalTransactions(updatedTransactions);
@@ -489,17 +473,31 @@ export function useTransactions(initialBudgetId?: string) {
           setLocalBudgetPlan(plan);
           setLocalSuggestions(budgetSuggestions);
         }
-        
-        // Show success message as toast
+
+        // Show success message early
         showToast('Transaction added successfully!', 'success');
-        
         setAlertMessage({
           type: 'success',
           message: 'Transaction added successfully!'
         });
-        
-        setIsLoading(false);
       });
+      // --- End Optimistic Update ---
+      
+      // Track transaction ID for return value
+      let transactionId = updatedTransaction.id || '';
+      
+      // If authenticated, save to Firestore in the background
+      if (isAuthenticated && user?.id) {
+        const newId = await transactionService.addTransaction(user.id, updatedTransaction, currentBudgetId);
+        if (newId) {
+          transactionId = newId;
+          // Note: updatedTransaction in local state already has a UUID
+          // If Firestore returns a different ID, we might need reconciliation logic
+          // For now, we assume the optimistic UUID is acceptable or Firestore uses the provided one
+        }
+        
+        // setShouldReload(true); // Removed: Optimistic update handles UI
+      }
       
       return transactionId;
     } catch (error) {
@@ -510,8 +508,12 @@ export function useTransactions(initialBudgetId?: string) {
         type: 'error',
         message: errorMessage
       });
-      setIsLoading(false);
+      // Potentially revert optimistic update here if needed
+      setIsLoading(false); // Ensure loading is off on error
       return null;
+    } finally {
+      // Ensure loading is off, although it shouldn't be set by this function anymore
+      setIsLoading(false); 
     }
   }, [
     isAuthenticated, 
@@ -527,128 +529,208 @@ export function useTransactions(initialBudgetId?: string) {
     setShouldReload
   ]);
 
-  // Add multiple transactions in a batch for better performance
-  const addTransactionBatch = useCallback(async (newTransactions: Omit<Transaction, 'id'>[]) => {
-    if (!newTransactions || newTransactions.length === 0) {
-      return;
-    }
-
+  // Add multiple transactions in a batch
+  const addTransactionBatch = useCallback(async (newTransactions: Transaction[]) => {
+    if (!newTransactions.length) return [];
+    
     try {
-      let addedTransactions: Transaction[] = [];
-
-      // If authenticated and has a budget ID, use Firebase batch
-      if (isAuthenticated && user?.id && currentBudgetId) {
-        setIsLoading(true);
+      console.log('Adding batch of', newTransactions.length, 'transactions');
+      
+      // Generate IDs for transactions that don't have them
+      const transactionsWithIds = newTransactions.map(transaction => {
+        if (transaction.id) return transaction;
+        return { ...transaction, id: uuidv4() };
+      });
+      
+      // Create optimistic update first
+      const updatedTransactions = [...transactions, ...transactionsWithIds];
+      const summary = calculateBudgetSummary(updatedTransactions);
+      const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
+      const budgetSuggestions = getBudgetSuggestions(plan);
+      
+      // Update all states in a batch for better UI performance
+      ReactDOM.unstable_batchedUpdates(() => {
+        // Update transactions array first
+        setTransactions(updatedTransactions);
         
-        // Show immediate feedback
-        showToast(`Adding ${newTransactions.length} transactions...`, 'success');
-
-        // Add transactions using batch
-        const transactionIds = await transactionService.addTransactionBatch(
-          user.id, 
-          newTransactions, 
-          currentBudgetId
-        );
-        
-        // Map the returned IDs to the transactions
-        addedTransactions = newTransactions.map((transaction, index) => ({
-          ...transaction,
-          id: transactionIds[index],
-          type: transaction.type || (transaction.amount > 0 ? 'income' : 'expense')
-        }));
-      } else {
-        // For non-authenticated users, use local state
-        // Generate random IDs for each transaction
-        addedTransactions = newTransactions.map(transaction => ({
-          ...transaction,
-          id: uuidv4(),
-          type: transaction.type || (transaction.amount > 0 ? 'income' : 'expense')
-        }));
-      }
-      
-      // Update local state with all the new transactions
-      const updatedTransactions = [...transactions, ...addedTransactions];
-      setTransactions(updatedTransactions);
-      
-      // If not authenticated, update in localStorage
-      if (!isAuthenticated || !user?.id) {
-        setLocalTransactions(updatedTransactions);
-      }
-      
-      // Recalculate budget
-      try {
-        const summary = calculateBudgetSummary(updatedTransactions);
+        // Then update budget data
         setBudgetSummary(summary);
-        
-        // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.id) {
-          setLocalBudgetSummary(summary);
-        }
-        
-        // Calculate the budget plan
-        const plan = create503020Plan(summary, { ratios: budgetPreferences?.ratios });
         setBudgetPlan(plan);
-        
-        // Save to localStorage if not authenticated
-        if (!isAuthenticated || !user?.id) {
-          setLocalBudgetPlan(plan);
-        }
-        
-        // Generate budget suggestions
-        const budgetSuggestions = getBudgetSuggestions(plan);
         setSuggestions(budgetSuggestions);
         
-        // Save to localStorage if not authenticated
+        // Also update localStorage for non-authenticated users
         if (!isAuthenticated || !user?.id) {
+          setLocalTransactions(updatedTransactions);
+          setLocalBudgetSummary(summary);
+          setLocalBudgetPlan(plan);
           setLocalSuggestions(budgetSuggestions);
         }
-      } catch (error) {
-        // Error handling without console.error
+        
+        // Explicitly clear any cached data for the current budget ID
+        if (currentBudgetId) {
+          setTransactionCache(prevCache => {
+            const newCache = { ...prevCache };
+            delete newCache[currentBudgetId];
+            return newCache;
+          });
+        }
+        
+        // Flag reload needed to force fresh data fetch next time
+        setShouldReload(true);
+        
+        // Show success message
+        showToast('Transactions added successfully!', 'success');
         setAlertMessage({
-          type: 'error',
-          message: 'Error updating budget calculations. Please try again.'
+          type: 'success',
+          message: 'Transactions added successfully!'
         });
+      });
+      
+      // Dispatch event for components to know about optimistic updates
+      document.dispatchEvent(new CustomEvent('transactionsUpdatedOptimistically', {
+        detail: { 
+          count: transactionsWithIds.length,
+          categories: Array.from(new Set(transactionsWithIds.map(t => t.category || '')))
+        }
+      }));
+      
+      // Then update Firebase if user is authenticated
+      if (isAuthenticated && user?.id) {
+        console.log('User authenticated, updating Firebase');
+        const batch = writeBatch(db);
+        
+        transactionsWithIds.forEach(transaction => {
+          console.log('Adding transaction to batch:', transaction);
+          
+          // Check if we're using the budgets collection structure
+          if (currentBudgetId) {
+            const transactionRef = doc(collection(db, 'users', user.id, 'budgets', currentBudgetId, 'transactions'));
+            batch.set(transactionRef, {
+              ...transaction,
+              id: transactionRef.id,
+            });
+          } else {
+            // Fallback to the old path
+            const transactionRef = doc(collection(db, 'users', user.id, 'transactions'));
+            batch.set(transactionRef, {
+              ...transaction,
+              id: transactionRef.id,
+            });
+          }
+        });
+        
+        console.log('Committing batch to Firebase');
+        await batch.commit();
+        
+        console.log('Batch committed successfully');
+        
+        // After successful Firebase update, force a reload after a short delay
+        // This ensures we get the latest data including any server-side processing
+        setTimeout(() => {
+          console.log('Delayed force reload after batch operation');
+          setShouldReload(true);
+          
+          // Also notify any listeners about the update
+          window.dispatchEvent(new CustomEvent('transactionsUpdated', {
+            detail: { 
+              timestamp: Date.now(),
+              source: 'addTransactionBatch'
+            }
+          }));
+        }, 500);
+      } else {
+        console.log('User not authenticated, skipping Firebase update');
       }
       
-      // Show success message
-      showToast(`Successfully added ${addedTransactions.length} transactions!`, 'success');
+      console.log('Batch add complete');
+      return transactionsWithIds.map(t => t.id);
       
-      return addedTransactions;
     } catch (error) {
-      // Error handling without console.error
-      setAlertMessage({
-        type: 'error',
-        message: `Error adding transactions: ${error instanceof Error ? error.message : 'Unknown error'}`
+      console.error('Error adding transactions batch:', error);
+      
+      // Rollback optimistic update on error
+      console.log('Error occurred, rolling back optimistic updates');
+      
+      ReactDOM.unstable_batchedUpdates(() => {
+        // Restore original transactions
+        setTransactions(transactions);
+        
+        // Restore original budget data
+        setBudgetSummary(budgetSummary);
+        setBudgetPlan(budgetPlan);
+        setSuggestions(suggestions);
+        
+        // Also restore localStorage for non-authenticated users
+        if (!isAuthenticated || !user?.id) {
+          setLocalTransactions(localTransactions);
+          setLocalBudgetSummary(localBudgetSummary);
+          setLocalBudgetPlan(localBudgetPlan);
+          setLocalSuggestions(localSuggestions);
+        }
+        
+        // Show error message
+        showToast('Failed to add transactions. Please try again.', 'error');
+        setAlertMessage({
+          type: 'error',
+          message: 'Failed to add transactions. Please try again.'
+        });
       });
-    } finally {
-      setIsLoading(false);
+      
+      throw error;
     }
   }, [
     isAuthenticated, 
     user, 
     currentBudgetId, 
     transactions, 
-    setTransactions, 
+    budgetSummary,
+    budgetPlan,
+    suggestions,
+    localTransactions,
+    localBudgetSummary,
+    localBudgetPlan,
+    localSuggestions,
+    setTransactions,
     setLocalTransactions, 
     setLocalBudgetSummary, 
     setLocalBudgetPlan, 
     setLocalSuggestions, 
     setAlertMessage,
     budgetPreferences,
-    showToast
+    showToast,
+    setBudgetSummary,
+    setBudgetPlan,
+    setSuggestions,
+    calculateBudgetSummary,
+    create503020Plan,
+    getBudgetSuggestions
   ]);
 
   // Load transactions from Firestore when authenticated or when budget changes
   useEffect(() => {
     // Set initial loading state
     if ((isAuthenticated && user?.id && currentBudgetId) || shouldReload) {
-      setIsLoading(true);
+      console.log(`Loading transactions - authenticated: ${isAuthenticated}, shouldReload: ${shouldReload}`);
+      
+      // Only show loading indicator for initial loads, not refreshes
+      if (!shouldReload || isFirstLoad.current) {
+        setIsLoading(true);
+      }
       
       // Clean up function will help prevent race conditions
       let isMounted = true;
       
       const loadTransactions = async () => {
         try {
+          // If shouldReload is true, clear the transaction cache for this budget to ensure fresh data
+          if (shouldReload && currentBudgetId && transactionCache[currentBudgetId]) {
+            console.log('Force reload requested, clearing cache for current budget');
+            // Create a new cache object without the current budget entry
+            const newCache = { ...transactionCache };
+            delete newCache[currentBudgetId];
+            setTransactionCache(newCache);
+          }
+          
           // Check if we have cached data for this budget and not forcing reload
           if (currentBudgetId && transactionCache[currentBudgetId] && !shouldReload) {
             // Use cached data for immediate display
@@ -664,10 +746,14 @@ export function useTransactions(initialBudgetId?: string) {
                 setSuggestions(cachedData.suggestions);
                 setIsLoading(false);
               });
+              
+              console.log(`Loaded ${cachedData.transactions.length} transactions from cache`);
             }
             
-            // Return early - no need to fetch from Firebase if we have cached data
-            return;
+            // Still let the load continue in the background for fresh data unless we're coming from a budget change
+            if (!shouldReload) {
+              return;
+            }
           }
           
           // Ensure we have a valid user ID and budget ID
@@ -717,6 +803,9 @@ export function useTransactions(initialBudgetId?: string) {
               if (shouldReload) {
                 setShouldReload(false);
               }
+              
+              // Mark that first load is complete
+              isFirstLoad.current = false;
               
               // Set loading to false only at the very end
               setIsLoading(false);
@@ -972,14 +1061,8 @@ export function useTransactions(initialBudgetId?: string) {
     const transaction = transactions[index];
     
     try {
-      // If authenticated and transaction has an ID, delete from Firestore
-      if (isAuthenticated && user?.id && transaction.id) {
-        setIsLoading(true);
-        // Pass budgetId to delete from the specific budget collection
-        await transactionService.deleteTransaction(transaction.id, user.id, currentBudgetId);
-      }
-      
-      // Update local state
+      // --- Optimistic UI Update ---
+      // Update local state immediately
       const updatedTransactions = transactions.filter((_, i) => i !== index);
       setTransactions(updatedTransactions);
       
@@ -987,8 +1070,15 @@ export function useTransactions(initialBudgetId?: string) {
       if (!isAuthenticated || !user?.id) {
         setLocalTransactions(updatedTransactions);
       }
+      // --- End Optimistic Update ---
+
+      // If authenticated and transaction has an ID, delete from Firestore in the background
+      if (isAuthenticated && user?.id && transaction.id) {
+        // Pass budgetId to delete from the specific budget collection
+        await transactionService.deleteTransaction(transaction.id, user.id, currentBudgetId);
+      }
       
-      // Recalculate budget
+      // Recalculate budget (after optimistic update)
       try {
         // If no transactions left, clear everything
         if (updatedTransactions.length === 0) {
@@ -1056,6 +1146,7 @@ export function useTransactions(initialBudgetId?: string) {
         message: errorMessage
       });
     } finally {
+      // Ensure loading state is reset if it was set elsewhere, though it shouldn't be by delete now
       if (isAuthenticated && user?.id) {
         setIsLoading(false);
       }

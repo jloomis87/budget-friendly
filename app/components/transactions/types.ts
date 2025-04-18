@@ -253,6 +253,7 @@ export interface TransactionTableContextProps {
   onAddTransaction: (transaction: Transaction) => void;
   onAddTransactionBatch?: (transactions: Transaction[]) => void;
   onUpdateAllTransactionsWithSameName?: (description: string, icon: string, excludeId?: string) => Promise<number | undefined>;
+  onForceReload?: () => void;
   onDragStart?: (e: React.DragEvent, transaction: Transaction, globalIndex: number) => void;
   onDragOver?: (e: React.DragEvent, category: string) => void;
   onDrop?: (e: React.DragEvent, targetCategory: string) => void;

@@ -207,6 +207,11 @@ export const TransactionTableProvider = ({
   children: React.ReactNode; 
   value: TransactionTableContextProps; 
 }) => {
+  console.log('TransactionTableProvider value:', {
+    hasAddTransactionBatch: !!value.onAddTransactionBatch,
+    category: value.category
+  });
+  
   // Get the categories from the CategoryContext
   const { categories } = useCategories();
   
@@ -237,29 +242,25 @@ export const TransactionTableProvider = ({
   const [isIntraMonthDrag, setIsIntraMonthDrag] = useState(false);
   
   // State for dialogs
-  const [editingRow, setEditingRow] = useState<any | null>(null);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [transactionToDelete, setTransactionToDelete] = useState<{ transaction: Transaction, index: number } | null>(null);
-  const [mobileEditDialogOpen, setMobileEditDialogOpen] = useState(false);
-  const [mobileEditTransaction, setMobileEditTransaction] = useState<{
-    transaction: Transaction;
-    index: number;
-    identifier: string;
-  } | null>(null);
-  const [mobileAddDialogOpen, setMobileAddDialogOpen] = useState(false);
-  const [copyMonthDialogOpen, setCopyMonthDialogOpen] = useState(false);
-  const [copySourceMonth, setCopySourceMonth] = useState('');
-  const [copyTargetMonth, setCopyTargetMonth] = useState('');
-  const [copyTransactions, setCopyTransactions] = useState<Transaction[]>([]);
-  const [newDescription, setNewDescription] = useState('');
-  const [newAmount, setNewAmount] = useState('');
-  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dialogState, setDialogState] = useState({
+    deleteConfirmOpen: false,
+    transactionToDelete: null as { transaction: Transaction, index: number } | null,
+    mobileEditDialogOpen: false,
+    mobileEditTransaction: null as { transaction: Transaction; index: number; identifier: string; } | null,
+    mobileAddDialogOpen: false,
+    copyMonthDialogOpen: false,
+    copySourceMonth: '',
+    copyTargetMonth: '',
+    copyTransactions: [] as Transaction[],
+    newDescription: '',
+    newAmount: '',
+    newDate: '',
+    newIcon: '',
+    editingRow: null as any | null
+  });
   
   // Add a force refresh counter
   const [refreshCounter, setRefreshCounter] = useState(0);
-  
-  // Add an icon state for new transactions
-  const [newIcon, setNewIcon] = useState<string>('');
   
   // Helper function to reset all drag state
   const resetDragState = useCallback((preserveCopyMode = false) => {
@@ -280,7 +281,14 @@ export const TransactionTableProvider = ({
   
   // Filter transactions by selected months
   const filteredTransactions = React.useMemo(() => {
+    console.log(`Recomputing filtered transactions for ${category}, refresh counter: ${refreshCounter}`);
+    
+    // Create a unique key for debugging transaction updates
+    const transactionIds = transactions.map(t => t.id).join(',').substring(0, 50);
+    console.log(`Transaction IDs hash: ${transactionIds}... (${transactions.length} transactions total)`);
+    
     if (!props.selectedMonths?.length) {
+      console.log(`No months selected, returning all ${transactions.length} transactions`);
       return transactions;
     }
     
@@ -300,76 +308,131 @@ export const TransactionTableProvider = ({
       }
       
       const transactionMonth = transactionDate.toLocaleString('default', { month: 'long' });
+      
+      // Log when filtering transactions for debugging purposes
+      if (props.category === 'Income' && transaction.description.includes('test')) {
+        console.log(`Filtering transaction: ${transaction.description} in ${transactionMonth}, selected: ${props.selectedMonths?.includes(transactionMonth)}`);
+      }
+      
       return props.selectedMonths?.includes(transactionMonth);
     });
     
+    console.log(`Filtered from ${transactions.length} to ${filtered.length} transactions for ${category}`);
     return filtered;
-  }, [transactions, props.selectedMonths, props.category, refreshCounter]);
+  }, [transactions, props.selectedMonths, props.category, refreshCounter, category]);
   
   // Handler functions
   const handleEditingChange = useCallback((field: string, value: string) => {
-    if (editingRow) {
-      setEditingRow({
-        ...editingRow,
-        [field]: value
-      });
+    if (dialogState.editingRow) {
+      setDialogState(prev => ({
+        ...prev,
+        editingRow: {
+          ...prev.editingRow,
+          [field]: value
+        }
+      }));
     }
-  }, [editingRow]);
+  }, [dialogState.editingRow]);
+  
+  const handleCloseMobileEdit = useCallback(() => {
+    setDialogState(prev => ({
+      ...prev,
+      mobileEditDialogOpen: false,
+      mobileEditTransaction: null,
+      editingRow: null
+    }));
+  }, []);
   
   const handleSaveEdit = useCallback(() => {
-    if (mobileEditTransaction && editingRow) {
-      const [year, month, day] = editingRow.date.split('-').map(Number);
-      
-      const updatedTransaction: Partial<Transaction> = {
-        description: editingRow.description,
-        date: new Date(year, month - 1, day),
-        amount: parseFloat(editingRow.amount) * (props.category === 'Income' ? 1 : -1),
-        icon: editingRow.icon
-      };
-      
-      const globalIndex = utils.findGlobalIndex(mobileEditTransaction.transaction, allTransactions);
-      
-      // Check if icon was changed
-      if (editingRow.icon !== mobileEditTransaction.transaction.icon) {
-        // First update the specific transaction
-        props.onUpdateTransaction(globalIndex, updatedTransaction);
-        
-        // Then use the specialized function to update all transactions with the same name
-        if (props.onUpdateAllTransactionsWithSameName) {
-          props.onUpdateAllTransactionsWithSameName(editingRow.description, editingRow.icon, mobileEditTransaction.transaction.id);
-        } else {
-          // Fallback to the old method if the specialized function is not available
-          const indicesToUpdate = utils.updateTransactionsWithSameName(
-            editingRow.description,
-            editingRow.icon,
-            allTransactions,
-            mobileEditTransaction.transaction.id
-          );
-          
-          // Update each transaction with the same description to have the same icon
-          indicesToUpdate.forEach(idx => {
-            props.onUpdateTransaction(idx, { icon: editingRow.icon });
-          });
-        }
-      } else {
-        // No icon change, just update the transaction normally
-        props.onUpdateTransaction(globalIndex, updatedTransaction);
-      }
-      
-      handleCloseMobileEdit();
+    if (!dialogState.mobileEditTransaction || !dialogState.editingRow) {
+      console.warn("Cannot save edit: missing mobileEditTransaction or editingRow in dialogState", { 
+        hasMobileEditTransaction: !!dialogState.mobileEditTransaction,
+        hasEditingRow: !!dialogState.editingRow
+      });
+      return;
     }
-  }, [mobileEditTransaction, editingRow, props.category, utils, allTransactions, props.onUpdateTransaction, props.onUpdateAllTransactionsWithSameName]);
+    
+    // Validate required fields
+    const { description, amount, date } = dialogState.editingRow;
+    if (!description || !amount || !date) {
+      console.warn("Cannot save edit: missing required fields", { description, amount, date });
+      return;
+    }
+    
+    // Check that date is in the correct format (YYYY-MM-DD)
+    const dateparts = date.split('-');
+    if (dateparts.length !== 3) {
+      console.warn("Cannot save edit: invalid date format", { date });
+      return;
+    }
+    
+    const [year, month, day] = dateparts.map(Number);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+      console.warn("Cannot save edit: invalid date components", { year, month, day });
+      return;
+    }
+    
+    // Check that amount is a valid number
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount)) {
+      console.warn("Cannot save edit: invalid amount", { amount });
+      return;
+    }
+    
+    const updatedTransaction: Partial<Transaction> = {
+      description: description,
+      date: new Date(year, month - 1, day),
+      amount: parsedAmount * (props.category === 'Income' ? 1 : -1),
+      icon: dialogState.editingRow.icon
+    };
+    
+    const globalIndex = utils.findGlobalIndex(dialogState.mobileEditTransaction.transaction, allTransactions);
+    if (globalIndex === -1) {
+      console.error("Cannot save edit: transaction not found in allTransactions", dialogState.mobileEditTransaction.transaction);
+      handleCloseMobileEdit();
+      return;
+    }
+    
+    // Check if icon was changed
+    if (dialogState.editingRow.icon !== dialogState.mobileEditTransaction.transaction.icon) {
+      // First update the specific transaction
+      props.onUpdateTransaction(globalIndex, updatedTransaction);
+      
+      // Then use the specialized function to update all transactions with the same name
+      if (props.onUpdateAllTransactionsWithSameName) {
+        props.onUpdateAllTransactionsWithSameName(dialogState.editingRow.description, dialogState.editingRow.icon, dialogState.mobileEditTransaction.transaction.id);
+      } else {
+        // Fallback to the old method if the specialized function is not available
+        const indicesToUpdate = utils.updateTransactionsWithSameName(
+          dialogState.editingRow.description,
+          dialogState.editingRow.icon,
+          allTransactions,
+          dialogState.mobileEditTransaction.transaction.id
+        );
+        
+        // Update each transaction with the same description to have the same icon
+        indicesToUpdate.forEach(idx => {
+          props.onUpdateTransaction(idx, { icon: dialogState.editingRow.icon });
+        });
+      }
+    } else {
+      // No icon change, just update the transaction normally
+      props.onUpdateTransaction(globalIndex, updatedTransaction);
+    }
+    
+    handleCloseMobileEdit();
+  }, [dialogState, props.category, utils, allTransactions, props.onUpdateTransaction, props.onUpdateAllTransactionsWithSameName, handleCloseMobileEdit]);
   
   const handleAddTransaction = useCallback(() => {
-    if (!newDescription.trim() || !newAmount.trim()) return;
+    if (!dialogState.newDescription.trim() || !dialogState.newAmount.trim()) return;
 
-    const [year, month, day] = newDate.split('-').map(Number);
+    const [year, month, day] = dialogState.newDate.split('-').map(Number);
     const date = new Date(year, month - 1, day);
 
     // First check if there are existing transactions with the same description
     // If so, use their icon for consistency
-    let iconToUse = newIcon;
-    const normalizedNewDescription = newDescription.trim().toLowerCase();
+    let iconToUse = dialogState.newIcon;
+    const normalizedNewDescription = dialogState.newDescription.trim().toLowerCase();
     
     const existingTransactionsWithSameName = allTransactions.filter(
       t => t.description.trim().toLowerCase() === normalizedNewDescription
@@ -381,8 +444,8 @@ export const TransactionTableProvider = ({
     }
 
     const transaction: Transaction = {
-      description: newDescription.trim(),
-      amount: parseFloat(newAmount) * (props.category === 'Income' ? 1 : -1),
+      description: dialogState.newDescription.trim(),
+      amount: parseFloat(dialogState.newAmount) * (props.category === 'Income' ? 1 : -1),
       date: date,
       category: props.category as any,
       id: uuidv4(),
@@ -396,7 +459,7 @@ export const TransactionTableProvider = ({
     // update all other transactions with the same name to have this icon
     if (iconToUse) {
       const indicesToUpdate = utils.updateTransactionsWithSameName(
-        newDescription.trim(),
+        dialogState.newDescription.trim(),
         iconToUse,
         allTransactions,
         transaction.id
@@ -411,12 +474,16 @@ export const TransactionTableProvider = ({
       }
     }
 
-    setNewDescription('');
-    setNewAmount('');
-    setNewDate(new Date().toISOString().split('T')[0]);
-    setNewIcon('');
-    setMobileAddDialogOpen(false);
-  }, [newDescription, newAmount, newDate, newIcon, props.category, props.onAddTransaction, allTransactions, utils, props.onUpdateTransaction]);
+    // Reset form values
+    setDialogState(prev => ({
+      ...prev,
+      newDescription: '',
+      newAmount: '',
+      newDate: new Date().toISOString().split('T')[0],
+      newIcon: '',
+      mobileAddDialogOpen: false
+    }));
+  }, [dialogState, props.category, props.onAddTransaction, allTransactions, utils, props.onUpdateTransaction]);
   
   const handleDeleteClick = useCallback((e: React.MouseEvent | undefined, transaction: Transaction) => {
     // Only call stopPropagation if e is a valid event object
@@ -427,8 +494,11 @@ export const TransactionTableProvider = ({
     const globalIndex = utils.findGlobalIndex(transaction, allTransactions);
     
     if (globalIndex !== -1) {
-      setTransactionToDelete({ transaction, index: globalIndex });
-      setDeleteConfirmOpen(true);
+      setDialogState(prev => ({
+        ...prev,
+        transactionToDelete: { transaction, index: globalIndex },
+        deleteConfirmOpen: true
+      }));
     }
   }, [utils, allTransactions]);
   
@@ -436,11 +506,10 @@ export const TransactionTableProvider = ({
     const transactionId = utils.getTransactionId(transaction);
     const globalIndex = utils.findGlobalIndex(transaction, allTransactions);
     
-    setMobileEditTransaction({
-      transaction,
-      index,
-      identifier: transactionId
-    });
+    if (globalIndex === -1) {
+      console.error("Could not find transaction in allTransactions:", transaction);
+      return;
+    }
     
     const dateString = transaction.date instanceof Date 
       ? transaction.date.toISOString().split('T')[0]
@@ -448,23 +517,27 @@ export const TransactionTableProvider = ({
         ? new Date(transaction.date).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0]);
     
-    setEditingRow({
-      index: globalIndex,
-      identifier: transactionId,
-      amount: Math.abs(transaction.amount).toString(),
-      date: dateString,
-      description: transaction.description,
-      icon: transaction.icon || ''
-    });
+    // Create a deep copy of the transaction to prevent reference issues
+    const transactionCopy = JSON.parse(JSON.stringify(transaction));
     
-    setMobileEditDialogOpen(true);
+    setDialogState(prev => ({
+      ...prev,
+      mobileEditTransaction: {
+        transaction: transactionCopy,
+        index,
+        identifier: transactionId
+      },
+      editingRow: {
+        index: globalIndex,
+        identifier: transactionId,
+        amount: Math.abs(transaction.amount).toString(),
+        date: dateString,
+        description: transaction.description,
+        icon: transaction.icon || ''
+      },
+      mobileEditDialogOpen: true
+    }));
   }, [utils, allTransactions]);
-  
-  const handleCloseMobileEdit = useCallback(() => {
-    setMobileEditDialogOpen(false);
-    setMobileEditTransaction(null);
-    setEditingRow(null);
-  }, []);
   
   const handleOpenMobileAdd = useCallback((month: string) => {
     const currentYear = new Date().getFullYear();
@@ -472,19 +545,25 @@ export const TransactionTableProvider = ({
     const firstOfMonth = new Date(currentYear, monthIndex, 1);
     const newDateValue = firstOfMonth.toISOString().split('T')[0];
 
-    setNewDescription('');
-    setNewAmount('');
-    setNewDate(newDateValue);
-    setNewIcon('');
-    setMobileAddDialogOpen(true);
+    setDialogState(prev => ({
+      ...prev,
+      newDescription: '',
+      newAmount: '',
+      newDate: newDateValue,
+      newIcon: '',
+      mobileAddDialogOpen: true
+    }));
   }, []);
   
   const handleCloseMobileAdd = useCallback(() => {
-    setMobileAddDialogOpen(false);
-    setNewDescription('');
-    setNewAmount('');
-    setNewDate(new Date().toISOString().split('T')[0]);
-    setNewIcon('');
+    setDialogState(prev => ({
+      ...prev,
+      mobileAddDialogOpen: false,
+      newDescription: '',
+      newAmount: '',
+      newDate: new Date().toISOString().split('T')[0],
+      newIcon: ''
+    }));
   }, []);
   
   const getNextMonth = useCallback((currentMonth: string): string => {
@@ -498,16 +577,29 @@ export const TransactionTableProvider = ({
   
   const handleCopyMonthClick = useCallback((month: string, transactions: Transaction[]) => {
     const nextMonth = getNextMonth(month);
-    setCopySourceMonth(month);
-    setCopyTargetMonth(nextMonth);
-    setCopyTransactions(transactions);
-    setCopyMonthDialogOpen(true);
+    setDialogState(prev => ({
+      ...prev,
+      copySourceMonth: month,
+      copyTargetMonth: nextMonth,
+      copyTransactions: transactions,
+      copyMonthDialogOpen: true
+    }));
   }, [getNextMonth]);
   
   // Force a refresh of the component
   const forceRefresh = useCallback(() => {
+    console.log('Forcing refresh with counter:', refreshCounter + 1);
     setRefreshCounter(prev => prev + 1);
-  }, []);
+    
+    // Also dispatch a custom event that parent components can listen for
+    const refreshEvent = new CustomEvent('transactionsUpdated', {
+      detail: { 
+        category,
+        timestamp: Date.now()
+      }
+    });
+    document.dispatchEvent(refreshEvent);
+  }, [refreshCounter, category]);
   
   // Helper function to show notifications
   const showNotification = useCallback((message: string, type: 'error' | 'warning' | 'success' | 'info' = 'error') => {
@@ -551,25 +643,31 @@ export const TransactionTableProvider = ({
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
-    const targetMonthIndex = months.indexOf(copyTargetMonth);
-
-    // Show feedback immediately
-    showNotification(`Copying transactions to ${copyTargetMonth}...`, 'info');
-
-    // Get existing transactions in the target month for duplicate checking
-    const targetMonthTransactions = transactions.filter(t => {
+    
+    // Get the source month's index
+    const sourceMonthIndex = months.indexOf(dialogState.copySourceMonth || '');
+    const targetMonthIndex = months.indexOf(dialogState.copyTargetMonth || '');
+    
+    if (sourceMonthIndex === -1 || targetMonthIndex === -1) {
+      return; // Invalid month
+    }
+    
+    // Count for tracking
+    let addedCount = 0;
+    let duplicateCount = 0;
+    
+    // Get all transactions in the target month
+    const targetMonthTransactions = props.allTransactions.filter(t => {
       const date = new Date(t.date);
       const month = date.toLocaleString('default', { month: 'long' });
-      return month === copyTargetMonth && t.category === props.category;
+      return month === dialogState.copyTargetMonth;
     });
-
-    let duplicateCount = 0;
-    let addedCount = 0;
     
-    // Prepare batch of transactions to add
+    // Array to hold transactions to add
     const transactionsToAdd: Transaction[] = [];
 
-    copyTransactions.forEach(transaction => {
+    // Copy each transaction if it doesn't already exist in target month
+    dialogState.copyTransactions.forEach(transaction => {
       const date = new Date(transaction.date);
       const newDate = new Date(date.getFullYear(), targetMonthIndex, date.getDate());
       
@@ -604,32 +702,105 @@ export const TransactionTableProvider = ({
       addedCount++;
     });
 
+    console.log('Copy month - transactionsToAdd:', transactionsToAdd);
+    console.log('Copy month - props.onAddTransactionBatch exists:', !!props.onAddTransactionBatch);
+    
+    // Close the dialog immediately to prevent double-clicks
+    setDialogState(prev => ({
+      ...prev,
+      copyMonthDialogOpen: false
+    }));
+    
+    // Store the timestamp when we started the operation
+    const operationStartTime = Date.now();
+    
     // Add all transactions at once if possible
     if (typeof props.onAddTransactionBatch === 'function' && transactionsToAdd.length > 0) {
-      props.onAddTransactionBatch(transactionsToAdd);
+      console.log('Copy month - Using batch function to add transactions');
+      
+      // Call the batch add function and handle the promise
+      props.onAddTransactionBatch(transactionsToAdd)
+        .then(() => {
+          console.log('Batch transaction add completed successfully');
+          
+          // Notify any parent components that they need to refresh their data
+          const refreshEvent = new CustomEvent('forceParentDataRefresh', {
+            detail: { 
+              category,
+              timestamp: operationStartTime,
+              count: transactionsToAdd.length
+            }
+          });
+          document.dispatchEvent(refreshEvent);
+          
+          // Show success message
+          if (addedCount > 0) {
+            showNotification(`Copied ${addedCount} transactions from ${dialogState.copySourceMonth} to ${dialogState.copyTargetMonth}`, 'success');
+          }
+          
+          // Force our own refresh
+          console.log('Forcing multiple UI refreshes after batch completion');
+          [0, 100, 300, 500, 1000, 2000].forEach(delay => {
+            setTimeout(() => {
+              console.log(`Post-batch refresh at ${delay}ms`);
+              forceRefresh();
+            }, delay);
+          });
+        })
+        .catch(error => {
+          console.error('Error in batch transaction add:', error);
+          showNotification('Error adding transactions', 'error');
+        });
     } else {
-      // Fall back to adding one by one
-      transactionsToAdd.forEach(transaction => {
-        props.onAddTransaction(transaction);
-      });
+      console.log('Copy month - Falling back to adding one by one');
+      
+      // Create an array of promises for each transaction add
+      const addPromises = transactionsToAdd.map(transaction => 
+        props.onAddTransaction(transaction)
+          .catch(error => {
+            console.error('Error adding transaction:', error);
+            return null;
+          })
+      );
+      
+      // Wait for all transactions to be added
+      Promise.all(addPromises)
+        .then(() => {
+          console.log('All individual transaction adds completed');
+          
+          // Notify any parent components that they need to refresh their data
+          const refreshEvent = new CustomEvent('forceParentDataRefresh', {
+            detail: { 
+              category,
+              timestamp: operationStartTime,
+              count: transactionsToAdd.length
+            }
+          });
+          document.dispatchEvent(refreshEvent);
+          
+          // Force our own refresh
+          console.log('Forcing multiple UI refreshes after individual adds completion');
+          [0, 100, 300, 500, 1000, 2000].forEach(delay => {
+            setTimeout(() => {
+              console.log(`Post-individual refresh at ${delay}ms`);
+              forceRefresh();
+            }, delay);
+          });
+        });
     }
     
-    // Force refresh the component only once after all transactions are added
-    if (addedCount > 0) {
-      forceRefresh();
-    }
-
-    // Show final notification
+    // Show info message if we skipped any duplicates
     if (duplicateCount > 0) {
-      showNotification(`Copied ${addedCount} transactions. Skipped ${duplicateCount} duplicate transactions.`, 'success');
-    } else if (addedCount > 0) {
-      showNotification(`Successfully copied ${addedCount} transactions.`, 'success');
-    } else {
-      showNotification('No transactions were copied (all were duplicates).', 'warning');
+      showNotification(`Skipped ${duplicateCount} duplicate transactions`, 'info');
     }
-
-    setCopyMonthDialogOpen(false);
-  }, [copyTargetMonth, copyTransactions, transactions, props.category, props.onAddTransaction, props.onAddTransactionBatch, forceRefresh, showNotification]);
+    
+  }, [
+    dialogState,
+    props, 
+    forceRefresh, 
+    showNotification,
+    category
+  ]);
   
   // Add a function to copy a transaction to all months
   const handleCopyToAllMonths = useCallback((transaction: Transaction) => {
@@ -699,28 +870,96 @@ export const TransactionTableProvider = ({
       copyCount++;
     });
     
+    // If no transactions to add, show a message and return early
+    if (transactionsToAdd.length === 0) {
+      showNotification('No additional months to copy to (duplicate check)', 'warning');
+      return;
+    }
+    
+    // Store the timestamp when we started the operation
+    const operationStartTime = Date.now();
+    
     // Add all transactions at once if possible
     if (typeof props.onAddTransactionBatch === 'function' && transactionsToAdd.length > 0) {
-      props.onAddTransactionBatch(transactionsToAdd);
+      console.log(`Copying "${transaction.description}" to ${copyCount} other months using batch function`);
+      
+      // Call the batch add function and handle the promise
+      props.onAddTransactionBatch(transactionsToAdd)
+        .then(() => {
+          console.log('Batch transaction add completed for copy to all months');
+          
+          // TARGETED APPROACH: Update just this component by forcing a refresh
+          forceRefresh();
+          
+          // Show success message
+          showNotification(`Copied "${transaction.description}" to ${copyCount} other months`, 'success');
+          
+          // Force a reload of the transactions list from the server ONLY if needed
+          // This is a more targeted approach that doesn't refresh the whole screen
+          if (props.onForceReload) {
+            console.log('Calling onForceReload with targeted approach');
+            
+            // Dispatch a custom event specifically for updating this category's transactions
+            const updateEvent = new CustomEvent('updateCategoryTransactions', {
+              detail: { 
+                category,
+                operation: 'copyToAllMonths',
+                timestamp: Date.now()
+              }
+            });
+            document.dispatchEvent(updateEvent);
+            
+            // Only call force reload once
+            props.onForceReload();
+          }
+        })
+        .catch(error => {
+          console.error('Error in batch transaction add for copy to all months:', error);
+          showNotification('Error copying transaction to all months', 'error');
+        });
     } else {
-      // Fall back to adding one by one
-      transactionsToAdd.forEach(transaction => {
-        props.onAddTransaction(transaction);
-      });
+      console.log(`Copying "${transaction.description}" to ${copyCount} other months one by one`);
+      
+      // Create an array of promises for each transaction add
+      const addPromises = transactionsToAdd.map(transaction => 
+        props.onAddTransaction(transaction)
+          .catch(error => {
+            console.error('Error adding transaction:', error);
+            return null;
+          })
+      );
+      
+      // Wait for all transactions to be added
+      Promise.all(addPromises)
+        .then(() => {
+          console.log('All individual transaction adds completed for copy to all months');
+          
+          // TARGETED APPROACH: Update just this component by forcing a refresh
+          forceRefresh();
+          
+          // Show a notification about the result
+          showNotification(`Copied "${transaction.description}" to ${copyCount} other months`, 'success');
+          
+          // Force a reload of the transactions list from the server ONLY if needed
+          if (props.onForceReload) {
+            console.log('Calling onForceReload with targeted approach');
+            
+            // Dispatch a custom event specifically for updating this category's transactions
+            const updateEvent = new CustomEvent('updateCategoryTransactions', {
+              detail: { 
+                category,
+                operation: 'copyToAllMonths',
+                timestamp: Date.now()
+              }
+            });
+            document.dispatchEvent(updateEvent);
+            
+            // Only call force reload once
+            props.onForceReload();
+          }
+        });
     }
-    
-    // Only trigger a refresh once after all transactions are added
-    if (copyCount > 0) {
-      forceRefresh();
-    }
-    
-    // Show a notification about the result
-    if (copyCount > 0) {
-      showNotification(`Copied "${transaction.description}" to ${copyCount} other months`, 'success');
-    } else {
-      showNotification('No additional months to copy to (duplicate check)', 'warning');
-    }
-  }, [props.allTransactions, props.category, props.onAddTransaction, props.onAddTransactionBatch, forceRefresh, showNotification]);
+  }, [props.allTransactions, props.category, props.onAddTransaction, props.onAddTransactionBatch, props.onForceReload, forceRefresh, showNotification, category]);
   
   const getMonthOrder = useCallback((month: string): number => {
     const months = [
@@ -729,6 +968,22 @@ export const TransactionTableProvider = ({
     ];
     return months.indexOf(month);
   }, []);
+  
+  // Listen for transaction updates from the parent
+  React.useEffect(() => {
+    const handleParentUpdate = (event: Event) => {
+      // Force a refresh when parent transactions update
+      forceRefresh();
+    };
+    
+    // Listen for the custom event
+    document.addEventListener('parentTransactionsUpdated', handleParentUpdate);
+    
+    // Clean up when the component unmounts
+    return () => {
+      document.removeEventListener('parentTransactionsUpdated', handleParentUpdate);
+    };
+  }, [forceRefresh]);
   
   // Listen for transaction icons updated event
   React.useEffect(() => {
@@ -835,6 +1090,11 @@ export const TransactionTableProvider = ({
     return isColorDark(bgColor) ? '#ffffff' : '#000000';
   }, [getCardBackgroundColor]);
   
+  // Update dialog setter and getter convenience methods for better readability
+  const setDialogStateValue = useCallback(<K extends keyof typeof dialogState>(key: K, value: typeof dialogState[K]) => {
+    setDialogState(prev => ({ ...prev, [key]: value }));
+  }, []);
+  
   const contextValue = {
     props,
     dragState: {
@@ -863,36 +1123,23 @@ export const TransactionTableProvider = ({
     formatDate,
     totalAmount,
     filteredTransactions,
-    dialogState: {
-      editingRow,
-      deleteConfirmOpen,
-      transactionToDelete,
-      mobileEditDialogOpen,
-      mobileEditTransaction,
-      mobileAddDialogOpen,
-      copyMonthDialogOpen,
-      copySourceMonth,
-      copyTargetMonth,
-      copyTransactions,
-      newDescription,
-      newAmount,
-      newDate,
-      newIcon
-    },
-    setEditingRow,
-    setDeleteConfirmOpen,
-    setTransactionToDelete,
-    setMobileEditDialogOpen,
-    setMobileEditTransaction,
-    setMobileAddDialogOpen,
-    setCopyMonthDialogOpen,
-    setCopySourceMonth,
-    setCopyTargetMonth,
-    setCopyTransactions,
-    setNewDescription,
-    setNewAmount,
-    setNewDate,
-    setNewIcon,
+    dialogState,
+    setEditingRow: (value: any) => setDialogStateValue('editingRow', value),
+    setDeleteConfirmOpen: (value: boolean) => setDialogStateValue('deleteConfirmOpen', value),
+    setTransactionToDelete: (value: { transaction: Transaction, index: number } | null) => 
+      setDialogStateValue('transactionToDelete', value),
+    setMobileEditDialogOpen: (value: boolean) => setDialogStateValue('mobileEditDialogOpen', value),
+    setMobileEditTransaction: (value: { transaction: Transaction; index: number; identifier: string; } | null) => 
+      setDialogStateValue('mobileEditTransaction', value),
+    setMobileAddDialogOpen: (value: boolean) => setDialogStateValue('mobileAddDialogOpen', value),
+    setCopyMonthDialogOpen: (value: boolean) => setDialogStateValue('copyMonthDialogOpen', value),
+    setCopySourceMonth: (value: string) => setDialogStateValue('copySourceMonth', value),
+    setCopyTargetMonth: (value: string) => setDialogStateValue('copyTargetMonth', value),
+    setCopyTransactions: (value: Transaction[]) => setDialogStateValue('copyTransactions', value),
+    setNewDescription: (value: string) => setDialogStateValue('newDescription', value),
+    setNewAmount: (value: string) => setDialogStateValue('newAmount', value),
+    setNewDate: (value: string) => setDialogStateValue('newDate', value),
+    setNewIcon: (value: string) => setDialogStateValue('newIcon', value),
     handleEditingChange,
     handleSaveEdit,
     handleAddTransaction,
@@ -922,14 +1169,14 @@ export const TransactionTableProvider = ({
       
       {/* Mobile edit dialog */}
       <MobileEditDialog
-        open={mobileEditDialogOpen}
+        open={dialogState.mobileEditDialogOpen}
         category={props.category}
-        editingRow={editingRow}
+        editingRow={dialogState.editingRow}
         onClose={handleCloseMobileEdit}
         onSave={handleSaveEdit}
         onDelete={() => {
-          if (mobileEditTransaction) {
-            handleDeleteClick(undefined, mobileEditTransaction.transaction);
+          if (dialogState.mobileEditTransaction) {
+            handleDeleteClick(undefined, dialogState.mobileEditTransaction.transaction);
             handleCloseMobileEdit();
           }
         }}
@@ -942,51 +1189,57 @@ export const TransactionTableProvider = ({
       
       {/* Mobile add dialog */}
       <MobileAddDialog
-        open={mobileAddDialogOpen}
+        open={dialogState.mobileAddDialogOpen}
         category={props.category}
-        newDescription={newDescription}
-        newAmount={newAmount}
-        newDate={newDate}
-        setNewDescription={setNewDescription}
-        setNewAmount={setNewAmount}
-        setNewDate={setNewDate}
+        newDescription={dialogState.newDescription}
+        newAmount={dialogState.newAmount}
+        newDate={dialogState.newDate}
+        setNewDescription={(value) => setDialogStateValue('newDescription', value)}
+        setNewAmount={(value) => setDialogStateValue('newAmount', value)}
+        setNewDate={(value) => setDialogStateValue('newDate', value)}
         onClose={handleCloseMobileAdd}
         onAdd={handleAddTransaction}
         generateDayOptions={utils.generateDayOptions}
         getOrdinalSuffix={utils.getOrdinalSuffix}
         tableColor={getCategoryBackgroundColor() || '#f5f5f5'}
         isDark={isDark}
-        icon={newIcon}
-        setIcon={setNewIcon}
+        icon={dialogState.newIcon}
+        setIcon={(value) => setDialogStateValue('newIcon', value)}
       />
       
       {/* Delete confirmation dialog */}
       <DeleteConfirmationDialog
-        open={deleteConfirmOpen}
-        transactionToDelete={transactionToDelete}
+        open={dialogState.deleteConfirmOpen}
+        transactionToDelete={dialogState.transactionToDelete}
         onClose={() => {
-          setDeleteConfirmOpen(false);
-          setTransactionToDelete(null);
+          setDialogState(prev => ({
+            ...prev,
+            deleteConfirmOpen: false,
+            transactionToDelete: null
+          }));
         }}
         onConfirm={() => {
-          if (transactionToDelete) {
-            props.onDeleteTransaction(transactionToDelete.index);
-            setDeleteConfirmOpen(false);
-            setTransactionToDelete(null);
+          if (dialogState.transactionToDelete) {
+            props.onDeleteTransaction(dialogState.transactionToDelete.index);
+            setDialogState(prev => ({
+              ...prev,
+              deleteConfirmOpen: false,
+              transactionToDelete: null
+            }));
           }
         }}
       />
       
       {/* Copy month confirmation dialog */}
       <CopyMonthConfirmationDialog
-        open={copyMonthDialogOpen}
-        onClose={() => setCopyMonthDialogOpen(false)}
+        open={dialogState.copyMonthDialogOpen}
+        onClose={() => setDialogStateValue('copyMonthDialogOpen', false)}
         onConfirm={handleCopyMonthConfirm}
-        sourceMonth={copySourceMonth}
-        targetMonth={copyTargetMonth}
+        sourceMonth={dialogState.copySourceMonth}
+        targetMonth={dialogState.copyTargetMonth}
         category={props.category}
-        transactionCount={copyTransactions.length}
-        onTargetMonthChange={setCopyTargetMonth}
+        transactionCount={dialogState.copyTransactions.length}
+        onTargetMonthChange={(value) => setDialogStateValue('copyTargetMonth', value)}
       />
     </TransactionTableContext.Provider>
   );
