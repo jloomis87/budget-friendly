@@ -207,10 +207,7 @@ export const TransactionTableProvider = ({
   children: React.ReactNode; 
   value: TransactionTableContextProps; 
 }) => {
-  console.log('TransactionTableProvider value:', {
-    hasAddTransactionBatch: !!value.onAddTransactionBatch,
-    category: value.category
-  });
+
   
   // Get the categories from the CategoryContext
   const { categories } = useCategories();
@@ -281,14 +278,11 @@ export const TransactionTableProvider = ({
   
   // Filter transactions by selected months
   const filteredTransactions = React.useMemo(() => {
-    console.log(`Recomputing filtered transactions for ${category}, refresh counter: ${refreshCounter}`);
     
     // Create a unique key for debugging transaction updates
     const transactionIds = transactions.map(t => t.id).join(',').substring(0, 50);
-    console.log(`Transaction IDs hash: ${transactionIds}... (${transactions.length} transactions total)`);
     
     if (!props.selectedMonths?.length) {
-      console.log(`No months selected, returning all ${transactions.length} transactions`);
       return transactions;
     }
     
@@ -311,13 +305,11 @@ export const TransactionTableProvider = ({
       
       // Log when filtering transactions for debugging purposes
       if (props.category === 'Income' && transaction.description.includes('test')) {
-        console.log(`Filtering transaction: ${transaction.description} in ${transactionMonth}, selected: ${props.selectedMonths?.includes(transactionMonth)}`);
       }
       
       return props.selectedMonths?.includes(transactionMonth);
     });
     
-    console.log(`Filtered from ${transactions.length} to ${filtered.length} transactions for ${category}`);
     return filtered;
   }, [transactions, props.selectedMonths, props.category, refreshCounter, category]);
   
@@ -588,7 +580,6 @@ export const TransactionTableProvider = ({
   
   // Force a refresh of the component
   const forceRefresh = useCallback(() => {
-    console.log('Forcing refresh with counter:', refreshCounter + 1);
     setRefreshCounter(prev => prev + 1);
     
     // Also dispatch a custom event that parent components can listen for
@@ -702,8 +693,6 @@ export const TransactionTableProvider = ({
       addedCount++;
     });
 
-    console.log('Copy month - transactionsToAdd:', transactionsToAdd);
-    console.log('Copy month - props.onAddTransactionBatch exists:', !!props.onAddTransactionBatch);
     
     // Close the dialog immediately to prevent double-clicks
     setDialogState(prev => ({
@@ -716,12 +705,10 @@ export const TransactionTableProvider = ({
     
     // Add all transactions at once if possible
     if (typeof props.onAddTransactionBatch === 'function' && transactionsToAdd.length > 0) {
-      console.log('Copy month - Using batch function to add transactions');
       
       // Call the batch add function and handle the promise
       props.onAddTransactionBatch(transactionsToAdd)
         .then(() => {
-          console.log('Batch transaction add completed successfully');
           
           // Notify any parent components that they need to refresh their data
           const refreshEvent = new CustomEvent('forceParentDataRefresh', {
@@ -739,10 +726,8 @@ export const TransactionTableProvider = ({
           }
           
           // Force our own refresh
-          console.log('Forcing multiple UI refreshes after batch completion');
           [0, 100, 300, 500, 1000, 2000].forEach(delay => {
             setTimeout(() => {
-              console.log(`Post-batch refresh at ${delay}ms`);
               forceRefresh();
             }, delay);
           });
@@ -752,7 +737,6 @@ export const TransactionTableProvider = ({
           showNotification('Error adding transactions', 'error');
         });
     } else {
-      console.log('Copy month - Falling back to adding one by one');
       
       // Create an array of promises for each transaction add
       const addPromises = transactionsToAdd.map(transaction => 
@@ -766,7 +750,6 @@ export const TransactionTableProvider = ({
       // Wait for all transactions to be added
       Promise.all(addPromises)
         .then(() => {
-          console.log('All individual transaction adds completed');
           
           // Notify any parent components that they need to refresh their data
           const refreshEvent = new CustomEvent('forceParentDataRefresh', {
@@ -779,10 +762,8 @@ export const TransactionTableProvider = ({
           document.dispatchEvent(refreshEvent);
           
           // Force our own refresh
-          console.log('Forcing multiple UI refreshes after individual adds completion');
           [0, 100, 300, 500, 1000, 2000].forEach(delay => {
             setTimeout(() => {
-              console.log(`Post-individual refresh at ${delay}ms`);
               forceRefresh();
             }, delay);
           });
@@ -881,12 +862,10 @@ export const TransactionTableProvider = ({
     
     // Add all transactions at once if possible
     if (typeof props.onAddTransactionBatch === 'function' && transactionsToAdd.length > 0) {
-      console.log(`Copying "${transaction.description}" to ${copyCount} other months using batch function`);
       
       // Call the batch add function and handle the promise
       props.onAddTransactionBatch(transactionsToAdd)
         .then(() => {
-          console.log('Batch transaction add completed for copy to all months');
           
           // TARGETED APPROACH: Update just this component by forcing a refresh
           forceRefresh();
@@ -897,7 +876,6 @@ export const TransactionTableProvider = ({
           // Force a reload of the transactions list from the server ONLY if needed
           // This is a more targeted approach that doesn't refresh the whole screen
           if (props.onForceReload) {
-            console.log('Calling onForceReload with targeted approach');
             
             // Dispatch a custom event specifically for updating this category's transactions
             const updateEvent = new CustomEvent('updateCategoryTransactions', {
@@ -918,7 +896,6 @@ export const TransactionTableProvider = ({
           showNotification('Error copying transaction to all months', 'error');
         });
     } else {
-      console.log(`Copying "${transaction.description}" to ${copyCount} other months one by one`);
       
       // Create an array of promises for each transaction add
       const addPromises = transactionsToAdd.map(transaction => 
@@ -932,7 +909,6 @@ export const TransactionTableProvider = ({
       // Wait for all transactions to be added
       Promise.all(addPromises)
         .then(() => {
-          console.log('All individual transaction adds completed for copy to all months');
           
           // TARGETED APPROACH: Update just this component by forcing a refresh
           forceRefresh();
@@ -942,7 +918,6 @@ export const TransactionTableProvider = ({
           
           // Force a reload of the transactions list from the server ONLY if needed
           if (props.onForceReload) {
-            console.log('Calling onForceReload with targeted approach');
             
             // Dispatch a custom event specifically for updating this category's transactions
             const updateEvent = new CustomEvent('updateCategoryTransactions', {

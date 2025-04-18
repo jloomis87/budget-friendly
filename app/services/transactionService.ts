@@ -728,7 +728,6 @@ export const addTransactionBatch = async (
       });
 
       if (isDuplicateInDB) {
-        console.log(`Skipping duplicate transaction in DB: ${transactionData.description} for ${targetMonthName} ${targetYear}`);
         continue; // Skip adding this transaction to the batch
       }
       // --- End Duplicate Check ---

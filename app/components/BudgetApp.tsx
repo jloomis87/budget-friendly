@@ -1073,20 +1073,17 @@ const BudgetAppContent = (): JSX.Element => {
   useEffect(() => {
     const handleForceRefresh = (event: Event) => {
       const customEvent = event as CustomEvent<any>;
-      console.log('Force refresh event received in BudgetApp', customEvent.detail);
       
       // Check if this is from a copy-to-all-months operation
       const isCopyToAllMonths = customEvent.detail?.description && 
                                 customEvent.detail?.count > 1;
                                 
       if (isCopyToAllMonths) {
-        console.log('Copy-to-all-months operation detected, forcing immediate reload');
         // Force immediate reload for copy-to-all-months operations
         setShouldReload(true);
         
         // Schedule a second reload with a delay to ensure everything is updated
         setTimeout(() => {
-          console.log('Scheduled second reload after copy-to-all-months');
           setShouldReload(true);
         }, 1000);
       } else {
@@ -1099,14 +1096,12 @@ const BudgetAppContent = (): JSX.Element => {
     const handleTargetedRefresh = (event: Event) => {
       // This is a targeted refresh event that only requires minimal updates
       const customEvent = event as CustomEvent<any>;
-      console.log('Targeted refresh event received in BudgetApp', customEvent.detail);
       
       // We'll make a more surgical update without refreshing the whole screen
       // This only causes our hook to fetch new data when it's actually needed
       if (customEvent.detail?.operation === 'copyToAllMonths') {
         // Just refresh the transactions data without triggering full app reload
         if (setShouldReload) {
-          console.log('Performing targeted refresh for copyToAllMonths operation');
           setShouldReload(true);
         }
       }

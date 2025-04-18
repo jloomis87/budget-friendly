@@ -534,8 +534,6 @@ export function useTransactions(initialBudgetId?: string) {
     if (!newTransactions.length) return [];
     
     try {
-      console.log('Adding batch of', newTransactions.length, 'transactions');
-      
       // Generate IDs for transactions that don't have them
       const transactionsWithIds = newTransactions.map(transaction => {
         if (transaction.id) return transaction;
@@ -596,12 +594,9 @@ export function useTransactions(initialBudgetId?: string) {
       
       // Then update Firebase if user is authenticated
       if (isAuthenticated && user?.id) {
-        console.log('User authenticated, updating Firebase');
         const batch = writeBatch(db);
         
         transactionsWithIds.forEach(transaction => {
-          console.log('Adding transaction to batch:', transaction);
-          
           // Check if we're using the budgets collection structure
           if (currentBudgetId) {
             const transactionRef = doc(collection(db, 'users', user.id, 'budgets', currentBudgetId, 'transactions'));
@@ -619,15 +614,11 @@ export function useTransactions(initialBudgetId?: string) {
           }
         });
         
-        console.log('Committing batch to Firebase');
         await batch.commit();
-        
-        console.log('Batch committed successfully');
         
         // After successful Firebase update, force a reload after a short delay
         // This ensures we get the latest data including any server-side processing
         setTimeout(() => {
-          console.log('Delayed force reload after batch operation');
           setShouldReload(true);
           
           // Also notify any listeners about the update
@@ -639,17 +630,14 @@ export function useTransactions(initialBudgetId?: string) {
           }));
         }, 500);
       } else {
-        console.log('User not authenticated, skipping Firebase update');
       }
       
-      console.log('Batch add complete');
       return transactionsWithIds.map(t => t.id);
       
     } catch (error) {
       console.error('Error adding transactions batch:', error);
       
       // Rollback optimistic update on error
-      console.log('Error occurred, rolling back optimistic updates');
       
       ReactDOM.unstable_batchedUpdates(() => {
         // Restore original transactions
@@ -710,8 +698,6 @@ export function useTransactions(initialBudgetId?: string) {
   useEffect(() => {
     // Set initial loading state
     if ((isAuthenticated && user?.id && currentBudgetId) || shouldReload) {
-      console.log(`Loading transactions - authenticated: ${isAuthenticated}, shouldReload: ${shouldReload}`);
-      
       // Only show loading indicator for initial loads, not refreshes
       if (!shouldReload || isFirstLoad.current) {
         setIsLoading(true);
@@ -724,7 +710,6 @@ export function useTransactions(initialBudgetId?: string) {
         try {
           // If shouldReload is true, clear the transaction cache for this budget to ensure fresh data
           if (shouldReload && currentBudgetId && transactionCache[currentBudgetId]) {
-            console.log('Force reload requested, clearing cache for current budget');
             // Create a new cache object without the current budget entry
             const newCache = { ...transactionCache };
             delete newCache[currentBudgetId];
@@ -746,8 +731,6 @@ export function useTransactions(initialBudgetId?: string) {
                 setSuggestions(cachedData.suggestions);
                 setIsLoading(false);
               });
-              
-              console.log(`Loaded ${cachedData.transactions.length} transactions from cache`);
             }
             
             // Still let the load continue in the background for fresh data unless we're coming from a budget change

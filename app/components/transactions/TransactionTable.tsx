@@ -43,11 +43,6 @@ interface TransactionTableProps {
 }
 
 export const TransactionTable: React.FC<TransactionTableProps> = (props) => {
-  console.log('TransactionTable props:', {
-    hasAddTransactionBatch: !!props.onAddTransactionBatch,
-    category: props.category
-  });
-  
   return (
     <TransactionTableProvider value={props as TransactionTableContextProps}>
       <TransactionTableContent />
@@ -750,26 +745,18 @@ export const TransactionTableContent: React.FC = () => {
       copyCount++;
     });
 
-    console.log('transactionsToAdd:', transactionsToAdd);
-    console.log('props.onAddTransactionBatch exists:', !!props.onAddTransactionBatch);
-
     // Add all transactions at once if possible using the batch function
     if (props.onAddTransactionBatch && transactionsToAdd.length > 0) {
-      console.log('Using batch function to add transactions');
-      console.log('onAddTransactionBatch type:', typeof props.onAddTransactionBatch);
       try {
         props.onAddTransactionBatch(transactionsToAdd);
-        console.log('Batch function called successfully');
       } catch (error) {
         console.error('Error calling batch function:', error);
         // Fall back to individual adds
-        console.log('Falling back to individual adds due to error');
         transactionsToAdd.forEach(copy => {
           props.onAddTransaction(copy);
         });
       }
     } else {
-      console.log('Falling back to adding transactions one by one');
       // Fallback: add one by one (less efficient, ensure onAddTransaction is optimistic)
       transactionsToAdd.forEach(copy => {
         props.onAddTransaction(copy);
@@ -951,13 +938,6 @@ export const TransactionTableContent: React.FC = () => {
                 handleOpenMobileAdd={handleOpenMobileAdd}
                 handleCopyMonthClick={handleCopyMonthClick}
                 handleCopyToAllMonths={(transaction) => {
-                  console.log('Context before handleCopyToAllMonths:', {
-                    props: JSON.stringify({
-                      hasAddTransactionBatch: !!props.onAddTransactionBatch,
-                      category: props.category,
-                      hasAddTransaction: !!props.onAddTransaction
-                    })
-                  });
                   handleCopyToAllMonths(transaction);
                 }}
                 handleDeleteTransaction={handleDeleteTransaction}
